@@ -7,7 +7,7 @@ import { useTheme } from '@/hooks/use-theme';
 export function Screen({ children, title, eyebrow = 'OUTTHERE' }: PropsWithChildren<{ title: string; eyebrow?: string }>) {
   const theme = useTheme();
   return <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1, backgroundColor: theme.background }}>
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentContainerStyle={styles.content}>
       <ThemedText type="smallBold" themeColor="primary" style={styles.eyebrow}>{eyebrow}</ThemedText>
       <ThemedText accessibilityRole="header" type="title" style={styles.title}>{title}</ThemedText>
       {children}

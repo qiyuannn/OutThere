@@ -15,6 +15,7 @@ export const isBackendConfigured = validUrl && !!key;
 export const supabase = isBackendConfigured ? createClient(url!, key!, {
   auth: {
     ...(Platform.OS !== 'web' ? { storage: AsyncStorage } : {}),
+    flowType: 'pkce',
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,

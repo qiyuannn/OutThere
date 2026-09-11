@@ -44,7 +44,8 @@
     "typecheck": "tsc --noEmit",
     "dev": "expo start --dev-client",
     "build:development:android": "npx eas-cli build --profile development --platform android",
-    "build:development:ios": "npx eas-cli build --profile development --platform ios"
+    "build:development:ios": "npx eas-cli build --profile development --platform ios",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs"
   },
   "private": true
 }

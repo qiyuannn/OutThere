@@ -11,22 +11,22 @@ npm ci
 npm run web
 ```
 
-The foundation runs without service credentials. Discover, Saved, Rankings, Friends,
-and Profile are navigable shells; venue discovery, authentication, and rewards are
-subsequent features. Existing launcher/splash artwork is still Expo starter artwork.
+The app opens to authentication. Discover, Saved, Rankings, Friends, and Profile
+are protected tabs; venue discovery and rewards remain subsequent features.
+Without service credentials the login form displays an unavailable state. Existing launcher/splash artwork is still Expo starter artwork.
 
 ## Connect Supabase
 
 Copy `.env.example` to `.env.local`, then set your project's URL and publishable key.
 Restart Metro after changing environment variables. The client is exported from
 `src/lib/supabase.ts`; it is `null` when configuration is missing or the URL is invalid.
-Configuration does not prove connectivity. No remote project, schema, or account has
-been created, and no live connection has been verified yet.
+The configured project’s public Auth endpoint has been verified. No database
+schema or test user accounts have been created.
 
 Use only a publishable key in the app. Privileged credentials and third-party API
 secrets belong on the server. Database tables must have appropriate Row Level
 Security policies before they are exposed to clients. Native auth persistence and
-foreground token refresh are wired for the authentication feature.
+foreground token refresh are managed by the authentication providers.
 
 ## Development builds
 
@@ -75,3 +75,40 @@ npx expo export --platform web
 Before merging navigation changes, open all five tabs, use the Discover/Saved
 buttons, reload a deep link, and check light/dark mode and narrow screen layouts.
 Native camera, location, and signing must be tested on devices when implemented.
+
+## Authentication (feature 2)
+
+Email/password sign-up, confirmation resend, sign-in, persisted sessions, local
+sign-out, and password recovery are implemented. Signed-out users cannot enter
+the main tabs. Supabase remains the source of truth for sessions and password
+policy; route guards are not a substitute for database Row Level Security.
+
+In Supabase **Authentication → URL Configuration → Redirect URLs**, allow:
+
+- `outthere://auth/callback`
+- `http://localhost:8083/auth/callback` (the current authentication preview)
+- `http://localhost:8081/auth/callback` (default Expo web port)
+- Your exact deployed web origin followed by `/auth/callback`, when deployed.
+
+Add any other local port you actually use, such as 8082. Keep email confirmation
+enabled. The default confirmation and recovery email templates must use
+`{{ .ConfirmationURL }}` so Supabase verifies the token before redirecting back.
+These dashboard settings have not been changed automatically.
+
+Links use PKCE: request and open the link on the same device/browser. A reset
+requested in the simulator must be opened in that simulator, not desktop Safari.
+Request a new link if it has expired or was opened elsewhere. A reset link can be
+opened using Simulator's Safari; for a link received on the Mac, use
+`xcrun simctl openurl booted '<full email link>'` locally (do not commit the link).
+
+The local publishable key is in ignored `.env.local`; teammates need their own
+local setup. Restart Metro when changing those values. No native dependency was
+added for authentication, so an existing development build can load this update.
+
+Run `npm test` for input/error handling and SDK-backed session and recovery tests
+with mocked network responses; no emails or real accounts are created by tests.
+For live acceptance, create a test account you control, confirm its email, sign in,
+restart the app, sign out, then request a reset and choose a new password. Check
+that an old/invalid link shows a recoverable error and a signed-out deep link to
+`/profile` returns to sign-in. Live email delivery and redirects still require
+verification against the configured project.
