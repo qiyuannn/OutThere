@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, TextInput, View, type TextInputProps } from 'react-native';
-import { ThemedText } from './themed-text';
+import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 
 export function AuthField({ label, password = false, ...props }: TextInputProps & { label: string; password?: boolean }) {

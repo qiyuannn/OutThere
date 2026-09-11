@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Redirect } from 'expo-router';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { Screen, Card, Button } from '@/components/foundation';
-import { AuthField } from '@/components/auth-field';
+import { AuthField } from '@/features/auth/components/auth-field';
 import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/providers/auth-provider';
 import { supabase } from '@/lib/supabase';

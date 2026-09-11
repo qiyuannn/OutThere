@@ -54,7 +54,8 @@ No cloud build or signing credentials have been created as part of this foundati
 
 ## Project structure
 
-- `src/app`: Expo Router routes; keep screen-specific behavior here.
+- `src/app`: thin Expo Router entry points and navigation layouts.
+- `src/features`: one folder per page/tab; implement screen behavior here.
 - `src/components/foundation.tsx`: shared Screen, Card, Button, and EmptyState.
 - `src/components/navigation-tabs.tsx`: shared tab navigator for native and web.
 - `src/constants/theme.ts`: light/dark colors, typography, spacing.
@@ -112,3 +113,49 @@ restart the app, sign out, then request a reset and choose a new password. Check
 that an old/invalid link shows a recoverable error and a signed-out deep link to
 `/profile` returns to sign-in. Live email delivery and redirects still require
 verification against the configured project.
+
+
+## Working on pages as a team
+
+```text
+src/
+  features/
+    discover/screen.tsx
+    bucket-list/screen.tsx
+    rankings/screen.tsx
+    friends/screen.tsx
+    profile/screen.tsx
+    auth/
+      account/screen.tsx
+      callback/screen.tsx
+      reset-password/screen.tsx
+      components/auth-field.tsx
+  app/                       # Routing entry points only
+    (tabs)/
+      (discover)/            # Discover remains at /
+      bucket-list/
+      rankings/
+      friends/
+      profile/
+      explore/               # Existing /explore redirect
+    auth/
+      index.tsx              # Account screen at /auth
+      callback/
+      reset-password/
+  components/                # UI shared across pages
+  hooks/                     # Shared hooks
+  constants/                 # Shared theme
+  lib/                       # Shared service clients and auth helpers
+  providers/                 # Cross-app state and lifecycle
+```
+
+Choose a page folder under `src/features` as your working area. Keep its local
+components, hooks, services, styles, and tests in that folder; create subfolders
+when needed. Files in `src/app` are routes, so do not put ordinary helpers or
+components there. Each tab has its own stack for future detail screens.
+
+Suggested ownership: Person 1 owns Discover and Bucket List; Person 2 owns Auth
+and backend infrastructure; Person 3 owns Rankings, Friends, and Profile.
+Everyone can work on their own feature branch. Coordinate edits to shared
+navigation, providers, dependencies, theme, and database contracts to reduce
+merge conflicts. Existing public paths and email callback URLs are unchanged.
