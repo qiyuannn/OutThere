@@ -1,56 +1,77 @@
-# Welcome to your Expo app 👋
+# OutThere
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+An Expo 57 / React Native / TypeScript app for real-world discovery.
 
-## Get started
+## Run locally
 
-1. Install dependencies
+Requires Node 22.13 or later and npm.
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```sh
+npm ci
+npm run web
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+The foundation runs without service credentials. Discover, Saved, Rankings, Friends,
+and Profile are navigable shells; venue discovery, authentication, and rewards are
+subsequent features. Existing launcher/splash artwork is still Expo starter artwork.
 
-### Other setup steps
+## Connect Supabase
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Copy `.env.example` to `.env.local`, then set your project's URL and publishable key.
+Restart Metro after changing environment variables. The client is exported from
+`src/lib/supabase.ts`; it is `null` when configuration is missing or the URL is invalid.
+Configuration does not prove connectivity. No remote project, schema, or account has
+been created, and no live connection has been verified yet.
 
-## Learn more
+Use only a publishable key in the app. Privileged credentials and third-party API
+secrets belong on the server. Database tables must have appropriate Row Level
+Security policies before they are exposed to clients. Native auth persistence and
+foreground token refresh are wired for the authentication feature.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Development builds
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+`expo-dev-client` and EAS profiles are configured. For local builds, install the
+native toolchain (Xcode on macOS for iOS, Android Studio/JDK for Android), then run:
 
-## Join the community
+```sh
+npm run ios
+npm run android
+```
 
-Join our community of developers creating universal apps.
+For EAS builds, sign in with `npx eas-cli login`, link your team's project with
+`npx eas-cli init`, then run one of:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```sh
+npm run build:development:android
+npm run build:development:ios
+npx eas-cli build --profile development-simulator --platform ios
+```
+
+The bundle/package identifier `com.outthere.app` is provisional; confirm ownership
+before registering a release app. Physical iOS distribution needs Apple signing
+and registered devices. Once installed, use `npm run dev` to serve the app.
+No cloud build or signing credentials have been created as part of this foundation.
+
+## Project structure
+
+- `src/app`: Expo Router routes; keep screen-specific behavior here.
+- `src/components/foundation.tsx`: shared Screen, Card, Button, and EmptyState.
+- `src/components/navigation-tabs.tsx`: shared tab navigator for native and web.
+- `src/constants/theme.ts`: light/dark colors, typography, spacing.
+- `src/lib`: backend clients and shared service integrations.
+- `src/providers`: application lifecycle integrations.
+
+Use theme tokens and shared components when adding screens. Import navigation APIs
+from `expo-router` (Expo 57), not external React Navigation packages.
+
+## Validation
+
+```sh
+npm run typecheck
+npx expo install --check
+npx expo export --platform web
+```
+
+Before merging navigation changes, open all five tabs, use the Discover/Saved
+buttons, reload a deep link, and check light/dark mode and narrow screen layouts.
+Native camera, location, and signing must be tested on devices when implemented.
