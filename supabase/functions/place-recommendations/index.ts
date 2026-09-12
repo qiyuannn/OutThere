@@ -13,6 +13,24 @@ type Place = {
   photos?: Array<{ name?: string; authorAttributions?: Array<{ displayName?: string; uri?: string }> }>;
 };
 
+type CachedPlace = {
+  google_place_id: string;
+  display_name: string | null;
+  formatted_address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  primary_type_display_name: string | null;
+  rating: number | null;
+  user_rating_count: number | null;
+  price_level: string | null;
+  open_now: boolean | null;
+  google_maps_uri: string | null;
+  photo_name: string | null;
+  photo_attribution_display_name: string | null;
+  photo_attribution_uri: string | null;
+  last_fetched_at: string;
+};
+
 const groups: Record<Mode, Record<string, string[]>> = {
   activities: {
     nature: ["park", "national_park", "botanical_garden", "hiking_area", "zoo"],
@@ -120,14 +138,46 @@ async function photo(apiKey: string, place: Place) {
   } catch { return { photoUrl: null, photoAttribution: null }; }
 }
 
+function cachedPlace(place: Place, fetchedAt: string): CachedPlace | null {
+  if (!place.id) return null;
+  const attribution = place.photos?.[0]?.authorAttributions?.[0];
+  return {
+    google_place_id: place.id,
+    display_name: place.displayName?.text ?? null,
+    formatted_address: place.formattedAddress ?? null,
+    latitude: place.location?.latitude ?? null,
+    longitude: place.location?.longitude ?? null,
+    primary_type_display_name: place.primaryTypeDisplayName?.text ?? null,
+    rating: place.rating ?? null,
+    user_rating_count: place.userRatingCount ?? null,
+    price_level: place.priceLevel ?? null,
+    open_now: place.currentOpeningHours?.openNow ?? null,
+    google_maps_uri: place.googleMapsUri ?? null,
+    photo_name: place.photos?.[0]?.name ?? null,
+    photo_attribution_display_name: attribution?.displayName ?? null,
+    photo_attribution_uri: attribution?.uri ?? null,
+    last_fetched_at: fetchedAt,
+  };
+}
+
+async function cacheFetchedPlaces(client: ReturnType<typeof createClient>, places: Iterable<Place>) {
+  const fetchedAt = new Date().toISOString();
+  const rows = [...places].map((place) => cachedPlace(place, fetchedAt)).filter((place): place is CachedPlace => place !== null);
+  if (rows.length === 0) return;
+  const { error } = await client.from("places").upsert(rows, { onConflict: "google_place_id" });
+  if (error) throw error;
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return reply({ error: "Method not allowed." }, 405);
   const authorization = request.headers.get("Authorization");
   if (!authorization?.startsWith("Bearer ")) return reply({ error: "Sign in to get recommendations." }, 401);
-  const url = Deno.env.get("SUPABASE_URL"); const anonKey = Deno.env.get("SUPABASE_ANON_KEY"); const googleKey = Deno.env.get("GOOGLE_PLACES_API_KEY");
-  if (!url || !anonKey || !googleKey) return reply({ error: "Recommendation service is not configured." }, 503);
+  const url = Deno.env.get("SUPABASE_URL"); const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"); const googleKey = Deno.env.get("GOOGLE_PLACES_API_KEY");
+  if (!url || !anonKey || !serviceRoleKey || !googleKey) return reply({ error: "Recommendation service is not configured." }, 503);
   const client = createClient(url, anonKey, { global: { headers: { Authorization: authorization } }, auth: { persistSession: false } });
+  const admin = createClient(url, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
   const { data: { user }, error: userError } = await client.auth.getUser(authorization.slice(7));
   if (userError || !user) return reply({ error: "Your session has expired. Please sign in again." }, 401);
 
@@ -148,6 +198,7 @@ Deno.serve(async (request) => {
     ...strings(body.excludedPlaceIds, 100),
   ]);
   const candidates = new Map<string, { place: Place; meters: number; score: number }>();
+  const fetchedPlaces = new Map<string, Place>();
   const searchPlan = buildSearchPlan(mode, { latitude, longitude }, radius);
   let successfulSearches = 0;
   for (const plan of searchPlan) {
@@ -155,6 +206,7 @@ Deno.serve(async (request) => {
     if (!result.ok) continue;
     successfulSearches += 1;
     for (const place of result.places) {
+      if (place.id) fetchedPlaces.set(place.id, place);
       const placeLat = place.location?.latitude; const placeLng = place.location?.longitude;
       if (!place.id || !place.displayName?.text || placeLat === undefined || placeLng === undefined || excluded.has(place.id) || candidates.has(place.id)) continue;
       const meters = distance(latitude, longitude, placeLat, placeLng);
@@ -165,6 +217,12 @@ Deno.serve(async (request) => {
     if (candidates.size >= 20) break;
   }
   if (successfulSearches === 0) return reply({ error: "Nearby places are temporarily unavailable." }, 502);
+  try {
+    await cacheFetchedPlaces(admin, fetchedPlaces.values());
+  } catch (error) {
+    console.error("Could not cache fetched Google Places", error);
+    return reply({ error: "Could not store nearby places." }, 500);
+  }
   if (candidates.size === 0 && successfulSearches < searchPlan.length) {
     return reply({ error: "We could not finish searching this area. Please try again." }, 502);
   }
