@@ -12,7 +12,7 @@ npm run web
 ```
 
 The app opens to authentication. Discover, Saved, Rankings, Friends, and Profile
-are protected tabs; venue discovery and rewards remain subsequent features.
+are protected tabs. New users complete profile onboarding before entering them.
 Without service credentials the login form displays an unavailable state. Existing launcher/splash artwork is still Expo starter artwork.
 
 ## Connect Supabase
@@ -20,8 +20,8 @@ Without service credentials the login form displays an unavailable state. Existi
 Copy `.env.example` to `.env.local`, then set your project's URL and publishable key.
 Restart Metro after changing environment variables. The client is exported from
 `src/lib/supabase.ts`; it is `null` when configuration is missing or the URL is invalid.
-The configured project’s public Auth endpoint has been verified. No database
-schema or test user accounts have been created.
+Apply the SQL migrations in `supabase/migrations` to your Supabase project before
+running the app. They configure the discovery tables and private profiles/avatars.
 
 Use only a publishable key in the app. Privileged credentials and third-party API
 secrets belong on the server. Database tables must have appropriate Row Level
@@ -159,3 +159,35 @@ and backend infrastructure; Person 3 owns Rankings, Friends, and Profile.
 Everyone can work on their own feature branch. Coordinate edits to shared
 navigation, providers, dependencies, theme, and database contracts to reduce
 merge conflicts. Existing public paths and email callback URLs are unchanged.
+
+## Profile and onboarding (feature 3)
+
+`src/features/profile` owns onboarding, profile display/editing, photo handling,
+validation, and persistence. `src/providers/profile-provider.tsx` loads the current
+user’s profile; tab routing requires completed onboarding while password recovery
+remains accessible independently.
+
+The three onboarding steps collect name/unique username/optional bio and photo,
+home city and interests, then budget, travel range (1–50 km), and exploration style.
+Each successful step is saved to Supabase and resumes after a restart. The profile
+page supports editing all fields and removing or replacing the photo. Concurrent
+saves from another device show a reload action instead of silently overwriting.
+
+The preferred range initializes Discover. Interests, budget, and exploration style
+are stored; recommendation scoring does not yet use those preferences. Home city
+is descriptive and does not replace the device location used by Discover.
+
+Migration `20260913010000_add_profiles_and_avatars.sql` creates `profiles` with
+per-user read/write policies and a private `avatars` bucket (JPEG, max 2 MB).
+Photos are cropped/resized to 512×512 and accessed with expiring signed URLs.
+There is no public/social profile access in this feature.
+
+Photo picking adds native dependencies. After `npm ci`, rebuild with `npm run ios`
+or `npm run android` once; refreshing an older development build is insufficient.
+
+Acceptance checks: sign in with a test account, save step 1, restart and resume
+step 2, complete onboarding, edit your city/range/interests, restart and verify
+persistence, replace/remove a photo, and sign out. Verify blank fields, a taken
+username, offline save/retry, and concurrent edits. `npm test` covers validation
+and auth regressions; database isolation/completion/version checks were also run
+against Supabase in a rolled-back transaction with synthetic records.

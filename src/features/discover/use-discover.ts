@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useProfile } from '@/providers/profile-provider';
 import { useAuth } from '@/providers/auth-provider';
 import { DEFAULT_RADIUS_METERS } from './constants';
 import { clearPassedPlaces, getRoundedDeviceLocation, passPlace, recordImpression, requestRecommendations, savePlace } from './service';
@@ -11,9 +12,11 @@ const falseModes = (): Record<DiscoverMode, boolean> => ({ activities: false, fo
 
 export function useDiscover() {
   const { session } = useAuth(); const userId = session?.user.id;
+  const { profile } = useProfile();
+  const preferredRadius = profile?.travel_radius_meters ?? DEFAULT_RADIUS_METERS;
   const [mode, setMode] = useState<DiscoverMode>('activities');
   const [location, setLocation] = useState<DiscoverLocation | null>(null);
-  const [radiusMeters, setRadiusMeters] = useState(DEFAULT_RADIUS_METERS);
+  const [radiusMeters, setRadiusMeters] = useState(preferredRadius);
   const [items, setItems] = useState(emptyLists); const [indices, setIndices] = useState(zeroes);
   const [loaded, setLoaded] = useState(falseModes); const [exhausted, setExhausted] = useState(falseModes);
   const [passedCounts, setPassedCounts] = useState(zeroes);
@@ -44,9 +47,13 @@ export function useDiscover() {
 
   useEffect(() => {
     if (!userId) return;
-    void fetchMode('activities', DEFAULT_RADIUS_METERS, null);
+    setRadiusMeters(preferredRadius);
+    setItems(emptyLists()); setIndices(zeroes()); setLoaded(falseModes());
+    setExhausted(falseModes()); setPassedCounts(zeroes());
+    void fetchMode('activities', preferredRadius, null);
+    return () => { requestNumber.current += 1; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, preferredRadius]);
 
   useEffect(() => { if (userId && !loaded[mode] && !loading) void fetchMode(mode); }, [fetchMode, loaded, loading, mode, userId]);
   const current = items[mode][indices[mode]] ?? null;

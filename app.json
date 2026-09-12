@@ -44,6 +44,14 @@
         {
           "locationWhenInUsePermission": "Allow OutThere to use your location to recommend nearby activities and food."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose a photo for your OutThere profile.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {

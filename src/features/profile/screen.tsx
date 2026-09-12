@@ -1,28 +1,43 @@
-import { useState } from 'react';
-import { Button, Card, EmptyState, Screen } from '@/components/foundation';
+import { View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Button, Card, Screen } from '@/components/foundation';
 import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/providers/auth-provider';
-import { supabase } from '@/lib/supabase';
-import { authErrorMessage } from '@/lib/auth-validation';
+import { useProfile } from '@/providers/profile-provider';
+import { useTheme } from '@/hooks/use-theme';
+import { Avatar } from './components/avatar';
+import { SignOutButton } from './components/sign-out';
+import { BUDGETS, EXPLORATION, INTERESTS } from './model';
 
 export default function ProfileScreen() {
   const { session } = useAuth();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  async function signOut() {
-    if (!supabase || busy) return;
-    setBusy(true); setError('');
-    try {
-      const { error } = await supabase.auth.signOut({ scope: 'local' });
-      if (error) throw error;
-    } catch (error) { setError(authErrorMessage(error)); }
-    finally { setBusy(false); }
-  }
+  const { profile } = useProfile();
+  const { updated } = useLocalSearchParams<{ updated?: string }>();
+  const theme = useTheme();
+  if (!profile) return null;
   return <Screen title="A story only you can tell." eyebrow="PROFILE">
-    <Card><ThemedText type="smallBold">SIGNED IN AS</ThemedText><ThemedText selectable>{session?.user.email}</ThemedText>
-      {!!error && <ThemedText accessibilityRole="alert">{error}</ThemedText>}
-      <Button label={busy ? 'Signing out…' : 'Sign out'} onPress={signOut} disabled={busy} />
+    {updated === '1' && <ThemedText accessibilityRole="alert" themeColor="primary">Your profile is saved.</ThemedText>}
+    <Card>
+      <View style={{ alignItems: 'center', gap: 12 }}>
+        <Avatar name={profile.display_name} path={profile.avatar_path} />
+        <ThemedText type="subtitle">{profile.display_name}</ThemedText>
+        <ThemedText themeColor="textSecondary">@{profile.username}</ThemedText>
+        <ThemedText themeColor="primary">{profile.city}</ThemedText>
+      </View>
+      {!!profile.bio && <ThemedText>{profile.bio}</ThemedText>}
+      <Button label="Edit profile" onPress={() => router.push('/profile/edit')} />
     </Card>
-    <EmptyState title="Your explorer profile" description="Your interests, XP, and memories will live here as your adventures begin. Profile setup is coming next." />
+    <Card>
+      <ThemedText type="subtitle" style={{ fontSize: 24 }}>Things that draw me out</ThemedText>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{INTERESTS.filter(([id]) => profile.interests.includes(id)).map(([id, label, icon]) => <View key={id} style={{ padding: 12, borderRadius: 14, backgroundColor: theme.accent }}><ThemedText type="smallBold" style={{ color: theme.onAccent }}>{icon} {label}</ThemedText></View>)}</View>
+    </Card>
+    <Card>
+      <ThemedText type="subtitle" style={{ fontSize: 24 }}>My kind of adventure</ThemedText>
+      <ThemedText>Budget · {BUDGETS.find(([id]) => id === profile.budget)?.[1]}</ThemedText>
+      <ThemedText>Discovery range · {profile.travel_radius_meters / 1000} km</ThemedText>
+      <ThemedText>Exploration style · {EXPLORATION.find(([id]) => id === profile.exploration_style)?.[1]}</ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">Your range sets the starting distance in Discover. Your other preferences are saved for future personalised recommendations.</ThemedText>
+    </Card>
+    <Card><ThemedText type="smallBold">SIGNED IN AS</ThemedText><ThemedText selectable>{session?.user.email}</ThemedText><SignOutButton /></Card>
   </Screen>;
 }
