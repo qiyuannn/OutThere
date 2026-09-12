@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.outthere.app"
+      "bundleIdentifier": "com.outthere.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Allow OutThere to use your location to recommend nearby activities and food."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -35,7 +38,13 @@
           "imageWidth": 76
         }
       ],
-      "expo-dev-client"
+      "expo-dev-client",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow OutThere to use your location to recommend nearby activities and food."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

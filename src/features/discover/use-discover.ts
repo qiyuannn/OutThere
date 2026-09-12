@@ -1,43 +1,50 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useAuth } from '@/providers/auth-provider';
-import { DEFAULT_SETTINGS } from './constants';
-import { loadSettings, persistSettings, recordImpression, requestRecommendations, savePlaceAction } from './service';
-import type { DiscoverMode, DiscoverSettings, Recommendation } from './types';
+import { DEFAULT_RADIUS_METERS } from './constants';
+import { clearPassedPlaces, getRoundedDeviceLocation, passPlace, recordImpression, requestRecommendations, savePlace } from './service';
+import type { DiscoverLocation, DiscoverMode, Recommendation } from './types';
 
 const emptyLists = (): Record<DiscoverMode, Recommendation[]> => ({ activities: [], food: [] });
 const zeroes = (): Record<DiscoverMode, number> => ({ activities: 0, food: 0 });
 const falseModes = (): Record<DiscoverMode, boolean> => ({ activities: false, food: false });
-const hiddenLists = (): Record<DiscoverMode, string[]> => ({ activities: [], food: [] });
 
 export function useDiscover() {
   const { session } = useAuth(); const userId = session?.user.id;
   const [mode, setMode] = useState<DiscoverMode>('activities');
-  const [settings, setSettings] = useState<DiscoverSettings>(DEFAULT_SETTINGS);
+  const [location, setLocation] = useState<DiscoverLocation | null>(null);
+  const [radiusMeters, setRadiusMeters] = useState(DEFAULT_RADIUS_METERS);
   const [items, setItems] = useState(emptyLists); const [indices, setIndices] = useState(zeroes);
-  const [loaded, setLoaded] = useState(falseModes); const [hidden, setHidden] = useState(hiddenLists);
+  const [loaded, setLoaded] = useState(falseModes); const [exhausted, setExhausted] = useState(falseModes);
+  const [passedCounts, setPassedCounts] = useState(zeroes);
   const [loading, setLoading] = useState(true); const [acting, setActing] = useState(false);
-  const [error, setError] = useState<string | null>(null); const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const requestNumber = useRef(0); const recorded = useRef(new Set<string>());
 
-  const fetchMode = useCallback(async (target: DiscoverMode, next = settings, excluded = hidden[target]) => {
-    const requestId = ++requestNumber.current; setLoading(true); setError(null); setNotice(null);
+  const fetchMode = useCallback(async (
+    target: DiscoverMode,
+    nextRadius = radiusMeters,
+    knownLocation = location,
+  ) => {
+    const requestId = ++requestNumber.current; setLoading(true); setError(null);
     try {
-      const recommendations = await requestRecommendations(target, next, excluded);
+      const nextLocation = knownLocation ?? await getRoundedDeviceLocation();
+      const result = await requestRecommendations(target, nextLocation, nextRadius);
       if (requestId !== requestNumber.current) return;
-      setItems((value) => ({ ...value, [target]: recommendations }));
-      setIndices((value) => ({ ...value, [target]: 0 })); setLoaded((value) => ({ ...value, [target]: true }));
+      setLocation(nextLocation);
+      setItems((value) => ({ ...value, [target]: result.recommendations }));
+      setIndices((value) => ({ ...value, [target]: 0 }));
+      setExhausted((value) => ({ ...value, [target]: result.exhausted }));
+      setPassedCounts((value) => ({ ...value, [target]: result.passedCount }));
+      setLoaded((value) => ({ ...value, [target]: true }));
     } catch (reason) {
       if (requestId === requestNumber.current) { setError(reason instanceof Error ? reason.message : 'Could not load nearby places.'); setLoaded((value) => ({ ...value, [target]: true })); }
     } finally { if (requestId === requestNumber.current) setLoading(false); }
-  }, [hidden, settings]);
+  }, [location, radiusMeters]);
 
   useEffect(() => {
-    if (!userId) return; let active = true; setLoading(true);
-    loadSettings(userId).then((saved) => { if (active) { setSettings(saved); return fetchMode('activities', saved, []); } })
-      .catch((reason) => active && setError(reason instanceof Error ? reason.message : 'Could not load your preferences.'))
-      .finally(() => active && setLoading(false));
-    return () => { active = false; };
+    if (!userId) return;
+    void fetchMode('activities', DEFAULT_RADIUS_METERS, null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
@@ -49,27 +56,38 @@ export function useDiscover() {
     void recordImpression(userId, current, mode).catch(() => recorded.current.delete(key));
   }, [current, mode, userId]);
 
-  const choose = useCallback(async (choice: 'pass' | 'later' | 'save') => {
+  const choose = useCallback(async (choice: 'pass' | 'notNow' | 'save') => {
     if (!userId || !current || acting) return; setActing(true); setError(null);
     try {
-      if (choice !== 'later') await savePlaceAction(userId, current.id, mode, choice === 'save' ? 'saved' : 'rejected');
-      setHidden((value) => ({ ...value, [mode]: [...value[mode], current.id] }));
-      setIndices((value) => ({ ...value, [mode]: value[mode] + 1 }));
-      setNotice(choice === 'save' ? 'Saved for later.' : choice === 'later' ? 'Skipped for this session.' : 'You won’t see that place again.');
+      if (choice === 'pass') await passPlace(userId, current.id, mode);
+      else await savePlace(userId, current.id, mode);
+
+      const reachedEnd = indices[mode] + 1 >= items[mode].length;
+      if (reachedEnd) {
+        await fetchMode(mode, radiusMeters, location);
+      } else {
+        setIndices((value) => ({ ...value, [mode]: value[mode] + 1 }));
+      }
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not save that choice.'); }
     finally { setActing(false); }
-  }, [acting, current, mode, userId]);
+  }, [acting, current, fetchMode, indices, items, location, mode, radiusMeters, userId]);
 
-  const updateSettings = useCallback(async (next: DiscoverSettings) => {
+  const reviewPassed = useCallback(async () => {
+    if (!userId || acting) return; setActing(true); setError(null);
+    try { await clearPassedPlaces(userId, mode); await fetchMode(mode, radiusMeters, location); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not restore passed places.'); }
+    finally { setActing(false); }
+  }, [acting, fetchMode, location, mode, radiusMeters, userId]);
+
+  const updateRadius = useCallback(async (nextRadius: number) => {
     if (!userId) return; setLoading(true); setError(null);
     try {
-      await persistSettings(userId, next); setSettings(next); setHidden(hiddenLists()); setItems(emptyLists()); setIndices(zeroes());
-      setLoaded(falseModes()); await fetchMode(mode, next, []);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not save your preferences.'); setLoading(false); throw reason; }
-  }, [fetchMode, mode, userId]);
+      setRadiusMeters(nextRadius); setItems(emptyLists()); setIndices(zeroes()); setExhausted(falseModes()); setPassedCounts(zeroes());
+      setLoaded(falseModes()); await fetchMode(mode, nextRadius, location);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not update the search range.'); setLoading(false); throw reason; }
+  }, [fetchMode, location, mode, userId]);
 
-  const startOver = useCallback(async () => { setHidden((value) => ({ ...value, [mode]: [] })); setNotice(null); await fetchMode(mode, settings, []); }, [fetchMode, mode, settings]);
-  return useMemo(() => ({ mode, setMode, settings, current, loading, acting, error, notice, choose, updateSettings, startOver,
-    retry: () => fetchMode(mode, settings, hidden[mode]) }),
-  [acting, choose, current, error, fetchMode, hidden, loading, mode, notice, settings, startOver, updateSettings]);
+  return useMemo(() => ({ mode, setMode, radiusMeters, current, loading, acting, error, exhausted: exhausted[mode], passedCount: passedCounts[mode], choose, reviewPassed, updateRadius,
+    retry: () => fetchMode(mode, radiusMeters, location) }),
+  [acting, choose, current, error, exhausted, fetchMode, loading, location, mode, passedCounts, radiusMeters, reviewPassed, updateRadius]);
 }

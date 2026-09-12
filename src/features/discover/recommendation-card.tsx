@@ -30,8 +30,7 @@ export function RecommendationCard({ place, mode }: { place: Recommendation; mod
     </View>
     <View style={styles.body}>
       <ThemedText type="smallBold" themeColor="primary" style={styles.kicker}>PICKED FOR YOU · {place.matchPercent}% MATCH</ThemedText>
-      <ThemedText accessibilityRole="header" style={styles.headline}>{place.headline}</ThemedText>
-      <ThemedText style={styles.placeName}>{place.name}</ThemedText>
+      <ThemedText accessibilityRole="header" style={styles.placeName}>{place.name}</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">{details}</ThemedText>
       {place.rating ? <ThemedText type="small" themeColor="textSecondary">★ {place.rating.toFixed(1)}{place.ratingCount ? ` (${place.ratingCount.toLocaleString()} ratings)` : ''}</ThemedText> : null}
       <View style={[styles.reason, { borderTopColor: theme.border }]}><ThemedText type="small" themeColor="textSecondary">{place.reason}</ThemedText></View>
@@ -51,6 +50,6 @@ const styles = StyleSheet.create({
   imageFallback: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, gap: 8 }, fallbackArrow: { fontSize: 48, lineHeight: 56 },
   photoBadge: { position: 'absolute', bottom: 12, left: 12, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 }, photoBadgeText: { fontSize: 9, lineHeight: 14, letterSpacing: 0.8, fontWeight: '800' },
   body: { paddingHorizontal: 6, paddingTop: 18, paddingBottom: 8, gap: 7 }, kicker: { fontSize: 10, lineHeight: 16, letterSpacing: 1 },
-  headline: { fontSize: 27, lineHeight: 33, letterSpacing: -0.7, fontWeight: '800' }, placeName: { fontSize: 17, lineHeight: 24, fontWeight: '700' },
+  placeName: { fontSize: 24, lineHeight: 30, fontWeight: '800', letterSpacing: -0.4 },
   reason: { borderTopWidth: 1, marginTop: 6, paddingTop: 11 }, attribution: { fontSize: 10, lineHeight: 14 },
 });
