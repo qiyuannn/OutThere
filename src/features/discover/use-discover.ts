@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/providers/auth-provider';
 import { DEFAULT_RADIUS_METERS } from './constants';
 import { clearPassedPlaces, getRoundedDeviceLocation, passPlace, recordImpression, requestRecommendations, savePlace } from './service';
-import type { DiscoverLocation, DiscoverMode, Recommendation } from './types';
+import type { DiscoverChoice, DiscoverLocation, DiscoverMode, Recommendation } from './types';
 
 const emptyLists = (): Record<DiscoverMode, Recommendation[]> => ({ activities: [], food: [] });
 const zeroes = (): Record<DiscoverMode, number> => ({ activities: 0, food: 0 });
@@ -56,7 +56,7 @@ export function useDiscover() {
     void recordImpression(userId, current, mode).catch(() => recorded.current.delete(key));
   }, [current, mode, userId]);
 
-  const choose = useCallback(async (choice: 'pass' | 'notNow' | 'save') => {
+  const choose = useCallback(async (choice: DiscoverChoice) => {
     if (!userId || !current || acting) return; setActing(true); setError(null);
     try {
       if (choice === 'pass') await passPlace(userId, current.id, mode);
