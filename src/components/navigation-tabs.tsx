@@ -39,7 +39,7 @@ export default function AppTabs() {
     tabBarItemStyle: { transform: [{ translateY: Math.max(0, insets.bottom / 2 - 5) }] }, tabBarLabelStyle: { fontWeight: '600' } }}>
     {tabs.map(({ name, title, icon }) => <Tabs.Screen key={name} name={name} options={{
       title,
-      tabBarIcon: ({ color }) => <SymbolView name={icon} tintColor={color} size={24} accessibilityElementsHidden />,
+      tabBarIcon: ({ color }) => <SymbolView name={icon} tintColor={color} size={28} accessibilityElementsHidden />,
     }} />)}
     <Tabs.Screen name="explore/index" options={{ href: null }} />
   </Tabs>;
