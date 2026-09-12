@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/use-theme';
+import { SubscriptionProvider } from '@/providers/subscription-provider';
 import { ProfileProvider } from '@/providers/profile-provider';
 import { BackendProvider } from '@/providers/backend-provider';
 import { AuthProvider, useAuth } from '@/providers/auth-provider';
@@ -26,6 +27,6 @@ export default function RootLayout() {
   const colors = useTheme();
   const base = dark ? DarkTheme : DefaultTheme;
   return <SafeAreaProvider><ThemeProvider value={{ ...base, colors: { ...base.colors, primary: colors.primary, background: colors.background, card: colors.backgroundElement, text: colors.text, border: colors.border } }}>
-    <BackendProvider><AuthProvider><ProfileProvider><StatusBar style={dark ? 'light' : 'dark'} /><Navigation /></ProfileProvider></AuthProvider></BackendProvider>
+    <BackendProvider><AuthProvider><SubscriptionProvider><ProfileProvider><StatusBar style={dark ? 'light' : 'dark'} /><Navigation /></ProfileProvider></SubscriptionProvider></AuthProvider></BackendProvider>
   </ThemeProvider></SafeAreaProvider>;
 }

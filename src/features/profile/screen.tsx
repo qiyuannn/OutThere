@@ -1,3 +1,4 @@
+import { SubscriptionCard } from '@/features/subscriptions/profile-card';
 import { View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Button, Card, Screen } from '@/components/foundation';
@@ -38,6 +39,7 @@ export default function ProfileScreen() {
       <ThemedText>Exploration style · {EXPLORATION.find(([id]) => id === profile.exploration_style)?.[1]}</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">Your range sets the starting distance in Discover. Your other preferences are saved for future personalised recommendations.</ThemedText>
     </Card>
+    <SubscriptionCard />
     <Card><ThemedText type="smallBold">SIGNED IN AS</ThemedText><ThemedText selectable>{session?.user.email}</ThemedText><SignOutButton /></Card>
   </Screen>;
 }

@@ -191,3 +191,16 @@ persistence, replace/remove a photo, and sign out. Verify blank fields, a taken
 username, offline save/retry, and concurrent edits. `npm test` covers validation
 and auth regressions; database isolation/completion/version checks were also run
 against Supabase in a rolled-back transaction with synthetic records.
+
+## RevenueCat membership
+
+Profile → View membership provides lifetime/yearly/monthly purchases, the
+RevenueCat Paywall, restore purchases, and Customer Center. `outthere_pro` controls
+the membership status. The current Supabase UUID identifies the RevenueCat
+customer. Native development builds must be rebuilt for the new SDKs.
+
+See [the step-by-step RevenueCat guide](docs/revenuecat.md) for complete code
+examples, public-key configuration, products/offerings, entitlement setup, testing,
+and production requirements. The provided key is configured locally for Test
+Store only. Dashboard entitlement attachments, published paywall/Customer Center,
+and production store keys must be verified before launch.
