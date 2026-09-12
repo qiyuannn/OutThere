@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import Slider from '@react-native-community/slider';
+import Slider from '@expo/ui/community/slider';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -38,8 +38,6 @@ export function FiltersModal({ visible, radiusMeters, onClose, onSave }:
             <ThemedText type="small" themeColor="textSecondary">50 km</ThemedText>
           </View>
           <Slider
-            accessibilityLabel="Recommendation distance"
-            accessibilityValue={{ min: 1, max: 50, now: draftRadius / 1000, text: `${draftRadius / 1000} kilometres` }}
             minimumValue={1}
             maximumValue={50}
             step={1}
