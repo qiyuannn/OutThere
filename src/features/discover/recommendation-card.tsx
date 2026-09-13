@@ -4,6 +4,7 @@ import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
+import { computeIsOpenNow } from '@/lib/opening-hours';
 import type { Recommendation } from './types';
 
 function distanceLabel(meters: number) {
@@ -18,19 +19,20 @@ function priceLabel(level: string | null) {
 export function RecommendationCard({ place }: { place: Recommendation }) {
   const theme = useTheme(); const [imageFailed, setImageFailed] = useState(false);
   const details = [priceLabel(place.priceLevel), place.category, distanceLabel(place.distanceMeters)].filter(Boolean).join(' · ');
-  return <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+    const isOpen = place.openNow ?? computeIsOpenNow(place.regularOpeningHours);
+    return <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
     <View style={[styles.imageFrame, { backgroundColor: theme.backgroundSelected }]}>
       {place.photoUrl && !imageFailed ? <Image source={{ uri: place.photoUrl }} accessibilityLabel={`Photo of ${place.name}`} style={styles.image}
         contentFit="cover" transition={200} onError={() => setImageFailed(true)} />
         : <View style={styles.imageFallback}><ThemedText style={[styles.fallbackArrow, { color: theme.primary }]}>↗</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">A new place to discover</ThemedText></View>}
-      {place.openNow !== null ? <View style={[styles.openBadge, {
-        backgroundColor: place.openNow ? theme.accent : theme.backgroundElement,
-        borderColor: place.openNow ? theme.accent : theme.border,
+      {isOpen !== null && isOpen !== undefined ? <View style={[styles.openBadge, {
+        backgroundColor: isOpen ? theme.accent : theme.backgroundElement,
+        borderColor: isOpen ? theme.accent : theme.border,
       }]}>
-        <View style={[styles.statusDot, { backgroundColor: place.openNow ? theme.onAccent : theme.textSecondary }]} />
-        <ThemedText style={[styles.openBadgeText, { color: place.openNow ? theme.onAccent : theme.textSecondary }]}>
-          {place.openNow ? 'OPEN NOW' : 'CLOSED NOW'}
+        <View style={[styles.statusDot, { backgroundColor: isOpen ? theme.onAccent : theme.textSecondary }]} />
+        <ThemedText style={[styles.openBadgeText, { color: isOpen ? theme.onAccent : theme.textSecondary }]}>
+          {isOpen ? 'OPEN NOW' : 'CLOSED NOW'}
         </ThemedText>
       </View> : null}
     </View>

@@ -47,7 +47,6 @@ type CachedPlace = {
   rating: number | null;
   user_rating_count: number | null;
   price_level: string | null;
-  open_now: boolean | null;
   google_maps_uri: string | null;
   website_uri: string | null;
   phone_number: string | null;
@@ -203,7 +202,6 @@ function cachedPlace(place: Place, fetchedAt: string): CachedPlace | null {
     rating: place.rating ?? null,
     user_rating_count: place.userRatingCount ?? null,
     price_level: place.priceLevel ?? null,
-    open_now: place.currentOpeningHours?.openNow ?? null,
     google_maps_uri: place.googleMapsUri ?? null,
     website_uri: place.websiteUri ?? null,
     phone_number: place.nationalPhoneNumber ?? place.internationalPhoneNumber ?? null,

@@ -15,7 +15,6 @@ export interface CachedPlace {
   rating: number | null;
   user_rating_count: number | null;
   price_level: string | null;
-  open_now: boolean | null;
   google_maps_uri: string | null;
   website_uri: string | null;
   phone_number: string | null;
