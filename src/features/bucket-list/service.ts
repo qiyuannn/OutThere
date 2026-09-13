@@ -1,3 +1,4 @@
+import { computeIsOpenNow } from '@/lib/opening-hours';
 import { supabase } from '@/lib/supabase';
 import type { CachedPlace, SavedPlace } from './types';
 
@@ -29,7 +30,7 @@ export async function getSavedPlaces(userId: string): Promise<SavedPlace[]> {
       category: details?.primary_type_display_name ?? null,
       rating: details?.rating ?? null,
       price_level: details?.price_level ?? null,
-      open_now: details?.open_now ?? null,
+      open_now: computeIsOpenNow(details?.regular_opening_hours),
       places: details ?? null,
     };
   });
