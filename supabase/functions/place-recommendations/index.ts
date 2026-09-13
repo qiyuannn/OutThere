@@ -4,13 +4,21 @@ import { corsHeaders } from "jsr:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
 
 type Mode = "activities" | "food";
+type PhotoAttribution = { displayName?: string; uri?: string; photoUri?: string };
+type PlacePhoto = {
+  name?: string;
+  widthPx?: number;
+  heightPx?: number;
+  authorAttributions?: PhotoAttribution[];
+};
+
 type Place = {
   id?: string; displayName?: { text?: string }; formattedAddress?: string;
   location?: { latitude?: number; longitude?: number };
   primaryTypeDisplayName?: { text?: string }; rating?: number;
   userRatingCount?: number; priceLevel?: string; currentOpeningHours?: { openNow?: boolean };
   googleMapsUri?: string;
-  photos?: Array<{ name?: string; authorAttributions?: Array<{ displayName?: string; uri?: string }> }>;
+  photos?: PlacePhoto[];
 };
 
 type CachedPlace = {
@@ -25,9 +33,7 @@ type CachedPlace = {
   price_level: string | null;
   open_now: boolean | null;
   google_maps_uri: string | null;
-  photo_name: string | null;
-  photo_attribution_display_name: string | null;
-  photo_attribution_uri: string | null;
+  photos: PlacePhoto[];
   last_fetched_at: string;
 };
 
@@ -140,7 +146,16 @@ async function photo(apiKey: string, place: Place) {
 
 function cachedPlace(place: Place, fetchedAt: string): CachedPlace | null {
   if (!place.id) return null;
-  const attribution = place.photos?.[0]?.authorAttributions?.[0];
+  const photos = (place.photos ?? []).slice(0, 10).map((item) => ({
+    name: item.name ?? null,
+    widthPx: item.widthPx ?? null,
+    heightPx: item.heightPx ?? null,
+    authorAttributions: (item.authorAttributions ?? []).map((a) => ({
+      displayName: a.displayName ?? null,
+      uri: a.uri ?? null,
+      photoUri: a.photoUri ?? null,
+    })),
+  }));
   return {
     google_place_id: place.id,
     display_name: place.displayName?.text ?? null,
@@ -153,9 +168,7 @@ function cachedPlace(place: Place, fetchedAt: string): CachedPlace | null {
     price_level: place.priceLevel ?? null,
     open_now: place.currentOpeningHours?.openNow ?? null,
     google_maps_uri: place.googleMapsUri ?? null,
-    photo_name: place.photos?.[0]?.name ?? null,
-    photo_attribution_display_name: attribution?.displayName ?? null,
-    photo_attribution_uri: attribution?.uri ?? null,
+    photos,
     last_fetched_at: fetchedAt,
   };
 }
@@ -241,6 +254,16 @@ Deno.serve(async (request) => {
     reason: meters < radius * 0.3 ? "A nearby option within your chosen range." : "A different corner of your chosen search area.",
     score: Number(score.toFixed(4)),
     matchPercent: Math.round(score * 100),
+    photos: (place.photos ?? []).slice(0, 10).map((p) => ({
+      name: p.name ?? null,
+      widthPx: p.widthPx ?? null,
+      heightPx: p.heightPx ?? null,
+      authorAttributions: (p.authorAttributions ?? []).map((a) => ({
+        displayName: a.displayName ?? null,
+        uri: a.uri ?? null,
+        photoUri: a.photoUri ?? null,
+      })),
+    })),
     ...await photo(googleKey, place),
   })));
   return reply({ recommendations, exhausted: recommendations.length === 0, passedCount: passedPlaces?.length ?? 0 });
