@@ -15,7 +15,8 @@ type PlacePhoto = {
 type Place = {
   id?: string; displayName?: { text?: string }; formattedAddress?: string;
   location?: { latitude?: number; longitude?: number };
-  primaryTypeDisplayName?: { text?: string }; rating?: number;
+  primaryType?: string; primaryTypeDisplayName?: { text?: string }; types?: string[];
+  rating?: number;
   userRatingCount?: number; priceLevel?: string; currentOpeningHours?: { openNow?: boolean };
   googleMapsUri?: string;
   photos?: PlacePhoto[];
@@ -58,27 +59,136 @@ type CachedPlace = {
 
 const groups: Record<Mode, Record<string, string[]>> = {
   activities: {
-    nature: ["park", "national_park", "botanical_garden", "hiking_area", "zoo"],
-    culture: ["museum", "art_gallery", "historical_place", "cultural_landmark", "performing_arts_theater"],
-    active: ["gym", "sports_complex", "swimming_pool", "stadium", "bowling_alley"],
-    entertainment: ["amusement_park", "aquarium", "movie_theater", "tourist_attraction"],
-    relaxation: ["spa", "park", "botanical_garden"], learning: ["library", "museum", "aquarium", "zoo"],
+    nature_parks_outdoors: [
+      "beach", "botanical_garden", "campground", "city_park", "cycling_park",
+      "dog_park", "fountain", "garden", "hiking_area", "island", "lake",
+      "mountain_peak", "national_park", "nature_preserve", "off_roading_area",
+      "park", "picnic_ground", "playground", "river", "scenic_spot",
+      "state_park", "wildlife_park", "wildlife_refuge", "woods", "zoo",
+    ],
+    culture_history_museums: [
+      "art_gallery", "art_museum", "art_studio", "castle", "cultural_center",
+      "cultural_landmark", "historical_landmark", "historical_place",
+      "history_museum", "monument", "museum", "plaza", "sculpture",
+      "visitor_center",
+    ],
+    amusement_games_fun: [
+      "amusement_center", "amusement_park", "aquarium", "bowling_alley",
+      "ferris_wheel", "go_karting_venue", "indoor_playground", "internet_cafe",
+      "karaoke", "miniature_golf_course", "movie_rental", "movie_theater",
+      "paintball_center", "roller_coaster", "skateboard_park", "video_arcade",
+      "water_park",
+    ],
+    arts_shows_music: [
+      "amphitheatre", "auditorium", "comedy_club", "concert_hall", "dance_hall",
+      "live_music_venue", "opera_house", "performing_arts_theater",
+      "philharmonic_hall", "planetarium",
+    ],
+    adventure_sports_recreation: [
+      "adventure_sports_center", "barbecue_area", "childrens_camp", "marina",
+      "observation_deck", "tourist_attraction", "vineyard",
+    ],
+    social_nightlife_venues: [
+      "banquet_hall", "casino", "community_center", "convention_center",
+      "event_venue", "night_club", "wedding_venue",
+    ],
   },
   food: {
-    cafes: ["cafe", "coffee_shop", "bakery"], local: ["restaurant", "food_court"],
-    japanese: ["japanese_restaurant", "ramen_restaurant", "sushi_restaurant"], chinese: ["chinese_restaurant"],
-    indian: ["indian_restaurant"], western: ["american_restaurant", "french_restaurant", "italian_restaurant"],
-    desserts: ["dessert_shop", "ice_cream_shop", "bakery"],
+    cafes_bakeries_sweets: [
+      "acai_shop", "bagel_shop", "bakery", "cafe", "cake_shop", "candy_store",
+      "cat_cafe", "chocolate_factory", "chocolate_shop", "coffee_roastery",
+      "coffee_shop", "coffee_stand", "confectionery", "dessert_restaurant",
+      "dessert_shop", "dog_cafe", "donut_shop", "ice_cream_shop", "juice_shop",
+      "pastry_shop", "tea_house",
+    ],
+    east_southeast_asian: [
+      "asian_fusion_restaurant", "asian_restaurant", "burmese_restaurant",
+      "cambodian_restaurant", "cantonese_restaurant", "chinese_noodle_restaurant",
+      "chinese_restaurant", "dim_sum_restaurant", "dumpling_restaurant",
+      "filipino_restaurant", "hot_pot_restaurant", "indonesian_restaurant",
+      "japanese_curry_restaurant", "japanese_izakaya_restaurant",
+      "japanese_restaurant", "korean_barbecue_restaurant", "korean_restaurant",
+      "malaysian_restaurant", "mongolian_barbecue_restaurant", "noodle_shop",
+      "ramen_restaurant", "sushi_restaurant", "taiwanese_restaurant",
+      "thai_restaurant", "tibetan_restaurant", "tonkatsu_restaurant",
+      "vietnamese_restaurant", "yakiniku_restaurant", "yakitori_restaurant",
+    ],
+    western_european_mediterranean: [
+      "american_restaurant", "australian_restaurant", "austrian_restaurant",
+      "basque_restaurant", "bavarian_restaurant", "belgian_restaurant",
+      "bistro", "british_restaurant", "californian_restaurant", "croatian_restaurant",
+      "czech_restaurant", "danish_restaurant", "dutch_restaurant",
+      "eastern_european_restaurant", "european_restaurant", "fondue_restaurant",
+      "french_restaurant", "german_restaurant", "greek_restaurant",
+      "hungarian_restaurant", "irish_restaurant", "italian_restaurant",
+      "mediterranean_restaurant", "pizza_delivery", "pizza_restaurant",
+      "polish_restaurant", "portuguese_restaurant", "romanian_restaurant",
+      "russian_restaurant", "scandinavian_restaurant", "spanish_restaurant",
+      "swiss_restaurant", "tapas_restaurant", "ukrainian_restaurant",
+      "western_restaurant",
+    ],
+    latin_south_american_bbq: [
+      "argentinian_restaurant", "barbecue_restaurant", "brazilian_restaurant",
+      "burrito_restaurant", "caribbean_restaurant", "chilean_restaurant",
+      "colombian_restaurant", "cuban_restaurant", "latin_american_restaurant",
+      "mexican_restaurant", "peruvian_restaurant", "south_american_restaurant",
+      "southwestern_us_restaurant", "taco_restaurant", "tex_mex_restaurant",
+    ],
+    south_asian_middle_eastern_african: [
+      "afghani_restaurant", "african_restaurant", "bangladeshi_restaurant",
+      "ethiopian_restaurant", "falafel_restaurant", "gyro_restaurant",
+      "halal_restaurant", "indian_restaurant", "israeli_restaurant",
+      "kebab_shop", "lebanese_restaurant", "middle_eastern_restaurant",
+      "moroccan_restaurant", "north_indian_restaurant", "pakistani_restaurant",
+      "persian_restaurant", "shawarma_restaurant", "south_indian_restaurant",
+      "sri_lankan_restaurant", "turkish_restaurant",
+    ],
+    quick_bites_fast_food: [
+      "cafeteria", "chicken_restaurant", "chicken_wings_restaurant", "deli",
+      "diner", "fast_food_restaurant", "fish_and_chips_restaurant", "food_court",
+      "hamburger_restaurant", "hot_dog_restaurant", "hot_dog_stand",
+      "meal_delivery", "meal_takeaway", "salad_shop", "sandwich_shop",
+      "snack_bar", "soup_restaurant",
+    ],
+    bars_pubs_breweries: [
+      "bar", "bar_and_grill", "beer_garden", "brewery", "brewpub",
+      "cocktail_bar", "gastropub", "hookah_bar", "irish_pub", "lounge_bar",
+      "pub", "sports_bar", "wine_bar", "winery",
+    ],
+    steak_seafood_specialty: [
+      "oyster_bar_restaurant", "seafood_restaurant", "steak_house",
+    ],
+    healthy_vegan_fusion: [
+      "cajun_restaurant", "fusion_restaurant", "hawaiian_restaurant",
+      "soul_food_restaurant", "vegan_restaurant", "vegetarian_restaurant",
+    ],
+    casual_fine_dining: [
+      "breakfast_restaurant", "brunch_restaurant", "buffet_restaurant",
+      "family_restaurant", "fine_dining_restaurant", "restaurant",
+    ],
   },
 };
+
+const typeToGroup: Record<Mode, Record<string, string>> = {
+  activities: {},
+  food: {},
+};
+for (const m of ["activities", "food"] as const) {
+  for (const [groupKey, types] of Object.entries(groups[m])) {
+    for (const t of types) {
+      typeToGroup[m][t] = groupKey;
+    }
+  }
+}
+
 const defaults: Record<Mode, string[]> = {
-  activities: ["park", "museum", "art_gallery", "tourist_attraction", "aquarium", "bowling_alley", "movie_theater", "zoo", "spa", "gym"],
-  food: ["restaurant", "cafe", "coffee_shop", "bakery", "food_court", "dessert_shop"],
+  activities: ["park", "museum", "art_gallery", "tourist_attraction", "aquarium", "hiking_area", "performing_arts_theater", "botanical_garden", "amusement_park", "zoo"],
+  food: ["restaurant", "cafe", "coffee_shop", "bakery", "seafood_restaurant", "bar", "pizza_restaurant", "diner", "bistro"],
 };
 const headers = { ...corsHeaders, "Content-Type": "application/json" };
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
 const number = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : null;
-const fieldMask = "places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours.openNow,places.googleMapsUri,places.photos,places.websiteUri,places.nationalPhoneNumber,places.internationalPhoneNumber,places.regularOpeningHours.weekdayDescriptions,places.dineIn,places.takeout,places.delivery,places.reservable,places.outdoorSeating,places.servesBeer,places.servesWine,places.servesVegetarianFood,places.goodForChildren,places.goodForGroups,places.parkingOptions,places.restroom";
+const fieldMask = "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.primaryTypeDisplayName,places.types,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours.openNow,places.googleMapsUri,places.photos,places.websiteUri,places.nationalPhoneNumber,places.internationalPhoneNumber,places.regularOpeningHours.weekdayDescriptions,places.dineIn,places.takeout,places.delivery,places.reservable,places.outdoorSeating,places.servesBeer,places.servesWine,places.servesVegetarianFood,places.goodForChildren,places.goodForGroups,places.parkingOptions,places.restroom";
 const strings = (value: unknown, max: number) => Array.isArray(value)
   ? [...new Set(value.filter((item): item is string => typeof item === "string").map((item) => item.trim().toLowerCase()).filter(Boolean))].slice(0, max) : [];
 
@@ -120,10 +230,13 @@ function buildSearchPlan(mode: Mode, origin: SearchCenter, radius: number): Sear
   const anchorDistance = radius * 0.55;
   const anchorRadius = Math.min(50_000, Math.max(1_000, Math.round(radius * 0.65)));
   const anchors = shuffle([0, 90, 180, 270].map((bearing) => offsetLocation(origin, anchorDistance, bearing + rotation)));
-  const categoryGroups = shuffle(Object.values(groups[mode]).map((types) => [...new Set(types)]));
+
+  const modeGroups = groups[mode];
+  const categoryGroups = shuffle(Object.values(modeGroups).map((types) => [...new Set(types)]));
+
   return [
     { center: origin, radius, includedTypes: defaults[mode] },
-    ...categoryGroups.map((includedTypes, index) => ({ center: anchors[index % anchors.length], radius: anchorRadius, includedTypes })),
+    ...categoryGroups.map((includedTypes, index) => ({ center: anchors[index % anchors.length], radius: anchorRadius, includedTypes: includedTypes.slice(0, 50) })),
     ...anchors.map((center) => ({ center, radius: anchorRadius, includedTypes: defaults[mode] })),
   ];
 }
@@ -362,9 +475,15 @@ Deno.serve(async (request) => {
   const latitude = number(body.latitude); const longitude = number(body.longitude); const requestedRadius = number(body.radiusMeters);
   if (!mode || latitude === null || longitude === null || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return reply({ error: "Choose a valid discovery area." }, 400);
   const radius = Math.min(50_000, Math.max(1_000, Math.round(requestedRadius ?? 10_000)));
-  const [{ data: savedPlaces, error: savedPlacesError }, { data: passedPlaces, error: passedPlacesError }] = await Promise.all([
+  const weightsTable = mode === "food" ? "user_food_category_weights" : "user_activity_category_weights";
+  const [
+    { data: savedPlaces, error: savedPlacesError },
+    { data: passedPlaces, error: passedPlacesError },
+    { data: categoryWeights },
+  ] = await Promise.all([
     client.from("saved_places").select("google_place_id").eq("user_id", user.id),
     client.from("passed_places").select("google_place_id").eq("user_id", user.id).eq("mode", mode),
+    client.from(weightsTable).select("category_key, weight").eq("user_id", user.id),
   ]);
   if (savedPlacesError || passedPlacesError) return reply({ error: "Could not load your recommendation history." }, 500);
   const excluded = new Set([
@@ -372,7 +491,21 @@ Deno.serve(async (request) => {
     ...(passedPlaces ?? []).map((row) => row.google_place_id),
     ...strings(body.excludedPlaceIds, 100),
   ]);
-  const candidates = new Map<string, { place: Place; meters: number; score: number }>();
+
+  const weightsMap = new Map<string, number>();
+  for (const row of (categoryWeights ?? []) as Array<{ category_key: string; weight: number }>) {
+    if (typeof row.category_key === "string" && typeof row.weight === "number") {
+      weightsMap.set(row.category_key, row.weight);
+    }
+  }
+
+  const candidates = new Map<string, {
+    place: Place;
+    meters: number;
+    score: number;
+    categoryKey: string | null;
+    categoryKeys: string[];
+  }>();
   const fetchedPlaces = new Map<string, Place>();
   const searchPlan = buildSearchPlan(mode, { latitude, longitude }, radius);
   let successfulSearches = 0;
@@ -386,10 +519,42 @@ Deno.serve(async (request) => {
       if (!place.id || !place.displayName?.text || placeLat === undefined || placeLng === undefined || excluded.has(place.id) || candidates.has(place.id)) continue;
       const meters = distance(latitude, longitude, placeLat, placeLng);
       if (meters > radius) continue;
+
+      const candidateCategoryKeys = new Set<string>();
+      if (place.primaryType && typeToGroup[mode][place.primaryType]) {
+        candidateCategoryKeys.add(typeToGroup[mode][place.primaryType]);
+      }
+      if (Array.isArray(place.types)) {
+        for (const t of place.types) {
+          if (typeToGroup[mode][t]) {
+            candidateCategoryKeys.add(typeToGroup[mode][t]);
+          }
+        }
+      }
+      const matchedKeys = Array.from(candidateCategoryKeys);
+      let maxWeight = 0.00;
+      for (const k of matchedKeys) {
+        const w = weightsMap.get(k) ?? 0.00;
+        if (w > maxWeight) maxWeight = w;
+      }
+
+      const wCategory = 0.5 + 1.5 * Math.min(1.0, Math.max(0.0, maxWeight));
       const proximity = Math.max(0, 1 - meters / radius);
-      candidates.set(place.id, { place, meters, score: 0.6 + 0.4 * proximity });
+      const wProximity = 0.5 + 0.5 * proximity;
+      const ratingValue = typeof place.rating === "number" ? Math.min(5, Math.max(0, place.rating)) : 3.5;
+      const wQuality = 0.7 + 0.3 * (ratingValue / 5);
+      const rawScore = wCategory * wProximity * wQuality;
+      const normalizedScore = Math.min(1.0, Math.max(0.0, rawScore / 2.0));
+
+      candidates.set(place.id, {
+        place,
+        meters,
+        score: normalizedScore,
+        categoryKey: matchedKeys[0] ?? null,
+        categoryKeys: matchedKeys,
+      });
     }
-    if (candidates.size >= 20) break;
+    if (candidates.size >= 40) break;
   }
   if (successfulSearches === 0) return reply({ error: "Nearby places are temporarily unavailable." }, 502);
   try {
@@ -401,8 +566,10 @@ Deno.serve(async (request) => {
   if (candidates.size === 0 && successfulSearches < searchPlan.length) {
     return reply({ error: "We could not finish searching this area. Please try again." }, 502);
   }
-  const ranked = shuffle([...candidates.values()]).slice(0, 20);
-  const recommendations = await Promise.all(ranked.map(async ({ place, meters, score }) => {
+  const ranked = [...candidates.values()]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20);
+  const recommendations = await Promise.all(ranked.map(async ({ place, meters, score, categoryKey, categoryKeys }) => {
     const photoInfo = await photo(googleKey, place);
     const photos = (place.photos ?? []).slice(0, 10).map((p, index) => ({
       name: p.name ?? null,
@@ -418,6 +585,8 @@ Deno.serve(async (request) => {
       id: place.id,
       name: place.displayName?.text,
       category: place.primaryTypeDisplayName?.text ?? "Place",
+      categoryKey,
+      categoryKeys,
       address: place.formattedAddress ?? null,
       distanceMeters: Math.round(meters),
       rating: place.rating ?? null,

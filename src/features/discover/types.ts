@@ -10,6 +10,8 @@ export interface Recommendation {
   id: string;
   name: string;
   category: string;
+  categoryKey?: string | null;
+  categoryKeys?: string[];
   address: string | null;
   distanceMeters: number;
   rating: number | null;

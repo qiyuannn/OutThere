@@ -14,7 +14,7 @@ import {
 
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
-import type { PlaceDetails, PlacePhotoItem } from '../types';
+import type { PlaceDetails } from '../types';
 
 interface PhotoCarouselProps {
   place: PlaceDetails;

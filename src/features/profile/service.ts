@@ -45,3 +45,76 @@ export async function saveProfile(userId: string, current: Profile | null, draft
     if (uploaded && !committed) await db.storage.from('avatars').remove([uploaded]).catch(() => {});
   }
 }
+
+
+export async function getUserCategoryWeights(
+  userId: string,
+  mode: 'food' | 'activities',
+): Promise<Record<string, number>> {
+  const table = mode === 'food' ? 'user_food_category_weights' : 'user_activity_category_weights';
+  const { data, error } = await client()
+    .from(table)
+    .select('category_key, weight')
+    .eq('user_id', userId);
+  if (error) throw error;
+
+  const weights: Record<string, number> = {};
+  for (const row of (data ?? []) as Array<{ category_key: string; weight: number | string }>) {
+    const val = typeof row.weight === 'number' ? row.weight : parseFloat(row.weight);
+    weights[row.category_key] = Number.isFinite(val) ? Math.max(0, Math.min(1, Math.round(val * 100) / 100)) : 0;
+  }
+  return weights;
+}
+
+export async function updateCategoryWeight(
+  userId: string,
+  mode: 'food' | 'activities',
+  categoryKey: string,
+  weight: number,
+): Promise<void> {
+  const table = mode === 'food' ? 'user_food_category_weights' : 'user_activity_category_weights';
+  const clamped = Math.max(0.00, Math.min(1.00, Math.round(weight * 100) / 100));
+  const { error } = await client()
+    .from(table)
+    .upsert({
+      user_id: userId,
+      category_key: categoryKey,
+      weight: clamped,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,category_key' });
+  if (error) throw error;
+}
+
+export async function resetCategoryWeight(
+  userId: string,
+  mode: 'food' | 'activities',
+  categoryKey: string,
+): Promise<void> {
+  return updateCategoryWeight(userId, mode, categoryKey, 0.00);
+}
+
+export async function getUserProfileStats(
+  userId: string,
+  mode: 'food' | 'activities',
+): Promise<{ savedCount: number; passedCount: number }> {
+  try {
+    const [savedRes, passedRes] = await Promise.all([
+      client()
+        .from('saved_places')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('mode', mode),
+      client()
+        .from('passed_places')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('mode', mode),
+    ]);
+    return {
+      savedCount: savedRes.count ?? 0,
+      passedCount: passedRes.count ?? 0,
+    };
+  } catch {
+    return { savedCount: 0, passedCount: 0 };
+  }
+}

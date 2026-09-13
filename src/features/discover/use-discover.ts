@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useProfile } from '@/providers/profile-provider';
 import { useAuth } from '@/providers/auth-provider';
 import { DEFAULT_RADIUS_METERS } from './constants';
-import { clearPassedPlaces, getRoundedDeviceLocation, passPlace, recordImpression, requestRecommendations, savePlace } from './service';
+import { clearPassedPlaces, getRoundedDeviceLocation, passPlace, requestRecommendations, savePlace } from './service';
 import type { DiscoverChoice, DiscoverLocation, DiscoverMode, Recommendation } from './types';
 
 const emptyLists = (): Record<DiscoverMode, Recommendation[]> => ({ activities: [], food: [] });
@@ -22,7 +22,7 @@ export function useDiscover() {
   const [passedCounts, setPassedCounts] = useState(zeroes);
   const [loading, setLoading] = useState(true); const [acting, setActing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const requestNumber = useRef(0); const recorded = useRef(new Set<string>());
+  const requestNumber = useRef(0);
 
   const fetchMode = useCallback(async (
     target: DiscoverMode,
@@ -57,17 +57,15 @@ export function useDiscover() {
 
   useEffect(() => { if (userId && !loaded[mode] && !loading) void fetchMode(mode); }, [fetchMode, loaded, loading, mode, userId]);
   const current = items[mode][indices[mode]] ?? null;
-  useEffect(() => {
-    if (!userId || !current) return; const key = `${mode}:${current.id}`;
-    if (recorded.current.has(key)) return; recorded.current.add(key);
-    void recordImpression(userId, current, mode).catch(() => recorded.current.delete(key));
-  }, [current, mode, userId]);
 
   const choose = useCallback(async (choice: DiscoverChoice) => {
     if (!userId || !current || acting) return; setActing(true); setError(null);
     try {
-      if (choice === 'pass') await passPlace(userId, current.id, mode);
-      else await savePlace(userId, current.id, mode);
+      if (choice === 'pass') {
+        await passPlace(userId, current.id, mode);
+      } else if (choice === 'save') {
+        await savePlace(userId, current.id, mode);
+      }
 
       const reachedEnd = indices[mode] + 1 >= items[mode].length;
       if (reachedEnd) {

@@ -1,7 +1,7 @@
 import * as Location from 'expo-location';
 
 import { supabase } from '@/lib/supabase';
-import type { DiscoverLocation, DiscoverMode, Recommendation, RecommendationResponse } from './types';
+import type { DiscoverLocation, DiscoverMode, RecommendationResponse } from './types';
 
 function client() {
   if (!supabase) throw new Error('Connect the app to Supabase to use recommendations.');
@@ -56,12 +56,5 @@ export async function passPlace(userId: string, placeId: string, mode: DiscoverM
 
 export async function clearPassedPlaces(userId: string, mode: DiscoverMode) {
   const { error } = await client().from('passed_places').delete().eq('user_id', userId).eq('mode', mode);
-  if (error) throw error;
-}
-
-export async function recordImpression(userId: string, place: Recommendation, mode: DiscoverMode) {
-  const { error } = await client().from('discover_recommendation_impressions').insert({
-    user_id: userId, google_place_id: place.id, mode, score: place.score,
-  });
   if (error) throw error;
 }
