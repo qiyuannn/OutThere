@@ -4,7 +4,7 @@ import { corsHeaders } from "jsr:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
 
 type Mode = "activities" | "food";
-type PhotoAttribution = { displayName?: string; uri?: string; photoUri?: string };
+type PhotoAttribution = { displayName?: string; uri?: string };
 type PlacePhoto = {
   name?: string;
   widthPx?: number;
@@ -189,7 +189,6 @@ function cachedPlace(place: Place, fetchedAt: string): CachedPlace | null {
     authorAttributions: (item.authorAttributions ?? []).map((a) => ({
       displayName: a.displayName ?? null,
       uri: a.uri ?? null,
-      photoUri: a.photoUri ?? null,
     })),
   }));
   return {
@@ -230,11 +229,135 @@ Deno.serve(async (request) => {
   if (!url || !anonKey || !serviceRoleKey || !googleKey) return reply({ error: "Recommendation service is not configured." }, 503);
   const client = createClient(url, anonKey, { global: { headers: { Authorization: authorization } }, auth: { persistSession: false } });
   const admin = createClient(url, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
-  const { data: { user }, error: userError } = await client.auth.getUser(authorization.slice(7));
-  if (userError || !user) return reply({ error: "Your session has expired. Please sign in again." }, 401);
 
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { return reply({ error: "Invalid request body." }, 400); }
+
+  if (body.action === "get-place-photos") {
+    let rawPhotos: Array<{
+      name?: string | null;
+      widthPx?: number | null;
+      heightPx?: number | null;
+      url?: string | null;
+      authorAttributions?: PhotoAttribution[];
+    }> = [];
+
+    if (typeof body.placeId === "string") {
+      const { data: placeRow } = await admin
+        .from("places")
+        .select("photos")
+        .eq("google_place_id", body.placeId)
+        .maybeSingle();
+
+      if (placeRow?.photos) {
+        rawPhotos = (placeRow.photos as typeof rawPhotos).slice(0, 10);
+      }
+    }
+
+    if (rawPhotos.length === 0 && Array.isArray(body.photos)) {
+      rawPhotos = (body.photos as typeof rawPhotos).slice(0, 10);
+    }
+
+    // Sanitize authorAttributions to never contain contributor avatar URLs
+    for (const p of rawPhotos) {
+      if (p.authorAttributions) {
+        p.authorAttributions = p.authorAttributions.map((a: any) => ({
+          displayName: a.displayName ?? null,
+          uri: a.uri ?? null,
+        }));
+      }
+    }
+
+    let updated = false;
+    await Promise.all(
+      rawPhotos.slice(0, 10).map(async (p) => {
+        if (!p.url && p.name) {
+          try {
+            const res = await fetch(
+              `https://places.googleapis.com/v1/${p.name}/media?maxWidthPx=1200&skipHttpRedirect=true`,
+              { headers: { "X-Goog-Api-Key": googleKey } }
+            );
+            if (res.ok) {
+              const data = (await res.json()) as { photoUri?: string };
+              if (data.photoUri) {
+                p.url = data.photoUri;
+                updated = true;
+              }
+            }
+          } catch {
+            // ignore individual photo fetch error
+          }
+        }
+      })
+    );
+
+    if (typeof body.placeId === "string") {
+      await admin.from("places").update({ photos: rawPhotos }).eq("google_place_id", body.placeId);
+    }
+
+    return reply({
+      photos: rawPhotos,
+      photoUrl: rawPhotos.find((p) => p.url)?.url ?? null,
+    });
+  }
+
+  if (body.action === "backfill-photos") {
+    const { data: allPlaces } = await admin
+      .from("places")
+      .select("google_place_id, photos");
+
+    let count = 0;
+    for (const row of allPlaces ?? []) {
+      const placeId = row.google_place_id;
+      const placePhotos = ((row.photos ?? []) as Array<{
+        name?: string | null;
+        widthPx?: number | null;
+        heightPx?: number | null;
+        url?: string | null;
+        authorAttributions?: any[];
+      }>).slice(0, 10);
+
+      for (const p of placePhotos) {
+        if (p.authorAttributions) {
+          p.authorAttributions = p.authorAttributions.map((a: any) => ({
+            displayName: a.displayName ?? null,
+            uri: a.uri ?? null,
+          }));
+        }
+      }
+
+      let rowUpdated = false;
+      await Promise.all(
+        placePhotos.map(async (p) => {
+          if (!p.url && p.name) {
+            try {
+              const res = await fetch(
+                `https://places.googleapis.com/v1/${p.name}/media?maxWidthPx=1200&skipHttpRedirect=true`,
+                { headers: { "X-Goog-Api-Key": googleKey } }
+              );
+              if (res.ok) {
+                const data = (await res.json()) as { photoUri?: string };
+                if (data.photoUri) {
+                  p.url = data.photoUri;
+                  rowUpdated = true;
+                }
+              }
+            } catch {
+              // ignore
+            }
+          }
+        })
+      );
+
+      await admin.from("places").update({ photos: placePhotos }).eq("google_place_id", placeId);
+      if (rowUpdated) count += 1;
+    }
+    return reply({ ok: true, updatedPlaces: count });
+  }
+
+  const { data: { user }, error: userError } = await client.auth.getUser(authorization.slice(7));
+  if (userError || !user) return reply({ error: "Your session has expired. Please sign in again." }, 401);
+
   const mode: Mode | null = body.mode === "activities" ? "activities" : body.mode === "food" ? "food" : null;
   const latitude = number(body.latitude); const longitude = number(body.longitude); const requestedRadius = number(body.radiusMeters);
   if (!mode || latitude === null || longitude === null || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return reply({ error: "Choose a valid discovery area." }, 400);
@@ -279,35 +402,40 @@ Deno.serve(async (request) => {
     return reply({ error: "We could not finish searching this area. Please try again." }, 502);
   }
   const ranked = shuffle([...candidates.values()]).slice(0, 20);
-  const recommendations = await Promise.all(ranked.map(async ({ place, meters, score }) => ({
-    id: place.id,
-    name: place.displayName?.text,
-    category: place.primaryTypeDisplayName?.text ?? "Place",
-    address: place.formattedAddress ?? null,
-    distanceMeters: Math.round(meters),
-    rating: place.rating ?? null,
-    ratingCount: place.userRatingCount ?? null,
-    priceLevel: place.priceLevel ?? null,
-    openNow: place.currentOpeningHours?.openNow ?? null,
-    mapsUrl: place.googleMapsUri ?? null,
-    websiteUri: place.websiteUri ?? null,
-    phoneNumber: place.nationalPhoneNumber ?? place.internationalPhoneNumber ?? null,
-    regularOpeningHours: place.regularOpeningHours?.weekdayDescriptions ?? [],
-    amenities: extractAmenities(place),
-    reason: meters < radius * 0.3 ? "A nearby option within your chosen range." : "A different corner of your chosen search area.",
-    score: Number(score.toFixed(4)),
-    matchPercent: Math.round(score * 100),
-    photos: (place.photos ?? []).slice(0, 10).map((p) => ({
+  const recommendations = await Promise.all(ranked.map(async ({ place, meters, score }) => {
+    const photoInfo = await photo(googleKey, place);
+    const photos = (place.photos ?? []).slice(0, 10).map((p, index) => ({
       name: p.name ?? null,
       widthPx: p.widthPx ?? null,
       heightPx: p.heightPx ?? null,
+      url: index === 0 ? photoInfo.photoUrl : null,
       authorAttributions: (p.authorAttributions ?? []).map((a) => ({
         displayName: a.displayName ?? null,
         uri: a.uri ?? null,
-        photoUri: a.photoUri ?? null,
       })),
-    })),
-    ...await photo(googleKey, place),
-  })));
+    }));
+    return {
+      id: place.id,
+      name: place.displayName?.text,
+      category: place.primaryTypeDisplayName?.text ?? "Place",
+      address: place.formattedAddress ?? null,
+      distanceMeters: Math.round(meters),
+      rating: place.rating ?? null,
+      ratingCount: place.userRatingCount ?? null,
+      priceLevel: place.priceLevel ?? null,
+      openNow: place.currentOpeningHours?.openNow ?? null,
+      mapsUrl: place.googleMapsUri ?? null,
+      websiteUri: place.websiteUri ?? null,
+      phoneNumber: place.nationalPhoneNumber ?? place.internationalPhoneNumber ?? null,
+      regularOpeningHours: place.regularOpeningHours?.weekdayDescriptions ?? [],
+      amenities: extractAmenities(place),
+      reason: meters < radius * 0.3 ? "A nearby option within your chosen range." : "A different corner of your chosen search area.",
+      score: Number(score.toFixed(4)),
+      matchPercent: Math.round(score * 100),
+      photos,
+      photoUrl: photoInfo.photoUrl,
+      photoAttribution: photoInfo.photoAttribution,
+    };
+  }));
   return reply({ recommendations, exhausted: recommendations.length === 0, passedCount: passedPlaces?.length ?? 0 });
 });

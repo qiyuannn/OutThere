@@ -1,7 +1,6 @@
 export interface PhotoAttribution {
   displayName: string | null;
   uri: string | null;
-  photoUri?: string | null;
 }
 
 export interface PlacePhotoItem {

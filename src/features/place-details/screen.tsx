@@ -84,6 +84,9 @@ export function PlaceDetailsScreen({
 
         if (active) {
           const regularHours = Array.isArray(data.regular_opening_hours) ? data.regular_opening_hours : [];
+          const rawPhotos = (data.photos ?? []) as PlaceDetails['photos'];
+          const primaryPhoto = rawPhotos?.find((p) => p.url);
+          const firstAttribution = rawPhotos?.[0]?.authorAttributions?.[0];
           setPlace({
             id: data.google_place_id,
             name: data.display_name ?? 'Saved Place',
@@ -100,7 +103,12 @@ export function PlaceDetailsScreen({
             phoneNumber: data.phone_number,
             regularOpeningHours: regularHours,
             amenities: data.amenities,
-            photos: data.photos,
+            photos: rawPhotos,
+            photoUrl: primaryPhoto?.url ?? null,
+            photoAttribution: firstAttribution?.displayName ? {
+              displayName: firstAttribution.displayName,
+              uri: firstAttribution.uri ?? null,
+            } : null,
           });
         }
       } catch {
@@ -116,6 +124,49 @@ export function PlaceDetailsScreen({
       active = false;
     };
   }, [place, placeId]);
+
+  // Fetch photo media URLs from edge function if missing
+  useEffect(() => {
+    if (!place || !placeId || !supabase) return;
+    const currentPhotos = place.photos;
+    const needsPhotoResolution = currentPhotos?.some((p) => p.name && !p.url);
+    if (!needsPhotoResolution) return;
+
+    let active = true;
+
+    async function loadPhotoUrls() {
+      try {
+        const { data, error } = await supabase!.functions.invoke('place-recommendations', {
+          body: {
+            action: 'get-place-photos',
+            placeId,
+            photos: currentPhotos,
+          },
+        });
+
+        if (error || !data || !active) return;
+
+        if (Array.isArray(data.photos) && data.photos.length > 0) {
+          setPlace((prev) => {
+            if (!prev || prev.id !== placeId) return prev;
+            return {
+              ...prev,
+              photos: data.photos,
+              photoUrl: data.photoUrl ?? data.photos.find((p: { url?: string }) => p.url)?.url ?? prev.photoUrl,
+            };
+          });
+        }
+      } catch {
+        // Silently ignore photo resolution error
+      }
+    }
+
+    void loadPhotoUrls();
+
+    return () => {
+      active = false;
+    };
+  }, [place?.photos, placeId]);
 
   // Check saved state in database if not provided
   useEffect(() => {

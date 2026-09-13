@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Image } from 'expo-image';
 import {
+  ActivityIndicator,
   FlatList,
   Linking,
   Pressable,
@@ -30,7 +31,7 @@ export function PhotoCarousel({ place }: PhotoCarouselProps) {
 
   if (place.photos && place.photos.length > 0) {
     for (const photo of place.photos) {
-      const uri = photo.url ?? photo.authorAttributions?.[0]?.photoUri ?? null;
+      const uri = photo.url ?? null;
       const attribution = photo.authorAttributions?.[0] ?? null;
       if (uri) {
         rawPhotos.push({ uri, attribution });
@@ -62,11 +63,16 @@ export function PhotoCarousel({ place }: PhotoCarouselProps) {
 
   // If completely empty or all photos failed
   if (rawPhotos.length === 0) {
+    const hasUnresolvedPhotos = place.photos?.some((p) => p.name && !p.url);
     return (
       <View style={[styles.fallbackContainer, { backgroundColor: theme.backgroundSelected, borderColor: theme.border }]}>
-        <ThemedText style={[styles.fallbackIcon, { color: theme.primary }]}>✦</ThemedText>
+        {hasUnresolvedPhotos ? (
+          <ActivityIndicator size="small" color={theme.primary} />
+        ) : (
+          <ThemedText style={[styles.fallbackIcon, { color: theme.primary }]}>✦</ThemedText>
+        )}
         <ThemedText type="smallBold" themeColor="textSecondary">
-          {place.category ?? 'A special place to explore'}
+          {hasUnresolvedPhotos ? 'Loading photos…' : (place.category ?? 'A special place to explore')}
         </ThemedText>
       </View>
     );
