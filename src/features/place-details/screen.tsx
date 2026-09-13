@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
+import { computeIsOpenNow } from '@/lib/opening-hours';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { ActionBar } from './components/action-bar';
@@ -36,10 +37,19 @@ export function PlaceDetailsScreen({
   const searchParams = useLocalSearchParams<{ id?: string; placeJson?: string }>();
 
   const [place, setPlace] = useState<PlaceDetails | null>(() => {
-    if (directPlace) return directPlace;
+    if (directPlace) {
+      return {
+        ...directPlace,
+        openNow: directPlace.openNow ?? computeIsOpenNow(directPlace.regularOpeningHours),
+      };
+    }
     if (searchParams.placeJson) {
       try {
-        return JSON.parse(searchParams.placeJson) as PlaceDetails;
+        const parsed = JSON.parse(searchParams.placeJson) as PlaceDetails;
+        return {
+          ...parsed,
+          openNow: parsed.openNow ?? computeIsOpenNow(parsed.regularOpeningHours),
+        };
       } catch {
         return null;
       }
@@ -73,6 +83,7 @@ export function PlaceDetailsScreen({
         }
 
         if (active) {
+          const regularHours = Array.isArray(data.regular_opening_hours) ? data.regular_opening_hours : [];
           setPlace({
             id: data.google_place_id,
             name: data.display_name ?? 'Saved Place',
@@ -83,11 +94,11 @@ export function PlaceDetailsScreen({
             rating: data.rating,
             ratingCount: data.user_rating_count,
             priceLevel: data.price_level,
-            openNow: data.open_now,
+            openNow: computeIsOpenNow(regularHours),
             mapsUrl: data.google_maps_uri,
             websiteUri: data.website_uri,
             phoneNumber: data.phone_number,
-            regularOpeningHours: data.regular_opening_hours,
+            regularOpeningHours: regularHours,
             amenities: data.amenities,
             photos: data.photos,
           });

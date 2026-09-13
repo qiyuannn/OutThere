@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
+import { computeIsOpenNow } from '@/lib/opening-hours';
 import type { PlaceDetails } from '../types';
 
 function distanceLabel(meters: number | null | undefined): string | null {
@@ -75,32 +76,36 @@ export function PlaceHeader({ place }: PlaceHeaderProps) {
         ) : null}
 
         {/* Open / Closed Status */}
-        {place.openNow !== null && place.openNow !== undefined ? (
-          <View
-            style={[
-              styles.badge,
-              {
-                backgroundColor: place.openNow ? theme.accent : theme.backgroundElement,
-                borderColor: place.openNow ? theme.accent : theme.border,
-              },
-            ]}
-          >
+        {(() => {
+          const isOpen = place.openNow ?? computeIsOpenNow(place.regularOpeningHours);
+          if (isOpen === null || isOpen === undefined) return null;
+          return (
             <View
               style={[
-                styles.statusDot,
-                { backgroundColor: place.openNow ? theme.onAccent : theme.textSecondary },
-              ]}
-            />
-            <ThemedText
-              style={[
-                styles.openBadgeText,
-                { color: place.openNow ? theme.onAccent : theme.textSecondary },
+                styles.badge,
+                {
+                  backgroundColor: isOpen ? theme.accent : theme.backgroundElement,
+                  borderColor: isOpen ? theme.accent : theme.border,
+                },
               ]}
             >
-              {place.openNow ? 'OPEN NOW' : 'CLOSED NOW'}
-            </ThemedText>
-          </View>
-        ) : null}
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: isOpen ? theme.onAccent : theme.textSecondary },
+                ]}
+              />
+              <ThemedText
+                style={[
+                  styles.openBadgeText,
+                  { color: isOpen ? theme.onAccent : theme.textSecondary },
+                ]}
+              >
+                {isOpen ? 'OPEN NOW' : 'CLOSED NOW'}
+              </ThemedText>
+            </View>
+          );
+        })()}
 
         {/* Distance */}
         {dist ? (

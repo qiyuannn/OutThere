@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
+import { computeIsOpenNow } from '@/lib/opening-hours';
 import type { PlaceDetails } from '../types';
 
 interface HoursSectionProps {
@@ -19,6 +20,7 @@ export function HoursSection({ place }: HoursSectionProps) {
   if (!hours || hours.length === 0) return null;
 
   const currentDayName = dayNames[new Date().getDay()];
+  const isOpen = place.openNow ?? computeIsOpenNow(hours);
 
   return (
     <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
@@ -42,7 +44,7 @@ export function HoursSection({ place }: HoursSectionProps) {
       {!expanded ? (
         <View style={styles.todayRow}>
           <ThemedText type="smallBold">
-            {place.openNow !== null && place.openNow !== undefined ? (place.openNow ? 'Open today' : 'Closed now') : 'Hours today'}
+            {isOpen !== null && isOpen !== undefined ? (isOpen ? 'Open today' : 'Closed now') : 'Hours today'}
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
             {hours.find((h) => h.startsWith(currentDayName)) ?? hours[0]}
