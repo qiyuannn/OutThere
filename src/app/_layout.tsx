@@ -3,6 +3,8 @@ import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/use-theme';
+import { SubscriptionProvider } from '@/providers/subscription-provider';
+import { ProfileProvider } from '@/providers/profile-provider';
 import { BackendProvider } from '@/providers/backend-provider';
 import { AuthProvider, useAuth } from '@/providers/auth-provider';
 import { Screen, Button } from '@/components/foundation';
@@ -16,7 +18,7 @@ function Navigation() {
   if (initializationError) return <Screen title="Let’s try that again."><ThemedText>We couldn’t restore your session. Check your connection.</ThemedText><Button label="Try again" onPress={retry} /></Screen>;
   return <Stack screenOptions={{ headerShown: false }}>
     <Stack.Screen name="auth" />
-    <Stack.Protected guard={!!session}><Stack.Screen name="(tabs)" /></Stack.Protected>
+    <Stack.Protected guard={!!session}><Stack.Screen name="(tabs)" /><Stack.Screen name="onboarding" /></Stack.Protected>
   </Stack>;
 }
 
@@ -25,6 +27,6 @@ export default function RootLayout() {
   const colors = useTheme();
   const base = dark ? DarkTheme : DefaultTheme;
   return <SafeAreaProvider><ThemeProvider value={{ ...base, colors: { ...base.colors, primary: colors.primary, background: colors.background, card: colors.backgroundElement, text: colors.text, border: colors.border } }}>
-    <BackendProvider><AuthProvider><StatusBar style={dark ? 'light' : 'dark'} /><Navigation /></AuthProvider></BackendProvider>
+    <BackendProvider><AuthProvider><SubscriptionProvider><ProfileProvider><StatusBar style={dark ? 'light' : 'dark'} /><Navigation /></ProfileProvider></SubscriptionProvider></AuthProvider></BackendProvider>
   </ThemeProvider></SafeAreaProvider>;
 }
