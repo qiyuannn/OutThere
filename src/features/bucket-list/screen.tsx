@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { router } from 'expo-router';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,33 +9,58 @@ import { useTheme } from '@/hooks/use-theme';
 import { useSavedPlaces } from './use-saved-places';
 import type { SavedPlace } from './types';
 
-const savedDate = new Intl.DateTimeFormat(undefined, {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-});
+const priceLabels: Record<string, string> = {
+  PRICE_LEVEL_FREE: 'Free',
+  PRICE_LEVEL_INEXPENSIVE: '$',
+  PRICE_LEVEL_MODERATE: '$$',
+  PRICE_LEVEL_EXPENSIVE: '$$$',
+  PRICE_LEVEL_VERY_EXPENSIVE: '$$$$',
+};
+
+function priceLabel(level: string | null) {
+  return level ? priceLabels[level] ?? level : 'Price unavailable';
+}
+
+function openingLabel(openNow: boolean | null) {
+  if (openNow === null) return 'Hours unavailable';
+  return openNow ? 'Open now' : 'Closed now';
+}
 
 export default function BucketListScreen() {
   const theme = useTheme();
   const { places, loading, refreshing, error, refresh } = useSavedPlaces();
+  const [selectedMode, setSelectedMode] = useState<SavedPlace['mode']>('food');
+  const visiblePlaces = places.filter((place) => place.mode === selectedMode);
+  const selectedLabel = selectedMode === 'food' ? 'food' : 'activity';
 
   return <SafeAreaView edges={['top', 'left', 'right']} style={[styles.screen, { backgroundColor: theme.background }]}>
     <FlatList
-      data={places}
+      data={visiblePlaces}
       keyExtractor={(place) => place.google_place_id}
       renderItem={({ item }) => <SavedPlaceRow place={item} />}
-      contentContainerStyle={[styles.content, places.length === 0 && styles.emptyContent]}
-      ItemSeparatorComponent={() => <View style={styles.separator} />}
+      contentContainerStyle={[styles.content, visiblePlaces.length === 0 && styles.emptyContent]}
+      ItemSeparatorComponent={() => <View style={[styles.separator, { backgroundColor: theme.border }]} />}
       ListHeaderComponent={<View style={styles.header}>
         <ThemedText type="smallBold" themeColor="primary" style={styles.eyebrow}>BUCKET LIST</ThemedText>
         <ThemedText accessibilityRole="header" type="title" style={styles.title}>Your someday starts here.</ThemedText>
-        {places.length > 0 ? <ThemedText themeColor="textSecondary">
-          {places.length} saved {places.length === 1 ? 'place' : 'places'}
+        <View accessibilityRole="tablist" style={[styles.tabs, { backgroundColor: theme.backgroundSelected }]}>
+          {(['food', 'activities'] as const).map((mode) => {
+            const selected = selectedMode === mode;
+            return <Pressable key={mode} accessibilityRole="tab" accessibilityState={{ selected }} onPress={() => setSelectedMode(mode)}
+              style={({ pressed }) => [styles.tab, { backgroundColor: selected ? theme.accent : 'transparent', opacity: pressed ? 0.75 : 1 }]}>
+              <ThemedText type="smallBold" style={{ color: selected ? theme.onAccent : theme.textSecondary }}>
+                {mode === 'food' ? 'Food' : 'Activity'}
+              </ThemedText>
+            </Pressable>;
+          })}
+        </View>
+        {visiblePlaces.length > 0 ? <ThemedText themeColor="textSecondary">
+          {visiblePlaces.length} saved {selectedLabel} {visiblePlaces.length === 1 ? 'place' : 'places'}
         </ThemedText> : null}
       </View>}
       ListEmptyComponent={loading ? <LoadingState /> : error ? <ErrorState message={error} onRetry={refresh} /> : <EmptyState
-        title="Room for new possibilities"
-        description="Places you save from Discover will show up here."
+        title={`No saved ${selectedMode === 'food' ? 'food' : 'activities'} yet`}
+        description={`Places you save from Discover’s ${selectedMode === 'food' ? 'Food' : 'Activities'} tab will show up here.`}
       >
         <Button label="Back to Discover" onPress={() => router.navigate('/')} />
       </EmptyState>}
@@ -47,18 +73,19 @@ export default function BucketListScreen() {
 
 function SavedPlaceRow({ place }: { place: SavedPlace }) {
   const theme = useTheme();
-  const date = new Date(place.saved_at);
-  const formattedDate = Number.isNaN(date.getTime()) ? 'Date unavailable' : `Saved ${savedDate.format(date)}`;
+  const name = place.display_name ?? 'Unnamed place';
+  const location = place.location ?? 'Location unavailable';
+  const category = place.category ?? (place.mode === 'food' ? 'Food' : 'Activity');
+  const price = priceLabel(place.price_level);
+  const opening = openingLabel(place.open_now);
 
-  return <View accessible accessibilityLabel={`${place.mode === 'food' ? 'Food' : 'Activity'} saved ${formattedDate.replace('Saved ', '')}`}
-    style={[styles.row, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-    <View style={[styles.modeIcon, { backgroundColor: theme.backgroundSelected }]}>
-      <ThemedText style={styles.modeIconText}>{place.mode === 'food' ? '◒' : '✦'}</ThemedText>
-    </View>
+  return <View accessible accessibilityLabel={`${name}. ${price}. ${category}. ${location}. ${opening}.`}
+    style={styles.row}>
     <View style={styles.rowCopy}>
-      <ThemedText type="smallBold" numberOfLines={1}>{place.mode === 'food' ? 'Food' : 'Activity'}</ThemedText>
-      <ThemedText type="code" themeColor="textSecondary" numberOfLines={1} selectable>{place.google_place_id}</ThemedText>
-      <ThemedText type="small" themeColor="textSecondary">{formattedDate}</ThemedText>
+      <ThemedText accessibilityRole="header" numberOfLines={2} style={styles.placeName}>{name}</ThemedText>
+      <ThemedText numberOfLines={2} style={styles.detailLine}>{price} · {category}</ThemedText>
+      <ThemedText numberOfLines={2} style={styles.detailLine}>⌖ · {location}</ThemedText>
+      <ThemedText numberOfLines={1} style={[styles.openingStatus, { color: place.open_now ? theme.primary : theme.textSecondary }]}>{opening}</ThemedText>
     </View>
   </View>;
 }
@@ -90,11 +117,14 @@ const styles = StyleSheet.create({
   header: { gap: 10, marginBottom: 24 },
   eyebrow: { letterSpacing: 3 },
   title: { fontSize: 40, lineHeight: 46, fontWeight: '800', letterSpacing: -1.5 },
-  separator: { height: 12 },
-  row: { minHeight: 96, borderWidth: 1, borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14 },
-  modeIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  modeIconText: { fontSize: 23, lineHeight: 28 },
-  rowCopy: { flex: 1, minWidth: 0, gap: 2 },
+  tabs: { flexDirection: 'row', padding: 4, gap: 4, borderRadius: 24, marginTop: 6 },
+  tab: { flex: 1, minHeight: 40, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
+  separator: { height: StyleSheet.hairlineWidth },
+  row: { minHeight: 124, paddingVertical: 16 },
+  rowCopy: { flex: 1, minWidth: 0 },
+  placeName: { fontSize: 18, lineHeight: 23, fontWeight: '800', letterSpacing: -0.25 },
+  detailLine: { fontSize: 14, lineHeight: 19, fontWeight: '500' },
+  openingStatus: { marginTop: 12, fontSize: 13, lineHeight: 18, fontWeight: '500' },
   loadingState: { flex: 1, minHeight: 220, alignItems: 'center', justifyContent: 'center', gap: 14 },
   errorState: { borderWidth: 1, borderRadius: 24, padding: 24, gap: 14 },
   stateTitle: { fontSize: 24, lineHeight: 30 },
