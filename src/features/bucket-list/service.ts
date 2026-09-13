@@ -1,20 +1,12 @@
+import { computeIsOpenNow } from '@/lib/opening-hours';
 import { supabase } from '@/lib/supabase';
-import type { SavedPlace } from './types';
-
-interface PlaceDetails {
-  display_name: string | null;
-  formatted_address: string | null;
-  primary_type_display_name: string | null;
-  rating: number | null;
-  price_level: string | null;
-  open_now: boolean | null;
-}
+import type { CachedPlace, SavedPlace } from './types';
 
 interface SavedPlaceRow {
   google_place_id: string;
   mode: SavedPlace['mode'];
   saved_at: string;
-  places: PlaceDetails[] | PlaceDetails | null;
+  places: CachedPlace[] | CachedPlace | null;
 }
 
 export async function getSavedPlaces(userId: string): Promise<SavedPlace[]> {
@@ -22,19 +14,7 @@ export async function getSavedPlaces(userId: string): Promise<SavedPlace[]> {
 
   const { data, error } = await supabase
     .from('saved_places')
-    .select(`
-      google_place_id,
-      mode,
-      saved_at,
-      places (
-        display_name,
-        formatted_address,
-        primary_type_display_name,
-        rating,
-        price_level,
-        open_now
-      )
-    `)
+    .select('google_place_id, mode, saved_at, places(*)')
     .eq('user_id', userId)
     .order('saved_at', { ascending: false });
 
@@ -50,7 +30,20 @@ export async function getSavedPlaces(userId: string): Promise<SavedPlace[]> {
       category: details?.primary_type_display_name ?? null,
       rating: details?.rating ?? null,
       price_level: details?.price_level ?? null,
-      open_now: details?.open_now ?? null,
+      open_now: computeIsOpenNow(details?.regular_opening_hours),
+      places: details ?? null,
     };
   });
+}
+
+export async function removeSavedPlace(userId: string, placeId: string): Promise<void> {
+  if (!supabase) throw new Error('Connect the app to Supabase to remove saved places.');
+
+  const { error } = await supabase
+    .from('saved_places')
+    .delete()
+    .eq('user_id', userId)
+    .eq('google_place_id', placeId);
+
+  if (error) throw error;
 }

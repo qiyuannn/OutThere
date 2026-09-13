@@ -4,7 +4,7 @@ import { corsHeaders } from "jsr:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
 
 type Mode = "activities" | "food";
-type PhotoAttribution = { displayName?: string; uri?: string; photoUri?: string };
+type PhotoAttribution = { displayName?: string; uri?: string };
 type PlacePhoto = {
   name?: string;
   widthPx?: number;
@@ -19,6 +19,22 @@ type Place = {
   userRatingCount?: number; priceLevel?: string; currentOpeningHours?: { openNow?: boolean };
   googleMapsUri?: string;
   photos?: PlacePhoto[];
+  websiteUri?: string;
+  nationalPhoneNumber?: string;
+  internationalPhoneNumber?: string;
+  regularOpeningHours?: { weekdayDescriptions?: string[] };
+  dineIn?: boolean;
+  takeout?: boolean;
+  delivery?: boolean;
+  reservable?: boolean;
+  outdoorSeating?: boolean;
+  servesBeer?: boolean;
+  servesWine?: boolean;
+  servesVegetarianFood?: boolean;
+  goodForChildren?: boolean;
+  goodForGroups?: boolean;
+  parkingOptions?: { freeParkingLot?: boolean; paidParkingLot?: boolean; freeStreetParking?: boolean; paidStreetParking?: boolean; valetParking?: boolean };
+  restroom?: boolean;
 };
 
 type CachedPlace = {
@@ -31,8 +47,11 @@ type CachedPlace = {
   rating: number | null;
   user_rating_count: number | null;
   price_level: string | null;
-  open_now: boolean | null;
   google_maps_uri: string | null;
+  website_uri: string | null;
+  phone_number: string | null;
+  regular_opening_hours: string[];
+  amenities: Record<string, boolean>;
   photos: PlacePhoto[];
   last_fetched_at: string;
 };
@@ -59,7 +78,7 @@ const defaults: Record<Mode, string[]> = {
 const headers = { ...corsHeaders, "Content-Type": "application/json" };
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
 const number = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : null;
-const fieldMask = "places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours.openNow,places.googleMapsUri,places.photos";
+const fieldMask = "places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours.openNow,places.googleMapsUri,places.photos,places.websiteUri,places.nationalPhoneNumber,places.internationalPhoneNumber,places.regularOpeningHours.weekdayDescriptions,places.dineIn,places.takeout,places.delivery,places.reservable,places.outdoorSeating,places.servesBeer,places.servesWine,places.servesVegetarianFood,places.goodForChildren,places.goodForGroups,places.parkingOptions,places.restroom";
 const strings = (value: unknown, max: number) => Array.isArray(value)
   ? [...new Set(value.filter((item): item is string => typeof item === "string").map((item) => item.trim().toLowerCase()).filter(Boolean))].slice(0, max) : [];
 
@@ -144,6 +163,23 @@ async function photo(apiKey: string, place: Place) {
   } catch { return { photoUrl: null, photoAttribution: null }; }
 }
 
+function extractAmenities(place: Place): Record<string, boolean> {
+  const amenities: Record<string, boolean> = {};
+  if (typeof place.dineIn === "boolean") amenities.dineIn = place.dineIn;
+  if (typeof place.takeout === "boolean") amenities.takeout = place.takeout;
+  if (typeof place.delivery === "boolean") amenities.delivery = place.delivery;
+  if (typeof place.reservable === "boolean") amenities.reservable = place.reservable;
+  if (typeof place.outdoorSeating === "boolean") amenities.outdoorSeating = place.outdoorSeating;
+  if (typeof place.servesBeer === "boolean") amenities.servesBeer = place.servesBeer;
+  if (typeof place.servesWine === "boolean") amenities.servesWine = place.servesWine;
+  if (typeof place.servesVegetarianFood === "boolean") amenities.servesVegetarianFood = place.servesVegetarianFood;
+  if (typeof place.goodForChildren === "boolean") amenities.goodForChildren = place.goodForChildren;
+  if (typeof place.goodForGroups === "boolean") amenities.goodForGroups = place.goodForGroups;
+  if (typeof place.restroom === "boolean") amenities.restroom = place.restroom;
+  if (place.parkingOptions?.freeParkingLot || place.parkingOptions?.freeStreetParking) amenities.freeParking = true;
+  return amenities;
+}
+
 function cachedPlace(place: Place, fetchedAt: string): CachedPlace | null {
   if (!place.id) return null;
   const photos = (place.photos ?? []).slice(0, 10).map((item) => ({
@@ -153,7 +189,6 @@ function cachedPlace(place: Place, fetchedAt: string): CachedPlace | null {
     authorAttributions: (item.authorAttributions ?? []).map((a) => ({
       displayName: a.displayName ?? null,
       uri: a.uri ?? null,
-      photoUri: a.photoUri ?? null,
     })),
   }));
   return {
@@ -166,8 +201,11 @@ function cachedPlace(place: Place, fetchedAt: string): CachedPlace | null {
     rating: place.rating ?? null,
     user_rating_count: place.userRatingCount ?? null,
     price_level: place.priceLevel ?? null,
-    open_now: place.currentOpeningHours?.openNow ?? null,
     google_maps_uri: place.googleMapsUri ?? null,
+    website_uri: place.websiteUri ?? null,
+    phone_number: place.nationalPhoneNumber ?? place.internationalPhoneNumber ?? null,
+    regular_opening_hours: place.regularOpeningHours?.weekdayDescriptions ?? [],
+    amenities: extractAmenities(place),
     photos,
     last_fetched_at: fetchedAt,
   };
@@ -191,11 +229,135 @@ Deno.serve(async (request) => {
   if (!url || !anonKey || !serviceRoleKey || !googleKey) return reply({ error: "Recommendation service is not configured." }, 503);
   const client = createClient(url, anonKey, { global: { headers: { Authorization: authorization } }, auth: { persistSession: false } });
   const admin = createClient(url, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
-  const { data: { user }, error: userError } = await client.auth.getUser(authorization.slice(7));
-  if (userError || !user) return reply({ error: "Your session has expired. Please sign in again." }, 401);
 
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { return reply({ error: "Invalid request body." }, 400); }
+
+  if (body.action === "get-place-photos") {
+    let rawPhotos: Array<{
+      name?: string | null;
+      widthPx?: number | null;
+      heightPx?: number | null;
+      url?: string | null;
+      authorAttributions?: PhotoAttribution[];
+    }> = [];
+
+    if (typeof body.placeId === "string") {
+      const { data: placeRow } = await admin
+        .from("places")
+        .select("photos")
+        .eq("google_place_id", body.placeId)
+        .maybeSingle();
+
+      if (placeRow?.photos) {
+        rawPhotos = (placeRow.photos as typeof rawPhotos).slice(0, 10);
+      }
+    }
+
+    if (rawPhotos.length === 0 && Array.isArray(body.photos)) {
+      rawPhotos = (body.photos as typeof rawPhotos).slice(0, 10);
+    }
+
+    // Sanitize authorAttributions to never contain contributor avatar URLs
+    for (const p of rawPhotos) {
+      if (p.authorAttributions) {
+        p.authorAttributions = p.authorAttributions.map((a: any) => ({
+          displayName: a.displayName ?? null,
+          uri: a.uri ?? null,
+        }));
+      }
+    }
+
+    let updated = false;
+    await Promise.all(
+      rawPhotos.slice(0, 10).map(async (p) => {
+        if (!p.url && p.name) {
+          try {
+            const res = await fetch(
+              `https://places.googleapis.com/v1/${p.name}/media?maxWidthPx=1200&skipHttpRedirect=true`,
+              { headers: { "X-Goog-Api-Key": googleKey } }
+            );
+            if (res.ok) {
+              const data = (await res.json()) as { photoUri?: string };
+              if (data.photoUri) {
+                p.url = data.photoUri;
+                updated = true;
+              }
+            }
+          } catch {
+            // ignore individual photo fetch error
+          }
+        }
+      })
+    );
+
+    if (typeof body.placeId === "string") {
+      await admin.from("places").update({ photos: rawPhotos }).eq("google_place_id", body.placeId);
+    }
+
+    return reply({
+      photos: rawPhotos,
+      photoUrl: rawPhotos.find((p) => p.url)?.url ?? null,
+    });
+  }
+
+  if (body.action === "backfill-photos") {
+    const { data: allPlaces } = await admin
+      .from("places")
+      .select("google_place_id, photos");
+
+    let count = 0;
+    for (const row of allPlaces ?? []) {
+      const placeId = row.google_place_id;
+      const placePhotos = ((row.photos ?? []) as Array<{
+        name?: string | null;
+        widthPx?: number | null;
+        heightPx?: number | null;
+        url?: string | null;
+        authorAttributions?: any[];
+      }>).slice(0, 10);
+
+      for (const p of placePhotos) {
+        if (p.authorAttributions) {
+          p.authorAttributions = p.authorAttributions.map((a: any) => ({
+            displayName: a.displayName ?? null,
+            uri: a.uri ?? null,
+          }));
+        }
+      }
+
+      let rowUpdated = false;
+      await Promise.all(
+        placePhotos.map(async (p) => {
+          if (!p.url && p.name) {
+            try {
+              const res = await fetch(
+                `https://places.googleapis.com/v1/${p.name}/media?maxWidthPx=1200&skipHttpRedirect=true`,
+                { headers: { "X-Goog-Api-Key": googleKey } }
+              );
+              if (res.ok) {
+                const data = (await res.json()) as { photoUri?: string };
+                if (data.photoUri) {
+                  p.url = data.photoUri;
+                  rowUpdated = true;
+                }
+              }
+            } catch {
+              // ignore
+            }
+          }
+        })
+      );
+
+      await admin.from("places").update({ photos: placePhotos }).eq("google_place_id", placeId);
+      if (rowUpdated) count += 1;
+    }
+    return reply({ ok: true, updatedPlaces: count });
+  }
+
+  const { data: { user }, error: userError } = await client.auth.getUser(authorization.slice(7));
+  if (userError || !user) return reply({ error: "Your session has expired. Please sign in again." }, 401);
+
   const mode: Mode | null = body.mode === "activities" ? "activities" : body.mode === "food" ? "food" : null;
   const latitude = number(body.latitude); const longitude = number(body.longitude); const requestedRadius = number(body.radiusMeters);
   if (!mode || latitude === null || longitude === null || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return reply({ error: "Choose a valid discovery area." }, 400);
@@ -240,31 +402,40 @@ Deno.serve(async (request) => {
     return reply({ error: "We could not finish searching this area. Please try again." }, 502);
   }
   const ranked = shuffle([...candidates.values()]).slice(0, 20);
-  const recommendations = await Promise.all(ranked.map(async ({ place, meters, score }) => ({
-    id: place.id,
-    name: place.displayName?.text,
-    category: place.primaryTypeDisplayName?.text ?? "Place",
-    address: place.formattedAddress ?? null,
-    distanceMeters: Math.round(meters),
-    rating: place.rating ?? null,
-    ratingCount: place.userRatingCount ?? null,
-    priceLevel: place.priceLevel ?? null,
-    openNow: place.currentOpeningHours?.openNow ?? null,
-    mapsUrl: place.googleMapsUri ?? null,
-    reason: meters < radius * 0.3 ? "A nearby option within your chosen range." : "A different corner of your chosen search area.",
-    score: Number(score.toFixed(4)),
-    matchPercent: Math.round(score * 100),
-    photos: (place.photos ?? []).slice(0, 10).map((p) => ({
+  const recommendations = await Promise.all(ranked.map(async ({ place, meters, score }) => {
+    const photoInfo = await photo(googleKey, place);
+    const photos = (place.photos ?? []).slice(0, 10).map((p, index) => ({
       name: p.name ?? null,
       widthPx: p.widthPx ?? null,
       heightPx: p.heightPx ?? null,
+      url: index === 0 ? photoInfo.photoUrl : null,
       authorAttributions: (p.authorAttributions ?? []).map((a) => ({
         displayName: a.displayName ?? null,
         uri: a.uri ?? null,
-        photoUri: a.photoUri ?? null,
       })),
-    })),
-    ...await photo(googleKey, place),
-  })));
+    }));
+    return {
+      id: place.id,
+      name: place.displayName?.text,
+      category: place.primaryTypeDisplayName?.text ?? "Place",
+      address: place.formattedAddress ?? null,
+      distanceMeters: Math.round(meters),
+      rating: place.rating ?? null,
+      ratingCount: place.userRatingCount ?? null,
+      priceLevel: place.priceLevel ?? null,
+      openNow: place.currentOpeningHours?.openNow ?? null,
+      mapsUrl: place.googleMapsUri ?? null,
+      websiteUri: place.websiteUri ?? null,
+      phoneNumber: place.nationalPhoneNumber ?? place.internationalPhoneNumber ?? null,
+      regularOpeningHours: place.regularOpeningHours?.weekdayDescriptions ?? [],
+      amenities: extractAmenities(place),
+      reason: meters < radius * 0.3 ? "A nearby option within your chosen range." : "A different corner of your chosen search area.",
+      score: Number(score.toFixed(4)),
+      matchPercent: Math.round(score * 100),
+      photos,
+      photoUrl: photoInfo.photoUrl,
+      photoAttribution: photoInfo.photoAttribution,
+    };
+  }));
   return reply({ recommendations, exhausted: recommendations.length === 0, passedCount: passedPlaces?.length ?? 0 });
 });
