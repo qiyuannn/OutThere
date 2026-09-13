@@ -19,6 +19,22 @@ type Place = {
   userRatingCount?: number; priceLevel?: string; currentOpeningHours?: { openNow?: boolean };
   googleMapsUri?: string;
   photos?: PlacePhoto[];
+  websiteUri?: string;
+  nationalPhoneNumber?: string;
+  internationalPhoneNumber?: string;
+  regularOpeningHours?: { weekdayDescriptions?: string[] };
+  dineIn?: boolean;
+  takeout?: boolean;
+  delivery?: boolean;
+  reservable?: boolean;
+  outdoorSeating?: boolean;
+  servesBeer?: boolean;
+  servesWine?: boolean;
+  servesVegetarianFood?: boolean;
+  goodForChildren?: boolean;
+  goodForGroups?: boolean;
+  parkingOptions?: { freeParkingLot?: boolean; paidParkingLot?: boolean; freeStreetParking?: boolean; paidStreetParking?: boolean; valetParking?: boolean };
+  restroom?: boolean;
 };
 
 type CachedPlace = {
@@ -33,6 +49,10 @@ type CachedPlace = {
   price_level: string | null;
   open_now: boolean | null;
   google_maps_uri: string | null;
+  website_uri: string | null;
+  phone_number: string | null;
+  regular_opening_hours: string[];
+  amenities: Record<string, boolean>;
   photos: PlacePhoto[];
   last_fetched_at: string;
 };
@@ -59,7 +79,7 @@ const defaults: Record<Mode, string[]> = {
 const headers = { ...corsHeaders, "Content-Type": "application/json" };
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
 const number = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : null;
-const fieldMask = "places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours.openNow,places.googleMapsUri,places.photos";
+const fieldMask = "places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours.openNow,places.googleMapsUri,places.photos,places.websiteUri,places.nationalPhoneNumber,places.internationalPhoneNumber,places.regularOpeningHours.weekdayDescriptions,places.dineIn,places.takeout,places.delivery,places.reservable,places.outdoorSeating,places.servesBeer,places.servesWine,places.servesVegetarianFood,places.goodForChildren,places.goodForGroups,places.parkingOptions,places.restroom";
 const strings = (value: unknown, max: number) => Array.isArray(value)
   ? [...new Set(value.filter((item): item is string => typeof item === "string").map((item) => item.trim().toLowerCase()).filter(Boolean))].slice(0, max) : [];
 
@@ -144,6 +164,23 @@ async function photo(apiKey: string, place: Place) {
   } catch { return { photoUrl: null, photoAttribution: null }; }
 }
 
+function extractAmenities(place: Place): Record<string, boolean> {
+  const amenities: Record<string, boolean> = {};
+  if (typeof place.dineIn === "boolean") amenities.dineIn = place.dineIn;
+  if (typeof place.takeout === "boolean") amenities.takeout = place.takeout;
+  if (typeof place.delivery === "boolean") amenities.delivery = place.delivery;
+  if (typeof place.reservable === "boolean") amenities.reservable = place.reservable;
+  if (typeof place.outdoorSeating === "boolean") amenities.outdoorSeating = place.outdoorSeating;
+  if (typeof place.servesBeer === "boolean") amenities.servesBeer = place.servesBeer;
+  if (typeof place.servesWine === "boolean") amenities.servesWine = place.servesWine;
+  if (typeof place.servesVegetarianFood === "boolean") amenities.servesVegetarianFood = place.servesVegetarianFood;
+  if (typeof place.goodForChildren === "boolean") amenities.goodForChildren = place.goodForChildren;
+  if (typeof place.goodForGroups === "boolean") amenities.goodForGroups = place.goodForGroups;
+  if (typeof place.restroom === "boolean") amenities.restroom = place.restroom;
+  if (place.parkingOptions?.freeParkingLot || place.parkingOptions?.freeStreetParking) amenities.freeParking = true;
+  return amenities;
+}
+
 function cachedPlace(place: Place, fetchedAt: string): CachedPlace | null {
   if (!place.id) return null;
   const photos = (place.photos ?? []).slice(0, 10).map((item) => ({
@@ -168,6 +205,10 @@ function cachedPlace(place: Place, fetchedAt: string): CachedPlace | null {
     price_level: place.priceLevel ?? null,
     open_now: place.currentOpeningHours?.openNow ?? null,
     google_maps_uri: place.googleMapsUri ?? null,
+    website_uri: place.websiteUri ?? null,
+    phone_number: place.nationalPhoneNumber ?? place.internationalPhoneNumber ?? null,
+    regular_opening_hours: place.regularOpeningHours?.weekdayDescriptions ?? [],
+    amenities: extractAmenities(place),
     photos,
     last_fetched_at: fetchedAt,
   };
@@ -251,6 +292,10 @@ Deno.serve(async (request) => {
     priceLevel: place.priceLevel ?? null,
     openNow: place.currentOpeningHours?.openNow ?? null,
     mapsUrl: place.googleMapsUri ?? null,
+    websiteUri: place.websiteUri ?? null,
+    phoneNumber: place.nationalPhoneNumber ?? place.internationalPhoneNumber ?? null,
+    regularOpeningHours: place.regularOpeningHours?.weekdayDescriptions ?? [],
+    amenities: extractAmenities(place),
     reason: meters < radius * 0.3 ? "A nearby option within your chosen range." : "A different corner of your chosen search area.",
     score: Number(score.toFixed(4)),
     matchPercent: Math.round(score * 100),

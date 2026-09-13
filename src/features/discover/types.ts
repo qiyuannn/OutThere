@@ -23,6 +23,10 @@ export interface Recommendation {
   photoUrl: string | null;
   photoAttribution: { displayName: string; uri: string | null } | null;
   photos?: PlacePhoto[];
+  websiteUri?: string | null;
+  phoneNumber?: string | null;
+  regularOpeningHours?: string[];
+  amenities?: Record<string, boolean>;
 }
 
 export interface PlacePhoto {
