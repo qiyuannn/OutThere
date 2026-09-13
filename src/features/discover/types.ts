@@ -22,6 +22,14 @@ export interface Recommendation {
   matchPercent: number;
   photoUrl: string | null;
   photoAttribution: { displayName: string; uri: string | null } | null;
+  photos?: PlacePhoto[];
+}
+
+export interface PlacePhoto {
+  name: string | null;
+  widthPx: number | null;
+  heightPx: number | null;
+  authorAttributions: Array<{ displayName: string | null; uri: string | null; photoUri?: string | null }>;
 }
 
 export interface RecommendationResponse {
