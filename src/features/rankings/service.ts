@@ -2,6 +2,7 @@ import { CATEGORY_GROUPS_BY_MODE, getCategoryKeysForPlace } from '@/features/cat
 import { inferVibeFromRating, recalibrateTierScores, Vibe } from './comparison';
 import { supabase } from '@/lib/supabase';
 import type { CandidatePlace, RankedPlace, RankingMode, SaveRatingInput } from './types';
+import { hydratePlaceRows } from '@/features/search/service';
 
 function client() {
   if (!supabase) throw new Error('Supabase is not configured.');
@@ -45,8 +46,12 @@ export async function getUserRankings(
 
   const groups = CATEGORY_GROUPS_BY_MODE[mode];
 
-  return ((data ?? []) as RatingRow[]).map((row) => {
-    const place = Array.isArray(row.places) ? row.places[0] : row.places;
+  const ratingRows = (data ?? []) as RatingRow[];
+  const hydrated = await hydratePlaceRows(ratingRows.map(row => (Array.isArray(row.places) ? row.places[0] : row.places) ?? { google_place_id: row.google_place_id, display_name: '' }));
+  const byId = new Map(hydrated.map(p => [p.google_place_id, p as PlaceRow]));
+
+  return ratingRows.map((row) => {
+    const place = byId.get(row.google_place_id);
     const numRating = typeof row.rating === 'number' ? row.rating : parseFloat(row.rating);
 
     const primaryType = place?.primary_type_display_name ?? null;
@@ -245,11 +250,14 @@ export async function syncCategoryWeightsFromRatings(
 ): Promise<void> {
   const { data: ratingsData, error: ratingsError } = await client()
     .from('user_place_ratings')
-    .select('rating, places(primary_type_display_name)')
+    .select('google_place_id, rating, places(google_place_id, display_name, primary_type_display_name)')
     .eq('user_id', userId)
     .eq('mode', mode);
 
   if (ratingsError) throw ratingsError;
+
+  const ratingPlaces = await hydratePlaceRows((ratingsData ?? []).map(row => (Array.isArray(row.places) ? row.places[0] : row.places) ?? { google_place_id: row.google_place_id, display_name: null }));
+  const ratingPlacesById = new Map(ratingPlaces.map(p => [p.google_place_id, p]));
 
   const groups = CATEGORY_GROUPS_BY_MODE[mode];
   const table = mode === 'food' ? 'user_food_category_weights' : 'user_activity_category_weights';
@@ -264,7 +272,7 @@ export async function syncCategoryWeightsFromRatings(
     const val = typeof row.rating === 'number' ? row.rating : parseFloat(row.rating);
     if (!Number.isFinite(val)) continue;
 
-    const place = Array.isArray(row.places) ? row.places[0] : row.places;
+    const place = ratingPlacesById.get(row.google_place_id);
     const primaryType = (place as { primary_type_display_name?: string } | null)?.primary_type_display_name ?? null;
     const catKeys = getCategoryKeysForPlace(mode, primaryType);
 
@@ -328,11 +336,14 @@ export async function getCandidatePlaces(
   const candidates: CandidatePlace[] = [];
   const seenIds = new Set<string>();
 
+  const savedPlaces = await hydratePlaceRows((savedData ?? []).map(row => ((Array.isArray(row.places) ? row.places[0] : row.places) as PlaceRow | null) ?? { google_place_id: row.google_place_id, display_name: '' }));
+  const savedById = new Map(savedPlaces.map(p => [p.google_place_id, p as PlaceRow]));
+
   for (const row of savedData ?? []) {
     if (ratedIds.has(row.google_place_id) || seenIds.has(row.google_place_id)) continue;
     seenIds.add(row.google_place_id);
 
-    const place = (Array.isArray(row.places) ? row.places[0] : row.places) as PlaceRow | null;
+    const place = savedById.get(row.google_place_id);
     if (!place) continue;
 
     candidates.push({
@@ -353,6 +364,7 @@ export async function getCandidatePlaces(
     .limit(40);
 
   for (const place of (otherPlaces ?? []) as PlaceRow[]) {
+    if (!place.display_name) continue;
     if (ratedIds.has(place.google_place_id) || seenIds.has(place.google_place_id)) continue;
     seenIds.add(place.google_place_id);
 

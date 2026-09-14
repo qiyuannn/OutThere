@@ -22,7 +22,7 @@ export function RankedPlaceCard({ item, rank, onDelete }: RankedPlaceCardProps) 
   const handlePress = () => {
     router.push({
       pathname: '/(tabs)/bucket-list/[id]',
-      params: { id: item.google_place_id },
+      params: { id: item.google_place_id, mode: item.mode },
     });
   };
 

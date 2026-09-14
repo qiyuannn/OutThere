@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Linking,
   Platform,
   Pressable,
@@ -83,6 +84,8 @@ export function ActionBar({
     try {
       setSaving(true);
       await onToggleSave(!isSaved);
+    } catch (error) {
+      Alert.alert('Could not update saved places', error instanceof Error ? error.message : 'Please try again.');
     } finally {
       setSaving(false);
     }

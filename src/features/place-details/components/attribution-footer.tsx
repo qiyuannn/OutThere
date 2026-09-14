@@ -2,6 +2,7 @@ import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import type { PlaceDetails } from '../types';
+import { GoogleAttribution } from '@/features/search/result-card';
 
 interface AttributionFooterProps {
   place: PlaceDetails;
@@ -57,9 +58,7 @@ export function AttributionFooter({ place }: AttributionFooterProps) {
         </View>
       ) : null}
 
-      <ThemedText style={styles.legalNotice} themeColor="textSecondary">
-        Data and imagery powered by Google Maps Platform
-      </ThemedText>
+      <GoogleAttribution attributions={place.attributions} />
     </View>
   );
 }

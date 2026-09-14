@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/providers/auth-provider';
 import { deleteUserPlaceRating, getUserRankings, saveUserPlaceRating } from './service';
 import type { RankedPlace, RankingMode, SaveRatingInput } from './types';
@@ -15,8 +16,10 @@ export function useRankings(initialMode: RankingMode = 'food') {
 
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const requestVersion = useRef(0);
 
   const loadData = useCallback(async (isRefresh = false) => {
+    const version = ++requestVersion.current;
     if (!userId) {
       setLoading(false);
       return;
@@ -27,18 +30,18 @@ export function useRankings(initialMode: RankingMode = 'food') {
 
     try {
       const data = await getUserRankings(userId, mode);
-      setRankings(data);
+      if (version === requestVersion.current) setRankings(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load your rankings.');
+      if (version === requestVersion.current) setError(err instanceof Error ? err.message : 'Could not load your rankings.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (version === requestVersion.current) { setLoading(false); setRefreshing(false); }
     }
   }, [userId, mode]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     void loadData();
-  }, [loadData]);
+    return () => { requestVersion.current++; };
+  }, [loadData]));
 
   // Reset category filter when switching between food and activities
   useEffect(() => {

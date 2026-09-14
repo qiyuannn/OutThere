@@ -12,6 +12,7 @@
     },
     "allowImportingTsExtensions": true
   },
+  "exclude": ["supabase/functions/place-search/index.ts"],
   "include": [
     "**/*.ts",
     "**/*.tsx",

@@ -10,7 +10,7 @@ const tabs = [
     icon: { ios: 'list.bullet.rectangle', android: 'feed', web: 'feed' },
   },
   {
-    name: 'friends',
+    name: 'search',
     title: 'Search',
     icon: { ios: 'magnifyingglass', android: 'search', web: 'search' },
   },
@@ -42,5 +42,6 @@ export default function AppTabs() {
       tabBarIcon: ({ color }) => <SymbolView name={icon} tintColor={color} size={28} accessibilityElementsHidden />,
     }} />)}
     <Tabs.Screen name="explore/index" options={{ href: null }} />
+    <Tabs.Screen name="friends" options={{ href: null }} />
   </Tabs>;
 }

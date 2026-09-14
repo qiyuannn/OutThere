@@ -1,6 +1,7 @@
 import { computeIsOpenNow } from '@/lib/opening-hours';
 import { supabase } from '@/lib/supabase';
 import type { CachedPlace, SavedPlace } from './types';
+import { hydratePlaceRows } from '@/features/search/service';
 
 interface SavedPlaceRow {
   google_place_id: string;
@@ -20,8 +21,12 @@ export async function getSavedPlaces(userId: string): Promise<SavedPlace[]> {
 
   if (error) throw error;
 
-  return ((data ?? []) as SavedPlaceRow[]).map(({ places, ...savedPlace }) => {
-    const details = Array.isArray(places) ? places[0] : places;
+  const rows = (data ?? []) as SavedPlaceRow[];
+  const hydrated = await hydratePlaceRows(rows.map(row => (Array.isArray(row.places) ? row.places[0] : row.places) ?? { google_place_id: row.google_place_id, display_name: null }));
+  const byId = new Map(hydrated.map(p => [p.google_place_id, p as CachedPlace & { live_open_now?: boolean | null }]));
+
+  return rows.map(({ places, ...savedPlace }) => {
+    const details = byId.get(savedPlace.google_place_id);
 
     return {
       ...savedPlace,
@@ -30,7 +35,7 @@ export async function getSavedPlaces(userId: string): Promise<SavedPlace[]> {
       category: details?.primary_type_display_name ?? null,
       rating: details?.rating ?? null,
       price_level: details?.price_level ?? null,
-      open_now: computeIsOpenNow(details?.regular_opening_hours),
+      open_now: details && 'live_open_now' in details ? details.live_open_now ?? null : computeIsOpenNow(details?.regular_opening_hours),
       places: details ?? null,
     };
   });
