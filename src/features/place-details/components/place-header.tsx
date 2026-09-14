@@ -77,7 +77,7 @@ export function PlaceHeader({ place }: PlaceHeaderProps) {
 
         {/* Open / Closed Status */}
         {(() => {
-          const isOpen = place.openNow ?? computeIsOpenNow(place.regularOpeningHours);
+          const isOpen = place.liveDetails ? place.openNow : place.openNow ?? computeIsOpenNow(place.regularOpeningHours);
           if (isOpen === null || isOpen === undefined) return null;
           return (
             <View

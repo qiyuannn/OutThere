@@ -11,9 +11,16 @@ npm ci
 npm run web
 ```
 
-The app opens to authentication. Discover, Saved, Rankings, Friends, and Profile
+The app opens to authentication. Discover, Search, Saved, Rankings, and Profile
 are protected tabs. New users complete profile onboarding before entering them.
 Without service credentials the login form displays an unavailable state. Existing launcher/splash artwork is still Expo starter artwork.
+
+## Place search
+
+Search real places by query and area, with category, distance, open-now, price,
+rating and sorting filters. Results connect to place details, Saved and Rankings.
+See [place-search setup and behaviour](docs/place-search.md) for backend deployment,
+Google API requirements, data lifetime, cost limits and testing.
 
 ## Connect Supabase
 

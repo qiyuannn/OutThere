@@ -27,14 +27,14 @@ export function PhotoCarousel({ place }: PhotoCarouselProps) {
   const [failedIndices, setFailedIndices] = useState<Record<number, boolean>>({});
 
   // Compute carousel items
-  const rawPhotos: Array<{ uri: string | null; attribution?: { displayName: string | null; uri: string | null } | null }> = [];
+  const rawPhotos: Array<{ uri: string | null; source?: string | null; attribution?: { displayName: string | null; uri: string | null } | null }> = [];
 
   if (place.photos && place.photos.length > 0) {
     for (const photo of place.photos) {
       const uri = photo.url ?? null;
       const attribution = photo.authorAttributions?.[0] ?? null;
       if (uri) {
-        rawPhotos.push({ uri, attribution });
+        rawPhotos.push({ uri, attribution, source: photo.googleMapsUri });
       }
     }
   }
@@ -100,6 +100,7 @@ export function PhotoCarousel({ place }: PhotoCarouselProps) {
                   accessibilityLabel={`Photo of ${place.name}`}
                   style={styles.image}
                   contentFit="cover"
+                  cachePolicy={place.liveDetails ? 'none' : 'disk'}
                   transition={200}
                   onError={() => handleImageError(index)}
                 />
@@ -133,6 +134,9 @@ export function PhotoCarousel({ place }: PhotoCarouselProps) {
       ) : null}
 
       {/* Pagination Indicator */}
+      {rawPhotos[activeIndex]?.source && <Pressable accessibilityRole="link" accessibilityLabel="View original photo on Google Maps"
+        onPress={() => void Linking.openURL(rawPhotos[activeIndex].source!).catch(() => {})}
+        style={[styles.paginationBadge, { bottom: 48 }]}><ThemedText style={styles.paginationText}>View photo on Google Maps ↗</ThemedText></Pressable>}
       {rawPhotos.length > 1 ? (
         <View style={styles.paginationBadge}>
           <ThemedText style={styles.paginationText}>

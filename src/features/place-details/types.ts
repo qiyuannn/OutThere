@@ -4,6 +4,7 @@ export interface PhotoAttribution {
 }
 
 export interface PlacePhotoItem {
+  googleMapsUri?: string | null;
   url?: string | null;
   name?: string | null;
   widthPx?: number | null;
@@ -12,6 +13,10 @@ export interface PlacePhotoItem {
 }
 
 export interface PlaceDetails {
+  mode?: 'food' | 'activities';
+  primaryType?: string | null;
+  liveDetails?: boolean;
+  attributions?: { provider?: string; providerUri?: string }[];
   id: string;
   name: string;
   category?: string | null;

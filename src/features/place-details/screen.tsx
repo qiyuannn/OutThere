@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,6 +15,8 @@ import { computeIsOpenNow } from '@/lib/opening-hours';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { getCategoryGroupKey } from '@/features/categories/catalog';
+import { getLivePlaceDetails } from '@/features/search/service';
+import { Button } from '@/components/foundation';
 import { RatePlaceModal } from '@/features/rankings/components/rate-place-modal';
 import { getUserRankings, getUserRatingForPlace, saveUserPlaceRating } from '@/features/rankings/service';
 import type { CandidatePlace, RankedPlace, RankingMode, SaveRatingInput } from '@/features/rankings/types';
@@ -38,13 +40,13 @@ export function PlaceDetailsScreen({
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
   const userId = session?.user.id;
-  const searchParams = useLocalSearchParams<{ id?: string; placeJson?: string }>();
+  const searchParams = useLocalSearchParams<{ id?: string; placeJson?: string; mode?: 'food' | 'activities' }>();
 
   const [place, setPlace] = useState<PlaceDetails | null>(() => {
     if (directPlace) {
       return {
         ...directPlace,
-        openNow: directPlace.openNow ?? computeIsOpenNow(directPlace.regularOpeningHours),
+        openNow: directPlace.liveDetails ? directPlace.openNow : directPlace.openNow ?? computeIsOpenNow(directPlace.regularOpeningHours),
       };
     }
     if (searchParams.placeJson) {
@@ -66,30 +68,34 @@ export function PlaceDetailsScreen({
   const [userRating, setUserRating] = useState<number | null>(null);
   const [isRateModalVisible, setIsRateModalVisible] = useState(false);
   const [existingRankings, setExistingRankings] = useState<RankedPlace[]>([]);
+  const [rankingsReady, setRankingsReady] = useState(false);
+  const [rankingsError, setRankingsError] = useState(false);
+  const [rankingsAttempt, setRankingsAttempt] = useState(0);
 
   const placeId = place?.id ?? (typeof searchParams.id === 'string' ? searchParams.id : undefined);
 
-  const detectedMode: RankingMode = (place?.category && getCategoryGroupKey('activities', place.category))
+  const detectedMode: RankingMode = (searchParams.mode === 'food' || searchParams.mode === 'activities' ? searchParams.mode : place?.mode) ?? ((place?.category && getCategoryGroupKey('activities', place.category))
     ? 'activities'
-    : 'food';
+    : 'food');
 
   // Fetch user rating and rankings for comparison
   useEffect(() => {
     if (!userId || !placeId) return;
     let active = true;
+    setRankingsReady(false); setRankingsError(false);
 
     getUserRatingForPlace(userId, placeId).then((res) => {
       if (active) setUserRating(res?.rating ?? null);
-    });
+    }).catch(() => { /* Rating state can be retried by reopening the place. */ });
 
     getUserRankings(userId, detectedMode).then((ranks) => {
-      if (active) setExistingRankings(ranks);
-    });
+      if (active) { setExistingRankings(ranks); setRankingsReady(true); }
+    }).catch(() => { if (active) setRankingsError(true); });
 
     return () => {
       active = false;
     };
-  }, [userId, placeId, detectedMode]);
+  }, [userId, placeId, detectedMode, rankingsAttempt]);
 
   const handleSaveRating = async (input: SaveRatingInput) => {
     if (!userId) return;
@@ -104,7 +110,7 @@ export function PlaceDetailsScreen({
         google_place_id: place.id,
         display_name: place.name,
         formatted_address: place.address ?? null,
-        primary_type: place.category ?? null,
+        primary_type: place.primaryType ?? place.category ?? null,
         primary_type_display_name: place.category ?? null,
         photo_url: place.photoUrl ?? place.photos?.[0]?.url ?? null,
         mode: detectedMode,
@@ -128,6 +134,12 @@ export function PlaceDetailsScreen({
 
         if (error || !data) {
           if (active) setLoading(false);
+          return;
+        }
+
+        if (!data.display_name) {
+          const fresh = (await getLivePlaceDetails([placeId!])).get(placeId!);
+          if (active && fresh) setPlace(fresh);
           return;
         }
 
@@ -218,7 +230,7 @@ export function PlaceDetailsScreen({
   }, [place?.photos, placeId]);
 
   // Check saved state in database if not provided
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if (directIsSaved !== undefined || !userId || !placeId || !supabase) return;
 
     let active = true;
@@ -245,7 +257,7 @@ export function PlaceDetailsScreen({
     return () => {
       active = false;
     };
-  }, [directIsSaved, placeId, userId]);
+  }, [directIsSaved, placeId, userId]));
 
   // Handle Save / Unsave toggle
   const handleToggleSave = useCallback(
@@ -262,20 +274,22 @@ export function PlaceDetailsScreen({
         const { error } = await supabase.from('saved_places').upsert({
           user_id: userId,
           google_place_id: placeId,
-          mode: 'food',
+          mode: detectedMode,
           saved_at: new Date().toISOString(),
         }, { onConflict: 'user_id,google_place_id' });
-        if (!error) setIsSaved(true);
+        if (error) throw error;
+        setIsSaved(true);
       } else {
         const { error } = await supabase
           .from('saved_places')
           .delete()
           .eq('user_id', userId)
           .eq('google_place_id', placeId);
-        if (!error) setIsSaved(false);
+        if (error) throw error;
+        setIsSaved(false);
       }
     },
-    [directOnToggleSave, placeId, userId]
+    [directOnToggleSave, placeId, userId, detectedMode]
   );
 
   const handleBack = () => {
@@ -365,8 +379,10 @@ export function PlaceDetailsScreen({
             isSaved={isSaved}
             onToggleSave={handleToggleSave}
             userRating={userRating}
-            onRate={() => setIsRateModalVisible(true)}
+            onRate={rankingsReady ? () => setIsRateModalVisible(true) : undefined}
           />
+          {rankingsError && <><ThemedText>Could not load your ratings for comparison.</ThemedText><Button label="Retry ratings" onPress={() => setRankingsAttempt(n => n + 1)} /></>}
+          {!rankingsReady && !rankingsError && <ThemedText type="small" themeColor="textSecondary">Loading your ratings…</ThemedText>}
 
           {/* Editorial / Recommendation Note */}
           <RecommendationNote place={place} />

@@ -145,7 +145,7 @@ export default function BucketListScreen() {
           ) : (
             <EmptyState
               title={`No saved ${selectedMode === 'food' ? 'food' : 'activities'} yet`}
-              description={`Places you save from Discover’s ${selectedMode === 'food' ? 'Food' : 'Activities'} tab will show up here.`}
+              description="Places you save from Search or Discover will show up here."
             >
               <Button label="Back to Discover" onPress={() => router.navigate('/')} />
             </EmptyState>
@@ -189,7 +189,7 @@ function SavedPlaceRow({
   const handlePress = () => {
     router.push({
       pathname: '/(tabs)/bucket-list/[id]',
-      params: { id: place.google_place_id },
+      params: { id: place.google_place_id, mode: place.mode },
     });
   };
 

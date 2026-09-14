@@ -14,13 +14,15 @@ const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 
 export function HoursSection({ place }: HoursSectionProps) {
   const theme = useTheme();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(!!place.liveDetails);
 
   const hours = place.regularOpeningHours;
   if (!hours || hours.length === 0) return null;
 
-  const currentDayName = dayNames[new Date().getDay()];
-  const isOpen = place.openNow ?? computeIsOpenNow(hours);
+  // A manually selected area may be in another timezone. Do not label the
+  // device's current weekday as "today" for live provider schedules.
+  const currentDayName = place.liveDetails ? null : dayNames[new Date().getDay()];
+  const isOpen = place.liveDetails ? place.openNow : place.openNow ?? computeIsOpenNow(hours);
 
   return (
     <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
@@ -44,17 +46,17 @@ export function HoursSection({ place }: HoursSectionProps) {
       {!expanded ? (
         <View style={styles.todayRow}>
           <ThemedText type="smallBold">
-            {isOpen !== null && isOpen !== undefined ? (isOpen ? 'Open today' : 'Closed now') : 'Hours today'}
+            {isOpen !== null && isOpen !== undefined ? (isOpen ? 'Open now' : 'Closed now') : place.liveDetails ? 'Regular weekly hours' : 'Hours today'}
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            {hours.find((h) => h.startsWith(currentDayName)) ?? hours[0]}
+            {currentDayName ? hours.find((h) => h.startsWith(currentDayName)) ?? hours[0] : 'See all days for this place’s regular schedule.'}
           </ThemedText>
         </View>
       ) : (
         /* Expanded: Full 7 days */
         <View style={styles.scheduleList}>
           {hours.map((line, idx) => {
-            const isToday = line.startsWith(currentDayName);
+            const isToday = currentDayName !== null && line.startsWith(currentDayName);
             const [day, ...rest] = line.split(': ');
             const time = rest.join(': ');
 
