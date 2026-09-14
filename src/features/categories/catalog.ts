@@ -219,20 +219,40 @@ export const CATEGORY_GROUPS_BY_MODE: Record<ProfileMode, readonly CategoryGroup
 const FOOD_TYPE_TO_GROUP = new Map<string, string>();
 for (const group of FOOD_CATEGORY_GROUPS) {
   for (const type of group.placeTypes) {
-    FOOD_TYPE_TO_GROUP.set(type, group.key);
+    const raw = type.toLowerCase().trim();
+    const snake = raw.replace(/[\s-]+/g, '_');
+    const spaced = raw.replace(/_/g, ' ');
+    FOOD_TYPE_TO_GROUP.set(raw, group.key);
+    FOOD_TYPE_TO_GROUP.set(snake, group.key);
+    FOOD_TYPE_TO_GROUP.set(spaced, group.key);
   }
 }
 
 const ACTIVITY_TYPE_TO_GROUP = new Map<string, string>();
 for (const group of ACTIVITY_CATEGORY_GROUPS) {
   for (const type of group.placeTypes) {
-    ACTIVITY_TYPE_TO_GROUP.set(type, group.key);
+    const raw = type.toLowerCase().trim();
+    const snake = raw.replace(/[\s-]+/g, '_');
+    const spaced = raw.replace(/_/g, ' ');
+    ACTIVITY_TYPE_TO_GROUP.set(raw, group.key);
+    ACTIVITY_TYPE_TO_GROUP.set(snake, group.key);
+    ACTIVITY_TYPE_TO_GROUP.set(spaced, group.key);
   }
+}
+
+function resolveTypeToGroup(map: Map<string, string>, rawType: string): string | null {
+  const cleaned = rawType.toLowerCase().trim();
+  if (map.has(cleaned)) return map.get(cleaned)!;
+  const snake = cleaned.replace(/[\s-]+/g, '_');
+  if (map.has(snake)) return map.get(snake)!;
+  const spaced = cleaned.replace(/_/g, ' ');
+  if (map.has(spaced)) return map.get(spaced)!;
+  return null;
 }
 
 export function getCategoryGroupKey(mode: ProfileMode, placeType: string): string | null {
   const map = mode === 'food' ? FOOD_TYPE_TO_GROUP : ACTIVITY_TYPE_TO_GROUP;
-  return map.get(placeType) ?? null;
+  return resolveTypeToGroup(map, placeType);
 }
 
 export function getCategoryKeysForPlace(
@@ -244,13 +264,13 @@ export function getCategoryKeysForPlace(
   const map = mode === 'food' ? FOOD_TYPE_TO_GROUP : ACTIVITY_TYPE_TO_GROUP;
 
   if (primaryType) {
-    const key = map.get(primaryType.toLowerCase().trim());
+    const key = resolveTypeToGroup(map, primaryType);
     if (key) keys.add(key);
   }
 
   if (types && Array.isArray(types)) {
     for (const t of types) {
-      const key = map.get(t.toLowerCase().trim());
+      const key = resolveTypeToGroup(map, t);
       if (key) keys.add(key);
     }
   }

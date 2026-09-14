@@ -14,6 +14,10 @@ import { useTheme } from '@/hooks/use-theme';
 import { computeIsOpenNow } from '@/lib/opening-hours';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
+import { getCategoryGroupKey } from '@/features/categories/catalog';
+import { RatePlaceModal } from '@/features/rankings/components/rate-place-modal';
+import { getUserRankings, getUserRatingForPlace, saveUserPlaceRating } from '@/features/rankings/service';
+import type { CandidatePlace, RankedPlace, RankingMode, SaveRatingInput } from '@/features/rankings/types';
 import { ActionBar } from './components/action-bar';
 import { AmenitiesSection } from './components/amenities-section';
 import { AttributionFooter } from './components/attribution-footer';
@@ -59,8 +63,53 @@ export function PlaceDetailsScreen({
 
   const [loading, setLoading] = useState(!place && !!searchParams.id);
   const [isSaved, setIsSaved] = useState(directIsSaved ?? false);
+  const [userRating, setUserRating] = useState<number | null>(null);
+  const [isRateModalVisible, setIsRateModalVisible] = useState(false);
+  const [existingRankings, setExistingRankings] = useState<RankedPlace[]>([]);
 
   const placeId = place?.id ?? (typeof searchParams.id === 'string' ? searchParams.id : undefined);
+
+  const detectedMode: RankingMode = (place?.category && getCategoryGroupKey('activities', place.category))
+    ? 'activities'
+    : 'food';
+
+  // Fetch user rating and rankings for comparison
+  useEffect(() => {
+    if (!userId || !placeId) return;
+    let active = true;
+
+    getUserRatingForPlace(userId, placeId).then((res) => {
+      if (active) setUserRating(res?.rating ?? null);
+    });
+
+    getUserRankings(userId, detectedMode).then((ranks) => {
+      if (active) setExistingRankings(ranks);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [userId, placeId, detectedMode]);
+
+  const handleSaveRating = async (input: SaveRatingInput) => {
+    if (!userId) return;
+    await saveUserPlaceRating(userId, input);
+    setUserRating(input.rating);
+    const ranks = await getUserRankings(userId, detectedMode);
+    setExistingRankings(ranks);
+  };
+
+  const candidateForModal: CandidatePlace | null = place
+    ? {
+        google_place_id: place.id,
+        display_name: place.name,
+        formatted_address: place.address ?? null,
+        primary_type: place.category ?? null,
+        primary_type_display_name: place.category ?? null,
+        photo_url: place.photoUrl ?? place.photos?.[0]?.url ?? null,
+        mode: detectedMode,
+      }
+    : null;
 
   // Fetch place from Supabase by ID if needed
   useEffect(() => {
@@ -311,7 +360,13 @@ export function PlaceDetailsScreen({
           <PlaceHeader place={place} />
 
           {/* Quick Action Buttons */}
-          <ActionBar place={place} isSaved={isSaved} onToggleSave={handleToggleSave} />
+          <ActionBar
+            place={place}
+            isSaved={isSaved}
+            onToggleSave={handleToggleSave}
+            userRating={userRating}
+            onRate={() => setIsRateModalVisible(true)}
+          />
 
           {/* Editorial / Recommendation Note */}
           <RecommendationNote place={place} />
@@ -329,6 +384,15 @@ export function PlaceDetailsScreen({
           <AttributionFooter place={place} />
         </View>
       </ScrollView>
+
+      <RatePlaceModal
+        visible={isRateModalVisible}
+        onClose={() => setIsRateModalVisible(false)}
+        onSave={handleSaveRating}
+        existingRankings={existingRankings}
+        mode={detectedMode}
+        initialPlace={candidateForModal}
+      />
     </View>
   );
 }

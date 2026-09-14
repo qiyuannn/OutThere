@@ -93,9 +93,19 @@ test('Resolves matching category keys for places accurately', () => {
   assert.ok(keys.includes('east_southeast_asian'));
   assert.ok(keys.includes('casual_fine_dining'));
 
+  // Test display names with spaces
+  const persianKeys = getCategoryKeysForPlace('food', 'Persian Restaurant');
+  assert.ok(persianKeys.includes('south_asian_middle_eastern_african'));
+
+  const seafoodKeys = getCategoryKeysForPlace('food', 'Seafood Restaurant');
+  assert.ok(seafoodKeys.includes('steak_seafood_specialty'));
+
   const actKeys = getCategoryKeysForPlace('activities', 'art_museum', ['museum', 'tourist_attraction']);
   assert.ok(actKeys.includes('culture_history_museums'));
   assert.ok(actKeys.includes('adventure_sports_recreation'));
+
+  const parkKeys = getCategoryKeysForPlace('activities', 'Botanical Garden');
+  assert.ok(parkKeys.includes('nature_parks_outdoors'));
 });
 
 test('Radar chart items map all category groups correctly', () => {

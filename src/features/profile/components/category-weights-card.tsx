@@ -75,7 +75,7 @@ export function CategoryWeightsCard({
             {isFood ? '🍕 Food Distribution' : '🎯 Activity Distribution'}
           </ThemedText>
           <ThemedText themeColor="textSecondary" style={styles.description}>
-            Your personal recommendation weights adjust automatically as you swipe in Discover.
+            Your category taste profile is calculated from the average of places you’ve rated in Rankings.
           </ThemedText>
         </View>
       </View>
@@ -161,7 +161,7 @@ export function CategoryWeightsCard({
                   numberOfLines={1}
                   style={styles.statValue}
                 >
-                  {metrics.topPercentage > 0 ? `${metrics.topPercentage}%` : '—'}
+                  {metrics.topPercentage > 0 ? `${(metrics.topPercentage / 10).toFixed(1)} / 10` : '—'}
                 </ThemedText>
                 <ThemedText
                   type="small"
@@ -193,7 +193,7 @@ export function CategoryWeightsCard({
                   </ThemedText>
                 </ThemedText>
                 <ThemedText type="small" themeColor="textSecondary" style={styles.statSub}>
-                  positive affinity
+                  rated categories
                 </ThemedText>
               </View>
             </View>
@@ -206,7 +206,9 @@ export function CategoryWeightsCard({
             </ThemedText>
 
             {groups.map((group) => {
+              const isRated = group.key in weights && weights[group.key] > 0;
               const currentWeight = weights[group.key] ?? 0.00;
+              const scoreTen = (currentWeight * 10).toFixed(1);
               const percent = Math.round(currentWeight * 100);
 
               return (
@@ -216,7 +218,7 @@ export function CategoryWeightsCard({
                     styles.categoryItem,
                     {
                       backgroundColor: theme.background,
-                      borderColor: percent > 0 ? theme.primary : theme.border,
+                      borderColor: isRated ? theme.primary : theme.border,
                       borderWidth: 1,
                     },
                   ]}
@@ -232,9 +234,9 @@ export function CategoryWeightsCard({
                         </ThemedText>
                         <ThemedText
                           type="smallBold"
-                          themeColor={percent > 0 ? 'primary' : 'textSecondary'}
+                          themeColor={isRated ? 'primary' : 'textSecondary'}
                         >
-                          {percent}%
+                          {isRated ? `${scoreTen} / 10` : 'Unrated'}
                         </ThemedText>
                       </View>
                       <ThemedText themeColor="textSecondary" style={styles.groupMeta}>
@@ -250,7 +252,7 @@ export function CategoryWeightsCard({
                         styles.barFill,
                         {
                           width: `${percent}%`,
-                          backgroundColor: percent > 0 ? theme.primary : 'transparent',
+                          backgroundColor: isRated ? theme.primary : 'transparent',
                         },
                       ]}
                     />

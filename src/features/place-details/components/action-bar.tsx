@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { ScoreBadge } from '@/features/rankings/components/score-badge';
 import { useTheme } from '@/hooks/use-theme';
 import type { PlaceDetails } from '../types';
 
@@ -17,9 +18,17 @@ interface ActionBarProps {
   place: PlaceDetails;
   isSaved?: boolean;
   onToggleSave?: (saved: boolean) => void | Promise<void>;
+  userRating?: number | null;
+  onRate?: () => void;
 }
 
-export function ActionBar({ place, isSaved = false, onToggleSave }: ActionBarProps) {
+export function ActionBar({
+  place,
+  isSaved = false,
+  onToggleSave,
+  userRating,
+  onRate,
+}: ActionBarProps) {
   const theme = useTheme();
   const [saving, setSaving] = useState(false);
 
@@ -120,6 +129,33 @@ export function ActionBar({ place, isSaved = false, onToggleSave }: ActionBarPro
                 </ThemedText>
                 <ThemedText type="smallBold" themeColor={isSaved ? 'primary' : undefined}>
                   {isSaved ? 'Saved' : 'Save'}
+                </ThemedText>
+              </>
+            )}
+          </Pressable>
+        ) : null}
+
+        {onRate ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={userRating ? `Rated ${userRating}, tap to update` : 'Rate this place'}
+            onPress={onRate}
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              {
+                backgroundColor: userRating ? theme.backgroundSelected : theme.backgroundElement,
+                borderColor: userRating ? theme.primary : theme.border,
+                opacity: pressed ? 0.75 : 1,
+              },
+            ]}
+          >
+            {userRating !== undefined && userRating !== null ? (
+              <ScoreBadge score={userRating} size="small" />
+            ) : (
+              <>
+                <ThemedText style={styles.buttonIcon}>★</ThemedText>
+                <ThemedText type="smallBold" themeColor="primary">
+                  Rate
                 </ThemedText>
               </>
             )}

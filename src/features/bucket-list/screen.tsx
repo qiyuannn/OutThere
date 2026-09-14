@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,6 +6,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, EmptyState } from '@/components/foundation';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '@/providers/auth-provider';
+import { RatePlaceModal } from '@/features/rankings/components/rate-place-modal';
+import { ScoreBadge } from '@/features/rankings/components/score-badge';
+import { getUserRankings, getUserRatingsMap, saveUserPlaceRating } from '@/features/rankings/service';
+import type { CandidatePlace, RankedPlace, SaveRatingInput } from '@/features/rankings/types';
 import { useSavedPlaces } from './use-saved-places';
 import type { SavedPlace } from './types';
 
@@ -28,17 +33,69 @@ function openingLabel(openNow: boolean | null) {
 
 export default function BucketListScreen() {
   const theme = useTheme();
+  const { session } = useAuth();
+  const userId = session?.user.id;
+
   const { places, loading, refreshing, error, refresh } = useSavedPlaces();
   const [selectedMode, setSelectedMode] = useState<SavedPlace['mode']>('food');
   const visiblePlaces = places.filter((place) => place.mode === selectedMode);
   const selectedLabel = selectedMode === 'food' ? 'food' : 'activity';
+
+  // Rating state
+  const [ratingsMap, setRatingsMap] = useState<Record<string, number>>({});
+  const [existingRankings, setExistingRankings] = useState<RankedPlace[]>([]);
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [placeToRate, setPlaceToRate] = useState<CandidatePlace | null>(null);
+
+  const loadRatings = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const [map, ranks] = await Promise.all([
+        getUserRatingsMap(userId),
+        getUserRankings(userId, selectedMode),
+      ]);
+      setRatingsMap(map);
+      setExistingRankings(ranks);
+    } catch {
+      // Ignore rating load failure
+    }
+  }, [userId, selectedMode]);
+
+  useEffect(() => {
+    void loadRatings();
+  }, [loadRatings]);
+
+  const handleOpenRate = (place: SavedPlace) => {
+    setPlaceToRate({
+      google_place_id: place.google_place_id,
+      display_name: place.display_name ?? (place.mode === 'food' ? 'Saved Food Spot' : 'Saved Activity'),
+      formatted_address: place.location,
+      primary_type: place.category,
+      primary_type_display_name: place.category,
+      photo_url: (place.places?.photos?.[0] as { url?: string } | undefined)?.url ?? null,
+      mode: place.mode,
+    });
+    setRatingModalVisible(true);
+  };
+
+  const handleSaveRating = async (input: SaveRatingInput) => {
+    if (!userId) return;
+    await saveUserPlaceRating(userId, input);
+    await loadRatings();
+  };
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.screen, { backgroundColor: theme.background }]}>
       <FlatList
         data={visiblePlaces}
         keyExtractor={(place) => place.google_place_id}
-        renderItem={({ item }) => <SavedPlaceRow place={item} />}
+        renderItem={({ item }) => (
+          <SavedPlaceRow
+            place={item}
+            userRating={ratingsMap[item.google_place_id]}
+            onRate={handleOpenRate}
+          />
+        )}
         contentContainerStyle={[styles.content, visiblePlaces.length === 0 && styles.emptyContent]}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListHeaderComponent={
@@ -98,11 +155,28 @@ export default function BucketListScreen() {
         refreshing={refreshing}
         accessibilityRole="list"
       />
+
+      <RatePlaceModal
+        visible={ratingModalVisible}
+        onClose={() => setRatingModalVisible(false)}
+        onSave={handleSaveRating}
+        existingRankings={existingRankings}
+        mode={selectedMode}
+        initialPlace={placeToRate}
+      />
     </SafeAreaView>
   );
 }
 
-function SavedPlaceRow({ place }: { place: SavedPlace }) {
+function SavedPlaceRow({
+  place,
+  userRating,
+  onRate,
+}: {
+  place: SavedPlace;
+  userRating?: number;
+  onRate: (place: SavedPlace) => void;
+}) {
   const theme = useTheme();
   const name = place.display_name ?? (place.mode === 'food' ? 'Saved Food Spot' : 'Saved Activity');
   const location = place.location;
@@ -160,6 +234,36 @@ function SavedPlaceRow({ place }: { place: SavedPlace }) {
             {opening}
           </ThemedText>
         ) : null}
+      </View>
+      <View style={styles.actionCol}>
+        {userRating !== undefined ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Rated ${userRating}, tap to update`}
+            onPress={() => onRate(place)}
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+          >
+            <ScoreBadge score={userRating} size="small" />
+          </Pressable>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Rate ${name}`}
+            onPress={() => onRate(place)}
+            style={({ pressed }) => [
+              styles.rateBtn,
+              {
+                backgroundColor: theme.backgroundSelected,
+                borderColor: theme.border,
+                opacity: pressed ? 0.75 : 1,
+              },
+            ]}
+          >
+            <ThemedText type="smallBold" themeColor="primary" style={{ fontSize: 12 }}>
+              ★ Rate
+            </ThemedText>
+          </Pressable>
+        )}
       </View>
       <ThemedText style={[styles.chevron, { color: theme.textSecondary }]}>›</ThemedText>
     </Pressable>
@@ -224,6 +328,8 @@ const styles = StyleSheet.create({
   ratingText: { fontSize: 13, color: '#E5A50A' },
   openingStatus: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
   chevron: { fontSize: 24, lineHeight: 26, paddingHorizontal: 4 },
+  actionCol: { alignItems: 'center', justifyContent: 'center' },
+  rateBtn: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   loadingState: { flex: 1, minHeight: 220, alignItems: 'center', justifyContent: 'center', gap: 14 },
   errorState: { borderWidth: 1, borderRadius: 24, padding: 24, gap: 14 },
   stateTitle: { fontSize: 24, lineHeight: 30 },
