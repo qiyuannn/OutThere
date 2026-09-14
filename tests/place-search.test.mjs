@@ -73,7 +73,7 @@ test('recent history is deduplicated, bounded and only contains user queries', (
 });
 test('all actions authenticate before any provider call', async () => {
   const f = fixture();
-  for (const action of ['areas', 'details', 'search']) {
+  for (const action of ['areas', 'details', 'search', 'suggest']) {
     assert.equal((await f.call({ ...input(), action }, null)).status, 401);
     assert.equal((await f.call({ ...input(), action }, 'invalid')).status, 401);
   }
@@ -140,4 +140,29 @@ test('provider and storage failures surface a retryable error, not an empty succ
     const result = await fixture(override).call(input()); assert.equal(result.status, 502);
     assert.equal(JSON.stringify(result.body).includes('secret'), false);
   }
+});
+
+test('autocomplete forwards partial input and location and returns named places only', async () => {
+  let sent;
+  const prediction = { placePrediction: { placeId: 'din_tai', structuredFormat: { mainText: { text: 'Din Tai Fung' }, secondaryText: { text: 'Orchard Road, Singapore' } } } };
+  const f = fixture({ google: async (path, mask, body) => {
+    sent = { path, mask, body };
+    return { suggestions: [prediction, prediction, { queryPrediction: { text: { text: 'din tai restaurants' } } }] };
+  } });
+  const result = await f.call({ action: 'suggest', query: 'Din Tai', center: input().center });
+  assert.equal(result.status, 200);
+  assert.equal(sent.path, 'places:autocomplete');
+  assert.equal(sent.body.input, 'Din Tai');
+  assert.deepEqual(sent.body.locationBias.circle.center, input().center);
+  assert.equal(sent.body.includeQueryPredictions, false);
+  assert.deepEqual(result.body.suggestions, [{ id: 'din_tai', name: 'Din Tai Fung', address: 'Orchard Road, Singapore' }]);
+  assert.deepEqual(f.remembered, []);
+});
+test('autocomplete rejects invalid input and coordinates before provider work', async () => {
+  const f = fixture();
+  for (const request of [{ query: 'x' }, { query: 'a'.repeat(161) }, { query: 'cafe', center: { latitude: 91, longitude: 0 } }]) {
+    assert.equal((await f.call({ action: 'suggest', ...request })).status, 400);
+  }
+  assert.equal(f.calls.length, 0);
+  assert.equal((await fixture({ consumeQuota: () => false }).call({ action: 'suggest', query: 'cafe' })).status, 429);
 });

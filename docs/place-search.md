@@ -36,7 +36,13 @@ keys. Existing cached rows are preserved. No SQL migration is required.
 
 ## Behaviour
 
-- Submit-based free-text queries, with a selected centre and a 1–50 km radius.
+- Place-name autocomplete appears after two characters and a 350 ms typing pause.
+  Google Places Autocomplete supplies up to five names and addresses; tapping a
+  suggestion opens that exact place by ID. Suggestions prioritize the selected
+  area but are not restricted by full-result filters. Without an area, Google's
+  default geographic bias applies. Suggestion failures leave full search usable.
+  Superseded responses and pending requests after selection are ignored.
+- Submit-based free-text queries remain available, with a selected centre and a 1–50 km radius.
 - All/Food/Activities; specific supported venue categories; open now; a single
   price tier; minimum Google rating; relevance or nearest sorting.
 - Filter changes stay in the sheet until **Apply filters**. Close discards them.
@@ -88,7 +94,9 @@ minute, provider request timeouts, request-size limits, and bounded pagination.
 This in-memory limit is **not a global distributed quota**: multiple Edge workers
 have separate counters. Before broad rollout, set Google project quotas/budget
 alerts and add a shared quota store if a strict per-account spend ceiling is
-needed. Avoid automatic polling or searching on every keystroke.
+needed. Autocomplete uses one lightweight request per debounced input, without
+photos or stored predictions. It currently uses per-request billing (no session
+token), and each call counts toward the endpoint's quota. Avoid automatic polling.
 
 ## Verification
 

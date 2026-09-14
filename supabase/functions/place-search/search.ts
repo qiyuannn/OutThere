@@ -98,6 +98,26 @@ export function createSearchHandler(deps: SearchDependencies) {
       try { body = JSON.parse(raw); } catch { throw new SearchError('Invalid search request.'); }
       if (!body || typeof body !== 'object' || Array.isArray(body)) throw new SearchError('Invalid search request.');
       const charge = (units: number) => { if (!deps.consumeQuota(userId, units)) throw new SearchError('Too many requests. Wait a minute and try again.', 429); };
+      if (body.action === 'suggest') {
+        const input = validQuery(body.query);
+        let locationBias;
+        if (body.center !== undefined) {
+          const parsed = parseSearch({ query: input, center: body.center, filters: {
+            mode: 'all', category: '', radiusMeters: 50000, openNow: false, price: '', minRating: 0, sort: 'relevance',
+          } });
+          locationBias = { circle: { center: parsed.center, radius: 50000 } };
+        }
+        charge(1);
+        const data = await deps.google('places:autocomplete',
+          'suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat',
+          { input, includeQueryPredictions: false, ...(locationBias ? { locationBias } : {}) });
+        const predictions = (data.suggestions ?? []) as { placePrediction?: {
+          placeId?: string; structuredFormat?: { mainText?: { text?: string }; secondaryText?: { text?: string } };
+        } }[];
+        const suggestions = predictions.flatMap(({ placePrediction: p }) => p?.placeId && ID.test(p.placeId) && p.structuredFormat?.mainText?.text
+          ? [{ id: p.placeId, name: p.structuredFormat.mainText.text, address: p.structuredFormat.secondaryText?.text ?? '' }] : []);
+        return reply({ suggestions: [...new Map(suggestions.map(p => [p.id, p])).values()].slice(0, 5) });
+      }
       if (body.action === 'areas') {
         const query = validQuery(body.query);
         charge(1);

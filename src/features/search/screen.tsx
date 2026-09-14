@@ -11,6 +11,7 @@ import { FilterSheet } from './filter-sheet';
 import { ResultCard } from './result-card';
 import { Chip, SearchInput, searchStyles } from './controls';
 import { usePlaceSearch } from './use-search';
+import { PlaceSuggestions } from './place-suggestions';
 
 export function SearchScreen() {
   const theme = useTheme();
@@ -20,8 +21,10 @@ export function SearchScreen() {
   const [filters, setFilters] = useState<SearchFilters>({ ...DEFAULT_FILTERS });
   const [sheet, setSheet] = useState<'area' | 'filters' | null>(null);
   const [pendingSubmit, setPendingSubmit] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   function submit(q = query, f = filters, a = area) {
     if (q.trim().length < 2) return;
+    setShowSuggestions(false);
     Keyboard.dismiss();
     if (!a) { setPendingSubmit(true); setSheet('area'); return; }
     void search.run({ query: q.trim(), filters: f, center: { latitude: a.latitude, longitude: a.longitude } });
@@ -46,7 +49,12 @@ export function SearchScreen() {
         <ThemedText type="smallBold" themeColor="primary" style={{ letterSpacing: 3 }}>OUTTHERE</ThemedText>
         <ThemedText type="title" accessibilityRole="header">Find your next place</ThemedText>
         <ThemedText themeColor="textSecondary">A favourite dish, a new neighbourhood, or somewhere worth the detour.</ThemedText>
-        <SearchInput accessibilityLabel="Search places" placeholder="Ramen, quiet café, Botanic Gardens…" value={query} onChangeText={setQuery} returnKeyType="search" onSubmitEditing={() => submit()} />
+        <SearchInput accessibilityLabel="Search places" placeholder="Type a place name, e.g. Din Tai Fung…" value={query}
+          onFocus={() => setShowSuggestions(true)} onChangeText={value => { setQuery(value); setShowSuggestions(true); }} returnKeyType="search" onSubmitEditing={() => submit()} />
+        {showSuggestions && !sheet && <PlaceSuggestions query={query} center={area ?? undefined} onSelect={place => {
+          setShowSuggestions(false); setQuery(place.name); Keyboard.dismiss();
+          router.push({ pathname: '/(tabs)/search/[id]', params: { id: place.id } });
+        }} />}
         <View style={searchStyles.row}><Chip label={area ? `Near ${area.label}` : 'Choose search area'} onPress={() => { setPendingSubmit(false); setSheet('area'); }} /><Chip label={`Filters${chips.length ? ` (${chips.length})` : ''}`} onPress={() => setSheet('filters')} /></View>
         <ThemedText type="small" themeColor="textSecondary">Within {filters.radiusMeters / 1000} km · {filters.sort === 'distance' ? 'Nearest matches' : 'Most relevant'}</ThemedText>
         {!!chips.length && <View style={searchStyles.row}>{chips.map(c => <Chip key={c.key} label={`${c.label} ×`} selected onPress={() => apply({ ...filters, ...c.clear })} />)}</View>}

@@ -1,5 +1,12 @@
 import { supabase } from '@/lib/supabase';
 import type { SearchArea, SearchPlace, SearchRequest, SearchResponse } from './model';
+import type { PlaceSuggestion } from './suggestions-controller';
+
+export async function suggestPlaces(query: string, center?: { latitude: number; longitude: number }): Promise<PlaceSuggestion[]> {
+  const data = await invokePlaceSearch<{ suggestions: PlaceSuggestion[] }>({ action: 'suggest', query, ...(center ? { center } : {}) });
+  if (!Array.isArray(data.suggestions)) throw new Error('Suggestions are unavailable. You can still search below.');
+  return data.suggestions;
+}
 
 export async function invokePlaceSearch<T>(body: unknown): Promise<T> {
   if (!supabase) throw new Error('Connect to Supabase to search for places.');
