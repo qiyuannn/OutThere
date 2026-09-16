@@ -26,6 +26,7 @@ interface RatingRow {
   vibe: RankedPlace['vibe'];
   recommend: boolean;
   notes: string | null;
+  social_visibility?: 'private' | 'friends';
   rated_at: string;
   places: PlaceRow[] | PlaceRow | null;
 }
@@ -69,6 +70,7 @@ export async function getUserRankings(
       vibe: row.vibe,
       recommend: row.recommend,
       notes: row.notes,
+      social_visibility: row.social_visibility,
       rated_at: row.rated_at,
       display_name: place?.display_name ?? 'Unknown Place',
       formatted_address: place?.formatted_address ?? null,
@@ -99,6 +101,7 @@ export async function saveUserPlaceRating(
         vibe: input.vibe,
         recommend: input.recommend,
         notes: input.notes?.trim() || null,
+        ...(input.social_visibility ? { social_visibility: input.social_visibility } : {}),
         rated_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },

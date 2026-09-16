@@ -42,6 +42,9 @@ export default function ProfileScreen() {
           <ThemedText themeColor="primary">{profile.city}</ThemedText>
         </View>
         {!!profile.bio && <ThemedText>{profile.bio}</ThemedText>}
+        <Button label="My rankings" onPress={() => router.push('/rankings')} />
+        <Button label="My social profile" onPress={() => router.push({ pathname: '/feed/person/[id]', params: { id: profile.user_id } })} />
+        <Button label="Privacy & sharing" onPress={() => router.push('/feed/privacy')} />
         <Button label="Edit profile" onPress={() => router.push('/profile/edit')} />
       </Card>
 

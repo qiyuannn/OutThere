@@ -11,6 +11,7 @@ export interface RankedPlace {
   vibe: Vibe;
   recommend: boolean;
   notes: string | null;
+  social_visibility?: 'private' | 'friends';
   rated_at: string;
   display_name: string;
   formatted_address: string | null;
@@ -38,5 +39,6 @@ export interface SaveRatingInput {
   vibe: Vibe;
   recommend: boolean;
   notes?: string | null;
+  social_visibility?: 'private' | 'friends';
   recalibratedPlaces?: Array<{ google_place_id: string; rating: number; vibe?: Vibe }>;
 }

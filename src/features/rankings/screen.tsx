@@ -1,3 +1,4 @@
+import { RatingSharing } from '@/features/social/rating-sharing';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -244,12 +245,14 @@ export default function RankingsScreen() {
       ) : filteredRankings.length > 0 ? (
         <View style={{ gap: 4 }}>
           {filteredRankings.map((item, idx) => (
+            <View key={item.id} style={{ gap: 6, marginBottom: 12 }}>
             <RankedPlaceCard
-              key={item.id}
               item={item}
               rank={idx + 1}
               onDelete={removeRating}
             />
+            <RatingSharing rating={item} onChanged={refresh} />
+            </View>
           ))}
         </View>
       ) : rankings.length > 0 ? (

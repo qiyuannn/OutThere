@@ -11,6 +11,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { socialRead, invalidateSocial } from '@/features/social/service';
+import type { SocialSettings, Visibility } from '@/features/social/types';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/providers/auth-provider';
@@ -72,6 +74,24 @@ export function RatePlaceModal({
   const [recommend, setRecommend] = useState(true);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [visibility, setVisibility] = useState<Visibility>('private');
+  const [socialSettings, setSocialSettings] = useState<SocialSettings | null>(null);
+  const [privacyLoaded, setPrivacyLoaded] = useState(false);
+  const [privacyError, setPrivacyError] = useState('');
+
+  useEffect(() => {
+    let live = true;
+    setSocialSettings(null); setPrivacyLoaded(false); setPrivacyError('');
+    if (visible && userId) void socialRead<SocialSettings>('settings').then(settings => {
+      if (live) { setSocialSettings(settings); setPrivacyLoaded(true); }
+    }).catch(() => { if (live) { setPrivacyError('Sharing settings could not load. This rating will stay private.'); setPrivacyLoaded(true); } });
+    return () => { live = false; };
+  }, [visible, userId]);
+  useEffect(() => {
+    const existing = existingRankings.find(item => item.google_place_id === selectedPlace?.google_place_id);
+    setVisibility(socialSettings?.enabled ? (existing ? existing.social_visibility ?? 'private' : socialSettings.default_visibility) : 'private');
+  }, [selectedPlace?.google_place_id, socialSettings, existingRankings]);
 
   // Reset modal state when opening
   useEffect(() => {
@@ -86,6 +106,7 @@ export function RatePlaceModal({
       setSelectedVibe('liked');
       setRecommend(true);
       setNotes('');
+      setSaveError('');
       setSaving(false);
       setComparisonCount(1);
       setRecalibratedPlaces([]);
@@ -185,7 +206,8 @@ export function RatePlaceModal({
 
   // Handle save
   const handleSave = async () => {
-    if (!selectedPlace || saving) return;
+    if (!selectedPlace || saving || !privacyLoaded) return;
+    setSaveError('');
     setSaving(true);
     try {
       await onSave({
@@ -195,10 +217,13 @@ export function RatePlaceModal({
         vibe: selectedVibe,
         recommend,
         notes,
+        social_visibility: visibility,
         recalibratedPlaces,
       });
+      invalidateSocial();
       onClose();
     } catch {
+      setSaveError('Could not save your rating. Please try again.');
       setSaving(false);
     }
   };
@@ -498,6 +523,7 @@ export function RatePlaceModal({
                   Notes & Highlights (Optional)
                 </ThemedText>
                 <TextInput
+                  maxLength={2000}
                   value={notes}
                   onChangeText={setNotes}
                   placeholder="What did you order? What stood out?"
@@ -515,10 +541,16 @@ export function RatePlaceModal({
                 />
               </View>
 
+              <View style={{ gap: 10 }}>
+                <ThemedText type="smallBold">Who can see this rating and review?</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">{privacyError || (!privacyLoaded ? 'Loading privacy settings…' : socialSettings?.enabled ? 'Friends can like and comment on shared ratings.' : 'Only you. Enable your social profile in Profile → Privacy & sharing to share ratings.')}</ThemedText>
+                {(['private', 'friends'] as const).map(audience => <Pressable key={audience} accessibilityRole="radio" accessibilityState={{ checked: visibility === audience, disabled: saving || !privacyLoaded || (audience === 'friends' && !socialSettings?.enabled) }} disabled={saving || !privacyLoaded || (audience === 'friends' && !socialSettings?.enabled)} onPress={() => setVisibility(audience)} style={{ padding: 12, minHeight: 44, borderRadius: 12, backgroundColor: theme.backgroundElement, opacity: audience === 'friends' && !socialSettings?.enabled ? 0.4 : 1 }}><ThemedText>{visibility === audience ? '● ' : '○ '}{audience === 'friends' ? 'Friends' : 'Only me'}</ThemedText></Pressable>)}
+                {!!saveError && <ThemedText accessibilityRole="alert">{saveError}</ThemedText>}
+              </View>
               {/* Save Button */}
               <Pressable
                 onPress={handleSave}
-                disabled={saving}
+                disabled={saving || !privacyLoaded}
                 style={({ pressed }) => [
                   styles.saveBtn,
                   {
@@ -554,6 +586,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 440,
+    height: '90%',
     maxHeight: '90%',
     borderRadius: 24,
     borderWidth: 1,

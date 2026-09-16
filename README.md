@@ -130,7 +130,8 @@ src/
     discover/screen.tsx
     bucket-list/screen.tsx
     rankings/screen.tsx
-    friends/screen.tsx
+    social/                  # Feed, people, profile, post, notifications, privacy
+    friends/screen.tsx        # Redirect to social people search
     profile/screen.tsx
     auth/
       account/screen.tsx
@@ -141,7 +142,8 @@ src/
     (tabs)/
       (discover)/            # Discover remains at /
       bucket-list/
-      rankings/
+      rankings/              # Personal rankings, opened from Profile
+      feed/                  # Social pages, one route per screen
       friends/
       profile/
       explore/               # Existing /explore redirect
@@ -211,3 +213,7 @@ examples, public-key configuration, products/offerings, entitlement setup, testi
 and production requirements. The provided key is configured locally for Test
 Store only. Dashboard entitlement attachments, published paywall/Customer Center,
 and production store keys must be verified before launch.
+
+## Social features
+
+See [social setup and privacy behavior](docs/social.md) for the friends feed, profile opt-in, requests, sharing, comments and in-app notifications. Rebuild the development client after installing the new Expo Crypto dependency.
