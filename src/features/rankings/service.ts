@@ -3,6 +3,7 @@ import { inferVibeFromRating, recalibrateTierScores, Vibe } from './comparison';
 import { supabase } from '@/lib/supabase';
 import type { CandidatePlace, RankedPlace, RankingMode, SaveRatingInput } from './types';
 import { hydratePlaceRows } from '@/features/search/service';
+import { calculateCategoryWeights } from './category-weights';
 
 function client() {
   if (!supabase) throw new Error('Supabase is not configured.');
@@ -259,58 +260,20 @@ export async function syncCategoryWeightsFromRatings(
   const ratingPlaces = await hydratePlaceRows((ratingsData ?? []).map(row => (Array.isArray(row.places) ? row.places[0] : row.places) ?? { google_place_id: row.google_place_id, display_name: null }));
   const ratingPlacesById = new Map(ratingPlaces.map(p => [p.google_place_id, p]));
 
-  const groups = CATEGORY_GROUPS_BY_MODE[mode];
-  const table = mode === 'food' ? 'user_food_category_weights' : 'user_activity_category_weights';
-
-  // Map category_key -> list of ratings
-  const categoryRatings = new Map<string, number[]>();
-  for (const group of groups) {
-    categoryRatings.set(group.key, []);
-  }
-
-  for (const row of ratingsData ?? []) {
-    const val = typeof row.rating === 'number' ? row.rating : parseFloat(row.rating);
-    if (!Number.isFinite(val)) continue;
-
+  const weights = calculateCategoryWeights(mode, (ratingsData ?? []).map((row) => {
+    const value = typeof row.rating === 'number' ? row.rating : parseFloat(row.rating);
     const place = ratingPlacesById.get(row.google_place_id);
-    const primaryType = (place as { primary_type_display_name?: string } | null)?.primary_type_display_name ?? null;
-    const catKeys = getCategoryKeysForPlace(mode, primaryType);
+    return {
+      rating: value,
+      primaryType: (place as { primary_type_display_name?: string } | null)?.primary_type_display_name ?? null,
+    };
+  }));
 
-    for (const k of catKeys) {
-      if (categoryRatings.has(k)) {
-        categoryRatings.get(k)!.push(val);
-      }
-    }
-  }
-
-  // Update or delete rows for each category group
-  for (const group of groups) {
-    const scores = categoryRatings.get(group.key) ?? [];
-    if (scores.length > 0) {
-      const avg = scores.reduce((sum, s) => sum + s, 0) / scores.length;
-      // Normalize 0.0 - 10.0 to 0.00 - 1.00 weight
-      const normalizedWeight = Math.max(0.0, Math.min(1.0, Math.round((avg / 10.0) * 100) / 100));
-
-      await client()
-        .from(table)
-        .upsert(
-          {
-            user_id: userId,
-            category_key: group.key,
-            weight: normalizedWeight,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'user_id,category_key' },
-        );
-    } else {
-      // Category is unrated! Remove explicit weight row so it is marked unrated
-      await client()
-        .from(table)
-        .delete()
-        .eq('user_id', userId)
-        .eq('category_key', group.key);
-    }
-  }
+  const { error } = await client().rpc('replace_user_category_weights', {
+    p_mode: mode,
+    p_weights: weights,
+  });
+  if (error) throw error;
 }
 
 export async function getCandidatePlaces(

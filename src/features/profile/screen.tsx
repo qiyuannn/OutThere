@@ -26,7 +26,7 @@ export default function ProfileScreen() {
   if (!profile) return null;
 
   return (
-    <Screen title="A story only you can tell." eyebrow="PROFILE">
+    <Screen title="A story only you can tell." headerDescription="A story only you can tell.">
       {updated === '1' && (
         <ThemedText accessibilityRole="alert" themeColor="primary">
           Your profile is saved.

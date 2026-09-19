@@ -11,6 +11,7 @@ import {
   NOT_NOW_WEIGHT_DELTA,
   SAVE_WEIGHT_DELTA,
 } from '../src/features/categories/catalog.ts';
+import { calculateCategoryWeights } from '../src/features/rankings/category-weights.ts';
 
 test('Food catalog maps 10 category groups and all place types properly', () => {
   assert.equal(FOOD_CATEGORY_GROUPS.length, 10);
@@ -140,4 +141,18 @@ test('Radar chart items map all category groups correctly', () => {
   assert.equal(activeCount, 2);
   assert.equal(topCategory, 'Nature & Outdoors');
   assert.equal(Math.round(topWeight * 100), 80);
+});
+
+test('Category rating averages are prepared as one normalized weight payload', () => {
+  const weights = calculateCategoryWeights('food', [
+    { rating: 8, primaryType: 'cafe' },
+    { rating: 6, primaryType: 'bakery' },
+    { rating: 9, primaryType: 'sushi_restaurant' },
+    { rating: Number.NaN, primaryType: 'restaurant' },
+  ]);
+
+  assert.deepEqual(weights, {
+    cafes_bakeries_sweets: 0.7,
+    east_southeast_asian: 0.9,
+  });
 });

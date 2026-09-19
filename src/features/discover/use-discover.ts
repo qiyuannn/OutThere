@@ -63,7 +63,7 @@ export function useDiscover() {
     try {
       if (choice === 'pass') {
         await passPlace(userId, current.id, mode);
-      } else if (choice === 'save') {
+      } else if (choice === 'save' || choice === 'go') {
         await savePlace(userId, current.id, mode);
       }
 

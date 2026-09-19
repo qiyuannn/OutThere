@@ -1,85 +1,33 @@
+import { Image, type ImageSource } from 'expo-image';
+import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Linking,
-  Platform,
-  Pressable,
-  Share,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { ScoreBadge } from '@/features/rankings/components/score-badge';
-import { useTheme } from '@/hooks/use-theme';
 import type { PlaceDetails } from '../types';
+
+const actionIcons = {
+  call: require('../../../../assets/images/place-details/call.svg'),
+  website: require('../../../../assets/images/place-details/website.svg'),
+  post: require('../../../../assets/images/place-details/post.svg'),
+  save: require('../../../../assets/images/place-details/save.svg'),
+  rate: require('../../../../assets/images/place-details/rate.svg'),
+} as const;
 
 interface ActionBarProps {
   place: PlaceDetails;
   isSaved?: boolean;
   onToggleSave?: (saved: boolean) => void | Promise<void>;
   userRating?: number | null;
+  hasPosted?: boolean;
+  postStatusReady?: boolean;
   onRate?: () => void;
 }
 
-export function ActionBar({
-  place,
-  isSaved = false,
-  onToggleSave,
-  userRating,
-  onRate,
-}: ActionBarProps) {
-  const theme = useTheme();
+export function ActionBar({ place, isSaved = false, onToggleSave, userRating, hasPosted = false, postStatusReady = false, onRate }: ActionBarProps) {
   const [saving, setSaving] = useState(false);
 
-  const handleDirections = () => {
-    if (place.mapsUrl) {
-      Linking.openURL(place.mapsUrl);
-    } else {
-      const query = encodeURIComponent(`${place.name} ${place.address ?? ''}`);
-      const url = Platform.select({
-        ios: `maps:0,0?q=${query}`,
-        android: `geo:0,0?q=${query}`,
-        default: `https://www.google.com/maps/search/?api=1&query=${query}`,
-      });
-      Linking.openURL(url);
-    }
-  };
-
-  const handleCall = () => {
-    if (place.phoneNumber) {
-      Linking.openURL(`tel:${place.phoneNumber.replace(/[^\d+]/g, '')}`);
-    }
-  };
-
-  const handleWebsite = () => {
-    if (place.websiteUri) {
-      Linking.openURL(place.websiteUri);
-    }
-  };
-
-  const handleShare = async () => {
-    try {
-      const message = [
-        `Check out ${place.name} on OutThere!`,
-        place.address ? `📍 ${place.address}` : null,
-        place.mapsUrl ? `Map: ${place.mapsUrl}` : null,
-      ]
-        .filter(Boolean)
-        .join('\n');
-
-      await Share.share({
-        title: place.name,
-        message,
-        url: place.mapsUrl ?? place.websiteUri ?? undefined,
-      });
-    } catch {
-      // User cancelled or share dismissed
-    }
-  };
-
-  const handleSaveToggle = async () => {
+  const toggleSave = async () => {
     if (!onToggleSave || saving) return;
     try {
       setSaving(true);
@@ -91,179 +39,109 @@ export function ActionBar({
     }
   };
 
+  const openPost = () => {
+    if (userRating === null || userRating === undefined || hasPosted) return;
+    router.push({
+      pathname: '/rankings/post',
+      params: {
+        placeId: place.id,
+        name: place.name,
+        category: place.category ?? '',
+        address: place.address ?? '',
+        rating: userRating.toFixed(1),
+      },
+    } as unknown as Href);
+  };
+
   return (
-    <View style={styles.container}>
-      {/* Primary Row: Directions & Save */}
-      <View style={styles.primaryRow}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={handleDirections}
-          style={({ pressed }) => [
-            styles.directionsButton,
-            { backgroundColor: theme.primary, opacity: pressed ? 0.8 : 1 },
-          ]}
-        >
-          <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
-            Directions
-          </ThemedText>
-          <ThemedText style={{ color: theme.onPrimary, fontSize: 13 }}>↗</ThemedText>
-        </Pressable>
-
-        {onToggleSave ? (
-          <Pressable
-            accessibilityRole="button"
-            disabled={saving}
-            onPress={handleSaveToggle}
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              {
-                backgroundColor: isSaved ? theme.backgroundSelected : theme.backgroundElement,
-                borderColor: isSaved ? theme.primary : theme.border,
-                opacity: saving ? 0.6 : pressed ? 0.75 : 1,
-              },
-            ]}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color={theme.primary} />
-            ) : (
-              <>
-                <ThemedText style={styles.buttonIcon}>
-                  {isSaved ? '★' : '☆'}
-                </ThemedText>
-                <ThemedText type="smallBold" themeColor={isSaved ? 'primary' : undefined}>
-                  {isSaved ? 'Saved' : 'Save'}
-                </ThemedText>
-              </>
-            )}
-          </Pressable>
-        ) : null}
-
-        {onRate ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={userRating ? `Rated ${userRating}, tap to update` : 'Rate this place'}
-            onPress={onRate}
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              {
-                backgroundColor: userRating ? theme.backgroundSelected : theme.backgroundElement,
-                borderColor: userRating ? theme.primary : theme.border,
-                opacity: pressed ? 0.75 : 1,
-              },
-            ]}
-          >
-            {userRating !== undefined && userRating !== null ? (
-              <ScoreBadge score={userRating} size="small" />
-            ) : (
-              <>
-                <ThemedText style={styles.buttonIcon}>★</ThemedText>
-                <ThemedText type="smallBold" themeColor="primary">
-                  Rate
-                </ThemedText>
-              </>
-            )}
-          </Pressable>
-        ) : null}
-      </View>
-
-      {/* Secondary Row: Call, Website, Share */}
-      <View style={styles.secondaryRow}>
-        {place.phoneNumber ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={handleCall}
-            style={({ pressed }) => [
-              styles.actionPill,
-              { backgroundColor: theme.backgroundElement, borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
-            ]}
-          >
-            <ThemedText style={styles.pillIcon}>📞</ThemedText>
-            <ThemedText type="smallBold">Call</ThemedText>
-          </Pressable>
-        ) : null}
-
-        {place.websiteUri ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={handleWebsite}
-            style={({ pressed }) => [
-              styles.actionPill,
-              { backgroundColor: theme.backgroundElement, borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
-            ]}
-          >
-            <ThemedText style={styles.pillIcon}>🌐</ThemedText>
-            <ThemedText type="smallBold">Website</ThemedText>
-          </Pressable>
-        ) : null}
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={handleShare}
-          style={({ pressed }) => [
-            styles.actionPill,
-            { backgroundColor: theme.backgroundElement, borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
-          ]}
-        >
-          <ThemedText style={styles.pillIcon}>↗</ThemedText>
-          <ThemedText type="smallBold">Share</ThemedText>
-        </Pressable>
-      </View>
+    <View style={styles.row}>
+      <QuickAction
+        disabled={!place.phoneNumber}
+        icon={actionIcons.call}
+        label="Call"
+        onPress={() => place.phoneNumber && void Linking.openURL(`tel:${place.phoneNumber.replace(/[^\d+]/g, '')}`)}
+      />
+      <QuickAction
+        disabled={!place.websiteUri}
+        icon={actionIcons.website}
+        label="Website"
+        onPress={() => place.websiteUri && void Linking.openURL(place.websiteUri)}
+      />
+      <QuickAction
+        disabled={!postStatusReady || userRating === null || userRating === undefined || hasPosted}
+        icon={actionIcons.post}
+        label={hasPosted ? 'Posted' : 'Post'}
+        onPress={openPost}
+        selected={hasPosted}
+      />
+      <QuickAction
+        busy={saving}
+        disabled={!onToggleSave}
+        icon={actionIcons.save}
+        label={isSaved ? 'Saved' : 'Save'}
+        onPress={() => void toggleSave()}
+        selected={isSaved}
+      />
+      <QuickAction
+        disabled={!onRate}
+        icon={actionIcons.rate}
+        label="Rate"
+        onPress={() => onRate?.()}
+        selected={userRating !== null && userRating !== undefined}
+        value={userRating === null || userRating === undefined ? undefined : userRating.toFixed(1)}
+      />
     </View>
   );
 }
 
+function QuickAction({
+  busy = false,
+  disabled = false,
+  icon,
+  label,
+  onPress,
+  selected = false,
+  value,
+}: {
+  busy?: boolean;
+  disabled?: boolean;
+  icon: ImageSource;
+  label: string;
+  onPress: () => void;
+  selected?: boolean;
+  value?: string;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={{ disabled, selected }}
+      disabled={disabled || busy}
+      onPress={onPress}
+      style={({ pressed }) => [styles.action, (disabled || busy) && styles.disabled, pressed && styles.pressed]}
+    >
+      <View style={[styles.iconCircle, selected && styles.selectedCircle]}>
+        {busy ? (
+          <ActivityIndicator color="#000000" size="small" />
+        ) : value ? (
+          <ThemedText style={styles.value}>{value}</ThemedText>
+        ) : (
+          <Image source={icon} contentFit="contain" style={styles.icon} />
+        )}
+      </View>
+      <ThemedText numberOfLines={1} style={styles.label}>{label}</ThemedText>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    gap: 10,
-    marginTop: 4,
-  },
-  primaryRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  directionsButton: {
-    flex: 2,
-    minHeight: 48,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  secondaryButton: {
-    flex: 1,
-    minHeight: 48,
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  buttonIcon: {
-    fontSize: 16,
-  },
-  secondaryRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  actionPill: {
-    flex: 1,
-    minWidth: 90,
-    minHeight: 42,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  pillIcon: {
-    fontSize: 14,
-  },
+  row: { width: '100%', flexDirection: 'row', alignItems: 'flex-start' },
+  action: { flex: 1, minWidth: 0, gap: 10, padding: 10, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  iconCircle: { width: 46, height: 46, borderWidth: 1, borderColor: '#000000', borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
+  selectedCircle: { backgroundColor: '#F3F4F6' },
+  icon: { width: 24, height: 24 },
+  label: { width: '100%', color: '#000000', fontSize: 10, fontWeight: '600', lineHeight: 12, textAlign: 'center' },
+  value: { color: '#000000', fontSize: 12, fontWeight: '600', lineHeight: 15, textAlign: 'center' },
+  disabled: { opacity: 0.3 },
+  pressed: { opacity: 0.5 },
 });

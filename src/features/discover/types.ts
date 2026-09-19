@@ -1,5 +1,5 @@
 export type DiscoverMode = 'activities' | 'food';
-export type DiscoverChoice = 'pass' | 'notNow' | 'save';
+export type DiscoverChoice = 'pass' | 'save' | 'go';
 
 export interface DiscoverLocation {
   latitude: number;

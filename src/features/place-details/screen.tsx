@@ -2,32 +2,29 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AppHeader } from '@/components/app-header';
 import { ThemedText } from '@/components/themed-text';
-import { useTheme } from '@/hooks/use-theme';
 import { computeIsOpenNow } from '@/lib/opening-hours';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { getCategoryGroupKey } from '@/features/categories/catalog';
+import { hasUserPostedAboutPlace } from '@/features/posts/service';
 import { getLivePlaceDetails } from '@/features/search/service';
 import { Button } from '@/components/foundation';
 import { RatePlaceModal } from '@/features/rankings/components/rate-place-modal';
 import { getUserRankings, getUserRatingForPlace, saveUserPlaceRating } from '@/features/rankings/service';
 import type { CandidatePlace, RankedPlace, RankingMode, SaveRatingInput } from '@/features/rankings/types';
 import { ActionBar } from './components/action-bar';
-import { AmenitiesSection } from './components/amenities-section';
 import { AttributionFooter } from './components/attribution-footer';
 import { HoursSection } from './components/hours-section';
 import { LocationSection } from './components/location-section';
 import { PhotoCarousel } from './components/photo-carousel';
 import { PlaceHeader } from './components/place-header';
-import { RecommendationNote } from './components/recommendation-note';
 import type { PlaceDetails, PlaceDetailsScreenProps } from './types';
 
 export function PlaceDetailsScreen({
@@ -36,8 +33,6 @@ export function PlaceDetailsScreen({
   isSaved: directIsSaved,
   onToggleSave: directOnToggleSave,
 }: Partial<PlaceDetailsScreenProps>) {
-  const theme = useTheme();
-  const insets = useSafeAreaInsets();
   const { session } = useAuth();
   const userId = session?.user.id;
   const searchParams = useLocalSearchParams<{ id?: string; placeJson?: string; mode?: 'food' | 'activities' }>();
@@ -66,6 +61,8 @@ export function PlaceDetailsScreen({
   const [loading, setLoading] = useState(!place && !!searchParams.id);
   const [isSaved, setIsSaved] = useState(directIsSaved ?? false);
   const [userRating, setUserRating] = useState<number | null>(null);
+  const [hasPosted, setHasPosted] = useState(false);
+  const [postStatusReady, setPostStatusReady] = useState(false);
   const [isRateModalVisible, setIsRateModalVisible] = useState(false);
   const [existingRankings, setExistingRankings] = useState<RankedPlace[]>([]);
   const [rankingsReady, setRankingsReady] = useState(false);
@@ -259,6 +256,34 @@ export function PlaceDetailsScreen({
     };
   }, [directIsSaved, placeId, userId]));
 
+  useFocusEffect(useCallback(() => {
+    if (!userId || !placeId) {
+      setHasPosted(false);
+      setPostStatusReady(true);
+      return;
+    }
+
+    let active = true;
+    setPostStatusReady(false);
+    void hasUserPostedAboutPlace(userId, placeId)
+      .then((posted) => {
+        if (active) {
+          setHasPosted(posted);
+          setPostStatusReady(true);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setHasPosted(false);
+          setPostStatusReady(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [placeId, userId]));
+
   // Handle Save / Unsave toggle
   const handleToggleSave = useCallback(
     async (nextSaved: boolean) => {
@@ -304,19 +329,11 @@ export function PlaceDetailsScreen({
 
   if (loading) {
     return (
-      <View style={[styles.screen, { backgroundColor: theme.background, paddingTop: insets.top }]}>
-        <View style={styles.topBar}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={handleBack}
-            style={[styles.floatingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
-          >
-            <ThemedText style={styles.backIcon}>←</ThemedText>
-          </Pressable>
-        </View>
+      <View style={styles.screen}>
+        <AppHeader description="Place Details" showBack onBack={handleBack} />
         <View style={styles.emptyContainer}>
-          <ActivityIndicator size="large" color={theme.primary} />
-          <ThemedText themeColor="textSecondary">Loading place details…</ThemedText>
+          <ActivityIndicator size="large" color="#000000" />
+          <ThemedText>Loading place details…</ThemedText>
         </View>
       </View>
     );
@@ -324,79 +341,40 @@ export function PlaceDetailsScreen({
 
   if (!place) {
     return (
-      <View style={[styles.screen, { backgroundColor: theme.background, paddingTop: insets.top }]}>
-        <View style={styles.topBar}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={handleBack}
-            style={[styles.floatingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
-          >
-            <ThemedText style={styles.backIcon}>←</ThemedText>
-          </Pressable>
-        </View>
+      <View style={styles.screen}>
+        <AppHeader description="Place Details" showBack onBack={handleBack} />
         <View style={styles.emptyContainer}>
           <ThemedText type="subtitle">Place not found</ThemedText>
-          <ThemedText themeColor="textSecondary">
-            We couldn’t find the details for this place.
-          </ThemedText>
+          <ThemedText>We couldn’t find the details for this place.</ThemedText>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={[styles.screen, { backgroundColor: theme.background }]}>
+    <View style={styles.screen}>
+      <AppHeader description="Place Details" showBack onBack={handleBack} />
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 48 }]}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero Photo Carousel */}
         <PhotoCarousel place={place} />
-
-        {/* Floating Top Nav Button */}
-        <View style={[styles.floatingNav, { top: insets.top + 8 }]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            onPress={handleBack}
-            style={[
-              styles.floatingButton,
-              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-            ]}
-          >
-            <ThemedText style={styles.backIcon}>←</ThemedText>
-          </Pressable>
-        </View>
-
-        {/* Content Body */}
         <View style={styles.body}>
-          {/* Main Title & Status Badges */}
-          <PlaceHeader place={place} />
-
-          {/* Quick Action Buttons */}
+          <View style={styles.summary}>
+            <PlaceHeader place={place} />
+          </View>
           <ActionBar
             place={place}
             isSaved={isSaved}
             onToggleSave={handleToggleSave}
             userRating={userRating}
+            hasPosted={hasPosted}
+            postStatusReady={postStatusReady}
             onRate={rankingsReady ? () => setIsRateModalVisible(true) : undefined}
           />
           {rankingsError && <><ThemedText>Could not load your ratings for comparison.</ThemedText><Button label="Retry ratings" onPress={() => setRankingsAttempt(n => n + 1)} /></>}
-          {!rankingsReady && !rankingsError && <ThemedText type="small" themeColor="textSecondary">Loading your ratings…</ThemedText>}
-
-          {/* Editorial / Recommendation Note */}
-          <RecommendationNote place={place} />
-
-          {/* 7-Day Operating Hours */}
           <HoursSection place={place} />
-
-          {/* Amenities & Highlights */}
-          <AmenitiesSection place={place} />
-
-          {/* Location & Map Shortcut */}
           <LocationSection place={place} />
-
-          {/* Compliance & Contributor Attribution */}
           <AttributionFooter place={place} />
         </View>
       </ScrollView>
@@ -418,45 +396,21 @@ export default PlaceDetailsScreen;
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
   },
   scrollContent: {
     flexGrow: 1,
-  },
-  floatingNav: {
-    position: 'absolute',
-    left: 16,
-    zIndex: 10,
-  },
-  topBar: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  floatingButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  backIcon: {
-    fontSize: 20,
-    lineHeight: 22,
-    fontWeight: '700',
+    width: '100%',
+    maxWidth: 402,
+    alignSelf: 'center',
+    paddingBottom: 24,
   },
   body: {
     width: '100%',
-    maxWidth: 720,
-    alignSelf: 'center',
-    padding: 20,
-    paddingTop: 24,
-    gap: 20,
+    gap: 10,
+    padding: 10,
   },
+  summary: { width: '100%', padding: 10, overflow: 'hidden' },
   emptyContainer: {
     flex: 1,
     alignItems: 'center',

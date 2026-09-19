@@ -1,144 +1,37 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { useTheme } from '@/hooks/use-theme';
-import { computeIsOpenNow } from '@/lib/opening-hours';
 import type { PlaceDetails } from '../types';
 
-interface HoursSectionProps {
-  place: PlaceDetails;
-}
-
-const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-export function HoursSection({ place }: HoursSectionProps) {
-  const theme = useTheme();
-  const [expanded, setExpanded] = useState(!!place.liveDetails);
-
+export function HoursSection({ place }: { place: PlaceDetails }) {
   const hours = place.regularOpeningHours;
-  if (!hours || hours.length === 0) return null;
-
-  // A manually selected area may be in another timezone. Do not label the
-  // device's current weekday as "today" for live provider schedules.
-  const currentDayName = place.liveDetails ? null : dayNames[new Date().getDay()];
-  const isOpen = place.liveDetails ? place.openNow : place.openNow ?? computeIsOpenNow(hours);
+  if (!hours?.length) return null;
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => setExpanded((prev) => !prev)}
-        style={styles.headerPressable}
-      >
-        <View style={styles.titleRow}>
-          <ThemedText style={styles.sectionIcon}>🕒</ThemedText>
-          <ThemedText type="smallBold" themeColor="textSecondary" style={styles.eyebrow}>
-            OPENING HOURS
-          </ThemedText>
-        </View>
-        <ThemedText type="smallBold" themeColor="primary">
-          {expanded ? 'Hide schedule' : 'See all days'} {expanded ? '▴' : '▾'}
-        </ThemedText>
-      </Pressable>
-
-      {/* If collapsed, show today's hours */}
-      {!expanded ? (
-        <View style={styles.todayRow}>
-          <ThemedText type="smallBold">
-            {isOpen !== null && isOpen !== undefined ? (isOpen ? 'Open now' : 'Closed now') : place.liveDetails ? 'Regular weekly hours' : 'Hours today'}
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {currentDayName ? hours.find((h) => h.startsWith(currentDayName)) ?? hours[0] : 'See all days for this place’s regular schedule.'}
-          </ThemedText>
-        </View>
-      ) : (
-        /* Expanded: Full 7 days */
-        <View style={styles.scheduleList}>
-          {hours.map((line, idx) => {
-            const isToday = currentDayName !== null && line.startsWith(currentDayName);
-            const [day, ...rest] = line.split(': ');
-            const time = rest.join(': ');
-
-            return (
-              <View
-                key={idx}
-                style={[
-                  styles.dayRow,
-                  isToday && [styles.todayHighlight, { backgroundColor: theme.backgroundSelected }],
-                ]}
-              >
-                <ThemedText
-                  type={isToday ? 'smallBold' : 'small'}
-                  themeColor={isToday ? 'primary' : undefined}
-                  style={styles.dayName}
-                >
-                  {day} {isToday ? '· Today' : ''}
-                </ThemedText>
-                <ThemedText
-                  type={isToday ? 'smallBold' : 'small'}
-                  themeColor={isToday ? 'text' : 'textSecondary'}
-                  style={styles.dayTime}
-                >
-                  {time || line}
-                </ThemedText>
-              </View>
-            );
-          })}
-        </View>
-      )}
+    <View style={styles.section}>
+      <ThemedText style={styles.title}>Opening Hours</ThemedText>
+      <View style={styles.list}>
+        {hours.map((line, index) => {
+          const separator = line.indexOf(':');
+          const day = separator >= 0 ? line.slice(0, separator) : line;
+          const time = separator >= 0 ? line.slice(separator + 1).trim() : '';
+          return (
+            <View key={`${line}-${index}`} style={styles.row}>
+              <ThemedText style={styles.day}>{day}</ThemedText>
+              <ThemedText style={styles.time}>{time}</ThemedText>
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 16,
-    gap: 12,
-  },
-  headerPressable: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  sectionIcon: {
-    fontSize: 14,
-  },
-  eyebrow: {
-    fontSize: 11,
-    lineHeight: 16,
-    letterSpacing: 1.2,
-  },
-  todayRow: {
-    gap: 4,
-    paddingTop: 2,
-  },
-  scheduleList: {
-    gap: 8,
-    paddingTop: 4,
-  },
-  dayRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-  },
-  todayHighlight: {
-    borderRadius: 10,
-  },
-  dayName: {
-    flex: 1,
-  },
-  dayTime: {
-    textAlign: 'right',
-  },
+  section: { width: '100%', gap: 10, padding: 10, overflow: 'hidden' },
+  title: { width: '100%', color: '#000000', fontSize: 16, fontWeight: '600', lineHeight: 20, letterSpacing: 0.25 },
+  list: { width: '100%', gap: 4, padding: 10 },
+  row: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  day: { width: 66, flexShrink: 0, color: '#000000', fontSize: 10, fontWeight: '300', lineHeight: 15 },
+  time: { flex: 1, color: '#000000', fontSize: 10, fontWeight: '300', lineHeight: 15 },
 });

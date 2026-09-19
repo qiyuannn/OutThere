@@ -23,6 +23,7 @@ interface PhotoCarouselProps {
 export function PhotoCarousel({ place }: PhotoCarouselProps) {
   const theme = useTheme();
   const { width: windowWidth } = useWindowDimensions();
+  const carouselWidth = Math.min(windowWidth, 402);
   const [activeIndex, setActiveIndex] = useState(0);
   const [failedIndices, setFailedIndices] = useState<Record<number, boolean>>({});
 
@@ -93,7 +94,7 @@ export function PhotoCarousel({ place }: PhotoCarouselProps) {
         renderItem={({ item, index }) => {
           const isFailed = failedIndices[index];
           return (
-            <View style={[styles.slide, { width: windowWidth, backgroundColor: theme.backgroundSelected }]}>
+            <View style={[styles.slide, { width: carouselWidth, backgroundColor: theme.backgroundSelected }]}>
               {item.uri && !isFailed ? (
                 <Image
                   source={{ uri: item.uri }}
@@ -151,12 +152,14 @@ export function PhotoCarousel({ place }: PhotoCarouselProps) {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    height: 300,
+    maxWidth: 402,
+    height: 227,
+    alignSelf: 'center',
     position: 'relative',
     overflow: 'hidden',
   },
   slide: {
-    height: 300,
+    height: 227,
   },
   image: {
     width: '100%',
@@ -164,8 +167,9 @@ const styles = StyleSheet.create({
   },
   fallbackContainer: {
     width: '100%',
-    height: 240,
-    borderRadius: 24,
+    maxWidth: 402,
+    height: 227,
+    alignSelf: 'center',
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',

@@ -49,7 +49,7 @@ export function SwipeableRecommendation({ place, disabled, onChoice }: Props) {
     const offscreen = width + 160;
     const target = choice === 'pass'
       ? { x: -offscreen, y: 0 }
-      : choice === 'save'
+      : choice === 'go'
         ? { x: offscreen, y: 0 }
         : { x: 0, y: height + 160 };
 
@@ -74,8 +74,8 @@ export function SwipeableRecommendation({ place, disabled, onChoice }: Props) {
       || (gesture.dy >= FLICK_DISTANCE && gesture.vy >= FLICK_VELOCITY);
 
     if (horizontal && left) completeChoice('pass');
-    else if (horizontal && right) completeChoice('save');
-    else if (!horizontal && down) completeChoice('notNow');
+    else if (horizontal && right) completeChoice('go');
+    else if (!horizontal && down) completeChoice('save');
     else resetPosition();
   }, [completeChoice, resetPosition]);
 
@@ -118,12 +118,12 @@ export function SwipeableRecommendation({ place, disabled, onChoice }: Props) {
     outputRange: [1, 0, 0],
     extrapolate: 'clamp',
   });
-  const saveOpacity = position.x.interpolate({
+  const goOpacity = position.x.interpolate({
     inputRange: [0, 24, SWIPE_DISTANCE],
     outputRange: [0, 0, 1],
     extrapolate: 'clamp',
   });
-  const notNowOpacity = position.y.interpolate({
+  const saveOpacity = position.y.interpolate({
     inputRange: [0, 24, SWIPE_DISTANCE],
     outputRange: [0, 0, 1],
     extrapolate: 'clamp',
@@ -131,59 +131,67 @@ export function SwipeableRecommendation({ place, disabled, onChoice }: Props) {
 
   const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
     if (event.nativeEvent.actionName === 'pass') completeChoice('pass');
-    if (event.nativeEvent.actionName === 'notNow') completeChoice('notNow');
     if (event.nativeEvent.actionName === 'save') completeChoice('save');
+    if (event.nativeEvent.actionName === 'go') completeChoice('go');
   };
 
   return <View style={styles.container}>
-    <Animated.View style={[styles.cardMotion, cardStyle]} {...panResponder.panHandlers}>
-      <RecommendationCard place={place} />
-      <Animated.View pointerEvents="none" style={[styles.choiceBadge, styles.passBadge, {
-        backgroundColor: theme.backgroundElement,
-        borderColor: theme.textSecondary,
-        opacity: passOpacity,
-      }]}>
-        <ThemedText type="smallBold" themeColor="textSecondary" style={styles.choiceText}>PASS</ThemedText>
-      </Animated.View>
-      <Animated.View pointerEvents="none" style={[styles.choiceBadge, styles.saveBadge, {
-        backgroundColor: theme.accent,
-        borderColor: theme.onAccent,
-        opacity: saveOpacity,
-      }]}>
-        <ThemedText type="smallBold" style={[styles.choiceText, { color: theme.onAccent }]}>LET’S GO</ThemedText>
-      </Animated.View>
-      <Animated.View pointerEvents="none" style={[styles.choiceBadge, styles.notNowBadge, {
-        backgroundColor: theme.backgroundElement,
-        borderColor: theme.primary,
-        opacity: notNowOpacity,
-      }]}>
-        <ThemedText type="smallBold" themeColor="primary" style={styles.choiceText}>NOT NOW</ThemedText>
-      </Animated.View>
-    </Animated.View>
+    <View style={styles.deck}>
+      <View pointerEvents="none" style={styles.cardSlot}>
+        <View style={[styles.nextCard, { backgroundColor: theme.backgroundSelected, borderColor: theme.border }]} />
+      </View>
+      <View style={styles.cardSlot}>
+        <Animated.View style={[styles.cardMotion, cardStyle]} {...panResponder.panHandlers}>
+          <RecommendationCard place={place} />
+          <Animated.View pointerEvents="none" style={[styles.choiceBadge, styles.passBadge, {
+            backgroundColor: theme.backgroundElement,
+            borderColor: theme.textSecondary,
+            opacity: passOpacity,
+          }]}>
+            <ThemedText type="smallBold" themeColor="textSecondary" style={styles.choiceText}>PASS</ThemedText>
+          </Animated.View>
+          <Animated.View pointerEvents="none" style={[styles.choiceBadge, styles.goBadge, {
+            backgroundColor: theme.accent,
+            borderColor: theme.onAccent,
+            opacity: goOpacity,
+          }]}>
+            <ThemedText type="smallBold" style={[styles.choiceText, { color: theme.onAccent }]}>LET’S GO</ThemedText>
+          </Animated.View>
+          <Animated.View pointerEvents="none" style={[styles.choiceBadge, styles.saveBadge, {
+            backgroundColor: theme.backgroundElement,
+            borderColor: theme.primary,
+            opacity: saveOpacity,
+          }]}>
+            <ThemedText type="smallBold" themeColor="primary" style={styles.choiceText}>SAVE</ThemedText>
+          </Animated.View>
+        </Animated.View>
+      </View>
+    </View>
 
     <View
       accessible
       accessibilityRole="adjustable"
       accessibilityLabel={`Choose what to do with ${place.name}`}
-      accessibilityHint="Swipe left to pass, down for not now, or right for let's go."
+      accessibilityHint="Swipe left to pass, down to save, or right to go."
       accessibilityActions={[
         { name: 'pass', label: 'Pass' },
-        { name: 'notNow', label: 'Not now' },
-        { name: 'save', label: 'Let’s go' },
+        { name: 'save', label: 'Save' },
+        { name: 'go', label: 'Go' },
       ]}
       onAccessibilityAction={handleAccessibilityAction}
       style={[styles.guide, { opacity: disabled ? 0.45 : 1 }]}
     >
-      <ThemedText type="smallBold" themeColor="textSecondary" style={styles.guideText}>←  PASS</ThemedText>
-      <ThemedText type="smallBold" themeColor="primary" style={styles.guideText}>↓  NOT NOW</ThemedText>
-      <ThemedText type="smallBold" themeColor="primary" style={styles.guideText}>LET’S GO  →</ThemedText>
+      <ThemedText style={styles.guideText}>SWIPE LEFT TO PASS   ·   DOWN TO SAVE   ·   RIGHT TO GO</ThemedText>
     </View>
   </View>;
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, minHeight: 0, gap: 12 },
-  cardMotion: { flex: 1, minHeight: 0 },
+  container: { flex: 1, minHeight: 0, gap: 10 },
+  deck: { flex: 1, minHeight: 0 },
+  cardSlot: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, paddingTop: 19, paddingBottom: 19, alignItems: 'center', justifyContent: 'center' },
+  cardMotion: { flex: 1, width: '90%', maxWidth: 343, maxHeight: 525 },
+  nextCard: { flex: 1, width: '90%', maxWidth: 343, maxHeight: 525, borderWidth: 1, borderRadius: 28, transform: [{ rotate: '-2deg' }] },
   choiceBadge: {
     position: 'absolute',
     zIndex: 2,
@@ -193,18 +201,14 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   passBadge: { top: 24, right: 24, transform: [{ rotate: '7deg' }] },
-  saveBadge: { top: 24, left: 24, transform: [{ rotate: '-7deg' }] },
-  notNowBadge: { top: 24, alignSelf: 'center' },
+  goBadge: { top: 24, left: 24, transform: [{ rotate: '-7deg' }] },
+  saveBadge: { top: 24, alignSelf: 'center' },
   choiceText: { fontSize: 12, lineHeight: 16, letterSpacing: 1.2 },
   guide: {
-    minHeight: 40,
-    borderRadius: 20,
+    minHeight: 15,
     backgroundColor: 'transparent',
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    gap: 6,
+    justifyContent: 'center',
   },
-  guideText: { flex: 1, fontSize: 10, lineHeight: 14, letterSpacing: 0.5, textAlign: 'center' },
+  guideText: { color: '#637068', fontSize: 10, lineHeight: 15, fontWeight: '600', letterSpacing: 0.25, textAlign: 'center' },
 });
