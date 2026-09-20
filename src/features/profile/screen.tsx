@@ -5,6 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/app-header';
 import { SubscriptionCard } from '@/features/subscriptions/profile-card';
+import { readSocialSummary } from '@/features/social/api';
+import type { SocialSummary } from '@/features/social/types';
 import { useAuth } from '@/providers/auth-provider';
 import { useProfile } from '@/providers/profile-provider';
 import { Avatar } from './components/avatar';
@@ -13,6 +15,7 @@ import { VisitedPlacesMap } from './components/visited-places-map';
 import { loadProfileVisitSummary, type ProfileVisitSummary } from './service';
 
 const EMPTY_SUMMARY: ProfileVisitSummary = { averageRating: null, places: [], visitedCount: 0 };
+const EMPTY_SOCIAL: SocialSummary = { enabled: false, friends: 0, incoming: 0, outgoing: 0, unread: 0 };
 
 export default function ProfileScreen() {
   const { session } = useAuth();
@@ -20,6 +23,7 @@ export default function ProfileScreen() {
   const { updated } = useLocalSearchParams<{ updated?: string }>();
   const [summary, setSummary] = useState<ProfileVisitSummary>(EMPTY_SUMMARY);
   const [loadingSummary, setLoadingSummary] = useState(true);
+  const [social, setSocial] = useState<SocialSummary>(EMPTY_SOCIAL);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -36,6 +40,13 @@ export default function ProfileScreen() {
     return () => { active = false; };
   }, [session?.user.id]));
 
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    if (!session?.user.id) return () => { active = false; };
+    void readSocialSummary().then((next) => { if (active) setSocial(next); }).catch(() => { if (active) setSocial(EMPTY_SOCIAL); });
+    return () => { active = false; };
+  }, [session?.user.id]));
+
   if (!profile) return null;
 
   return (
@@ -49,6 +60,7 @@ export default function ProfileScreen() {
           <View style={styles.identity}>
             <Text style={styles.name}>{profile.display_name}</Text>
             <Text style={styles.username}>@{profile.username}</Text>
+            <Text style={styles.socialCounts}>{social.friends} {social.friends === 1 ? 'friend' : 'friends'} · {social.incoming} incoming</Text>
           </View>
         </View>
 
@@ -61,6 +73,17 @@ export default function ProfileScreen() {
           style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}>
           <Text style={styles.buttonLabel}>My Rankings</Text>
         </Pressable>
+
+        <View style={styles.actions}>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/feed/people')}
+            style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
+            <Text style={styles.buttonLabel}>Friends{social.incoming ? ` (${social.incoming})` : ''}</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/feed/privacy')}
+            style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
+            <Text style={styles.buttonLabel}>Privacy & Sharing</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.statistics}>
           <View style={styles.statRow}>
@@ -105,6 +128,7 @@ const styles = StyleSheet.create({
   identity: { flex: 1, minHeight: 81, justifyContent: 'center', paddingVertical: 16 },
   name: { color: '#000000', fontSize: 20, lineHeight: 24, fontWeight: '700' },
   username: { color: '#000000', fontSize: 10, lineHeight: 15, fontWeight: '300', letterSpacing: 0.25 },
+  socialCounts: { color: '#000000', fontSize: 10, lineHeight: 15, fontWeight: '500', letterSpacing: 0.25 },
   outlineButton: { minHeight: 37, borderWidth: 1, borderColor: '#000000', padding: 10, alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.55 },
   buttonLabel: { color: '#000000', fontSize: 12, lineHeight: 15, fontWeight: '600', textAlign: 'center' },

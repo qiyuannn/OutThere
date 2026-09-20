@@ -1,1 +1,1 @@
-export { default } from '@/features/posts/feed-screen';
+export { default } from '@/features/social/feed-screen';

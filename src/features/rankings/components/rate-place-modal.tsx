@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Image } from 'expo-image';
-import { router, type Href } from 'expo-router';
 import {
   ActivityIndicator,
   FlatList,
@@ -25,6 +24,8 @@ import {
 } from '../comparison';
 import { getCandidatePlaces } from '../service';
 import type { CandidatePlace, RankedPlace, RankingMode, SaveRatingInput } from '../types';
+import { useSocialQuery } from '@/features/social/hooks';
+import type { SocialSettings, SocialVisibility } from '@/features/social/types';
 import { RatingPlaceSummary } from './rating-place-summary';
 
 const closeIcon = require('../../../../assets/images/rankings/close.svg');
@@ -94,6 +95,8 @@ export function RatePlaceModal({
   const [finalScore, setFinalScore] = useState<number>(7.8);
   const [recalibratedPlaces, setRecalibratedPlaces] = useState<RecalibratedPlace[]>([]);
   const [saving, setSaving] = useState(false);
+  const [visibility, setVisibility] = useState<SocialVisibility>('private');
+  const social = useSocialQuery<SocialSettings>('settings', {}, visible);
 
   // Reset modal state when opening
   useEffect(() => {
@@ -111,6 +114,10 @@ export function RatePlaceModal({
       setRecalibratedPlaces([]);
     }
   }, [visible, initialPlace]);
+
+  useEffect(() => {
+    if (visible && social.data) setVisibility(social.data.enabled ? social.data.default_visibility : 'private');
+  }, [social.data, visible]);
 
   // Load candidate places when on select_place step
   useEffect(() => {
@@ -204,7 +211,7 @@ export function RatePlaceModal({
   }, [existingRankings, finalScore]);
 
   // Handle save
-  const handleSave = async (openPost = false) => {
+  const handleSave = async () => {
     if (!selectedPlace || saving) return;
     setSaving(true);
     try {
@@ -215,21 +222,10 @@ export function RatePlaceModal({
         vibe: selectedVibe,
         recommend: true,
         notes: '',
+        social_visibility: visibility,
         recalibratedPlaces,
       });
       onClose();
-      if (openPost) {
-        router.push({
-          pathname: '/rankings/post',
-          params: {
-            placeId: selectedPlace.google_place_id,
-            name: selectedPlace.display_name,
-            category: selectedPlace.primary_type_display_name ?? '',
-            address: selectedPlace.formatted_address ?? '',
-            rating: finalScore.toFixed(1),
-          },
-        } as unknown as Href);
-      }
     } catch {
       setSaving(false);
     }
@@ -424,6 +420,18 @@ export function RatePlaceModal({
               <ThemedText style={styles.rankCopy}>
                 Ranked {projectedRank}{projectedRank === 1 ? 'st' : projectedRank === 2 ? 'nd' : projectedRank === 3 ? 'rd' : 'th'} out of {existingRankings.length + 1} in {mode === 'food' ? 'Food' : 'Activities'}
               </ThemedText>
+              <View style={styles.audienceBox}>
+                <ThemedText style={styles.prompt}>Who can see this rating?</ThemedText>
+                <View style={styles.audienceActions}>
+                  <Pressable accessibilityRole="button" accessibilityState={{ selected: visibility === 'private' }} onPress={() => setVisibility('private')} style={({ pressed }) => [styles.audienceButton, visibility === 'private' && styles.audienceSelected, pressed && styles.pressed]}>
+                    <ThemedText style={styles.finalButtonLabel}>{visibility === 'private' ? '✓ ' : ''}Only me</ThemedText>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityState={{ disabled: !social.data?.enabled, selected: visibility === 'friends' }} disabled={!social.data?.enabled} onPress={() => setVisibility('friends')} style={({ pressed }) => [styles.audienceButton, visibility === 'friends' && styles.audienceSelected, !social.data?.enabled && styles.disabledButton, pressed && styles.pressed]}>
+                    <ThemedText style={styles.finalButtonLabel}>{visibility === 'friends' ? '✓ ' : ''}Friends</ThemedText>
+                  </Pressable>
+                </View>
+                {!social.data?.enabled && <ThemedText type="small" themeColor="textSecondary">Enable your social profile under Feed → Privacy & sharing to share ratings.</ThemedText>}
+              </View>
               <View style={styles.finalActions}>
                 <Pressable
                   accessibilityRole="button"
@@ -431,15 +439,7 @@ export function RatePlaceModal({
                   onPress={() => void handleSave()}
                   style={({ pressed }) => [styles.finalButton, (pressed || saving) && styles.pressed]}
                 >
-                  {saving ? <ActivityIndicator size="small" color="#000000" /> : <ThemedText style={styles.finalButtonLabel}>Save</ThemedText>}
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={saving}
-                  onPress={() => void handleSave(true)}
-                  style={({ pressed }) => [styles.finalButton, (pressed || saving) && styles.pressed]}
-                >
-                  {saving ? <ActivityIndicator size="small" color="#000000" /> : <ThemedText style={styles.finalButtonLabel}>Save &amp; Post</ThemedText>}
+                  {saving ? <ActivityIndicator size="small" color="#000000" /> : <ThemedText style={styles.finalButtonLabel}>Save rating</ThemedText>}
                 </Pressable>
               </View>
             </View>
@@ -595,6 +595,11 @@ const styles = StyleSheet.create({
     gap: 10,
     overflow: 'hidden',
   },
+  audienceBox: { width: '100%', gap: 8 },
+  audienceActions: { width: '100%', flexDirection: 'row', gap: 10 },
+  audienceButton: { flex: 1, minHeight: 38, borderWidth: 1, borderColor: '#000000', alignItems: 'center', justifyContent: 'center', padding: 8 },
+  audienceSelected: { backgroundColor: '#F3F4F6' },
+  disabledButton: { opacity: 0.35 },
   finalButton: {
     flex: 1,
     minWidth: 0,

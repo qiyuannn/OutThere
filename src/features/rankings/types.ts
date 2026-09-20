@@ -1,4 +1,5 @@
 import type { Vibe } from './comparison';
+import type { SocialVisibility } from '@/features/social/types';
 
 export type RankingMode = 'food' | 'activities';
 
@@ -12,6 +13,7 @@ export interface RankedPlace {
   recommend: boolean;
   notes: string | null;
   rated_at: string;
+  social_visibility: SocialVisibility;
   display_name: string;
   formatted_address: string | null;
   primary_type: string | null;
@@ -38,5 +40,6 @@ export interface SaveRatingInput {
   vibe: Vibe;
   recommend: boolean;
   notes?: string | null;
+  social_visibility?: SocialVisibility;
   recalibratedPlaces?: Array<{ google_place_id: string; rating: number; vibe?: Vibe }>;
 }

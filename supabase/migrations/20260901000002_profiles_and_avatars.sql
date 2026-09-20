@@ -65,11 +65,14 @@ on conflict (id) do update set
   file_size_limit = 5242880,
   allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp'];
 
-create policy "Signed-in users can read avatars"
+create policy "Users can read own avatar"
   on storage.objects
   for select
   to authenticated
-  using (bucket_id = 'avatars');
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
 
 create policy "Upload own avatar"
   on storage.objects

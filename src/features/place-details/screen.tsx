@@ -13,7 +13,6 @@ import { computeIsOpenNow } from '@/lib/opening-hours';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { getCategoryGroupKey } from '@/features/categories/catalog';
-import { hasUserPostedAboutPlace } from '@/features/posts/service';
 import { getLivePlaceDetails } from '@/features/search/service';
 import { Button } from '@/components/foundation';
 import { RatePlaceModal } from '@/features/rankings/components/rate-place-modal';
@@ -61,8 +60,6 @@ export function PlaceDetailsScreen({
   const [loading, setLoading] = useState(!place && !!searchParams.id);
   const [isSaved, setIsSaved] = useState(directIsSaved ?? false);
   const [userRating, setUserRating] = useState<number | null>(null);
-  const [hasPosted, setHasPosted] = useState(false);
-  const [postStatusReady, setPostStatusReady] = useState(false);
   const [isRateModalVisible, setIsRateModalVisible] = useState(false);
   const [existingRankings, setExistingRankings] = useState<RankedPlace[]>([]);
   const [rankingsReady, setRankingsReady] = useState(false);
@@ -256,34 +253,6 @@ export function PlaceDetailsScreen({
     };
   }, [directIsSaved, placeId, userId]));
 
-  useFocusEffect(useCallback(() => {
-    if (!userId || !placeId) {
-      setHasPosted(false);
-      setPostStatusReady(true);
-      return;
-    }
-
-    let active = true;
-    setPostStatusReady(false);
-    void hasUserPostedAboutPlace(userId, placeId)
-      .then((posted) => {
-        if (active) {
-          setHasPosted(posted);
-          setPostStatusReady(true);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setHasPosted(false);
-          setPostStatusReady(false);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [placeId, userId]));
-
   // Handle Save / Unsave toggle
   const handleToggleSave = useCallback(
     async (nextSaved: boolean) => {
@@ -368,8 +337,6 @@ export function PlaceDetailsScreen({
             isSaved={isSaved}
             onToggleSave={handleToggleSave}
             userRating={userRating}
-            hasPosted={hasPosted}
-            postStatusReady={postStatusReady}
             onRate={rankingsReady ? () => setIsRateModalVisible(true) : undefined}
           />
           {rankingsError && <><ThemedText>Could not load your ratings for comparison.</ThemedText><Button label="Retry ratings" onPress={() => setRankingsAttempt(n => n + 1)} /></>}

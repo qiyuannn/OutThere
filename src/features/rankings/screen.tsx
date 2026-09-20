@@ -14,6 +14,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { RankedPlaceCard } from './components/ranked-place-card';
 import { RatePlaceModal } from './components/rate-place-modal';
 import { ScoreBadge } from './components/score-badge';
+import { RatingSharing } from '@/features/social/rating-sharing';
 import { useRankings } from './use-rankings';
 
 export default function RankingsScreen() {
@@ -35,6 +36,7 @@ export default function RankingsScreen() {
     stats,
     saveRating,
     removeRating,
+    refresh,
   } = useRankings('food');
 
   const groups = CATEGORY_GROUPS_BY_MODE[mode];
@@ -240,14 +242,10 @@ export default function RankingsScreen() {
         </View>
       ) : filteredRankings.length > 0 ? (
         <View style={{ gap: 4 }}>
-          {filteredRankings.map((item, idx) => (
-            <RankedPlaceCard
-              key={item.id}
-              item={item}
-              rank={idx + 1}
-              onDelete={removeRating}
-            />
-          ))}
+          {filteredRankings.map((item, idx) => <View key={item.id}>
+            <RankedPlaceCard item={item} rank={idx + 1} onDelete={removeRating} />
+            <RatingSharing rating={item} onChanged={refresh} />
+          </View>)}
         </View>
       ) : rankings.length > 0 ? (
         <EmptyState

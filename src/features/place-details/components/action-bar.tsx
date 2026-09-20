@@ -1,5 +1,4 @@
 import { Image, type ImageSource } from 'expo-image';
-import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
 
@@ -9,7 +8,6 @@ import type { PlaceDetails } from '../types';
 const actionIcons = {
   call: require('../../../../assets/images/place-details/call.svg'),
   website: require('../../../../assets/images/place-details/website.svg'),
-  post: require('../../../../assets/images/place-details/post.svg'),
   save: require('../../../../assets/images/place-details/save.svg'),
   rate: require('../../../../assets/images/place-details/rate.svg'),
 } as const;
@@ -19,12 +17,10 @@ interface ActionBarProps {
   isSaved?: boolean;
   onToggleSave?: (saved: boolean) => void | Promise<void>;
   userRating?: number | null;
-  hasPosted?: boolean;
-  postStatusReady?: boolean;
   onRate?: () => void;
 }
 
-export function ActionBar({ place, isSaved = false, onToggleSave, userRating, hasPosted = false, postStatusReady = false, onRate }: ActionBarProps) {
+export function ActionBar({ place, isSaved = false, onToggleSave, userRating, onRate }: ActionBarProps) {
   const [saving, setSaving] = useState(false);
 
   const toggleSave = async () => {
@@ -37,20 +33,6 @@ export function ActionBar({ place, isSaved = false, onToggleSave, userRating, ha
     } finally {
       setSaving(false);
     }
-  };
-
-  const openPost = () => {
-    if (userRating === null || userRating === undefined || hasPosted) return;
-    router.push({
-      pathname: '/rankings/post',
-      params: {
-        placeId: place.id,
-        name: place.name,
-        category: place.category ?? '',
-        address: place.address ?? '',
-        rating: userRating.toFixed(1),
-      },
-    } as unknown as Href);
   };
 
   return (
@@ -66,13 +48,6 @@ export function ActionBar({ place, isSaved = false, onToggleSave, userRating, ha
         icon={actionIcons.website}
         label="Website"
         onPress={() => place.websiteUri && void Linking.openURL(place.websiteUri)}
-      />
-      <QuickAction
-        disabled={!postStatusReady || userRating === null || userRating === undefined || hasPosted}
-        icon={actionIcons.post}
-        label={hasPosted ? 'Posted' : 'Post'}
-        onPress={openPost}
-        selected={hasPosted}
       />
       <QuickAction
         busy={saving}

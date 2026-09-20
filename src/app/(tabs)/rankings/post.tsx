@@ -1,1 +1,5 @@
-export { default } from '@/features/posts/screen';
+import { Redirect } from 'expo-router';
+
+export default function LegacyPostRedirect() {
+  return <Redirect href="/rankings" />;
+}
