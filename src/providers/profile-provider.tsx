@@ -7,7 +7,7 @@ interface ProfileState {
   loading: boolean;
   error: boolean;
   reload: () => Promise<void>;
-  save: (draft: ProfileDraft, step: number, completed: boolean, avatar: AvatarSelection | null) => Promise<Profile>;
+  save: (draft: ProfileDraft, completed: boolean, avatar: AvatarSelection | null) => Promise<Profile>;
 }
 const Context = createContext<ProfileState | null>(null);
 export function ProfileProvider({ children }: PropsWithChildren) {
@@ -32,12 +32,12 @@ function ProfileSession({ children, userId }: PropsWithChildren<{ userId?: strin
     finally { if (id === request.current) setLoading(false); }
   }, [userId]);
   useEffect(() => { void reload(); return () => { request.current += 1; }; }, [reload]);
-  async function save(draft: ProfileDraft, step: number, completed: boolean, avatar: AvatarSelection | null) {
+  async function save(draft: ProfileDraft, completed: boolean, avatar: AvatarSelection | null) {
     if (!userId || saving.current) throw new Error('A profile save is already in progress.');
     saving.current = true;
     const id = ++request.current;
     try {
-      const next = await saveProfile(userId, current.current, draft, step, completed, avatar);
+      const next = await saveProfile(userId, current.current, draft, completed, avatar);
       if (id === request.current) { current.current = next; setProfile(next); setError(false); }
       return next;
     } finally { saving.current = false; }

@@ -1,15 +1,17 @@
 import { supabase } from './supabase';
+import {
+  createAuthCallbackManager,
+  extractAuthParams,
+  type ExtractedAuthParams,
+  type AuthCallbackClient,
+} from './auth-validation';
 
-// Strict Mode may mount the callback twice. Exchange a one-use code only once.
-let lastCode: string | undefined;
-let pendingExchange: ReturnType<NonNullable<typeof supabase>['auth']['exchangeCodeForSession']> | undefined;
-export function exchangeAuthCode(code: string) {
-  if (!supabase) throw new Error('Authentication is not configured.');
-  if (code !== lastCode || !pendingExchange) {
-    lastCode = code;
-    pendingExchange = supabase.auth.exchangeCodeForSession(code).finally(() => {
-      if (lastCode === code) { lastCode = undefined; pendingExchange = undefined; }
-    });
-  }
-  return pendingExchange;
-}
+export { extractAuthParams, type ExtractedAuthParams, type AuthCallbackClient, createAuthCallbackManager };
+
+const defaultManager = createAuthCallbackManager(() => supabase);
+
+export const exchangeAuthCode = defaultManager.exchangeAuthCode;
+export const handleAuthCallbackUrl = defaultManager.handleAuthCallbackUrl;
+export const _resetExchangeState = defaultManager._resetExchangeState;
+
+

@@ -51,7 +51,7 @@ export default function RankingsScreen() {
   const isFood = mode === 'food';
 
   return (
-    <Screen title="Your places. Your favourites." eyebrow="RANKINGS">
+    <Screen title="Your places. Your favourites." headerDescription="Your places. Your favourites.">
       {/* Dual Mode Switcher (Food vs Activities) */}
       <View accessibilityRole="tablist" style={[styles.tabs, { backgroundColor: theme.backgroundSelected }]}>
         {(['food', 'activities'] as const).map((m) => (

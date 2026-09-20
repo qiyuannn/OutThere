@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { router } from 'expo-router';
 
-import { useProfile } from '@/providers/profile-provider';
 import { useAuth } from '@/providers/auth-provider';
 import { DEFAULT_RADIUS_METERS } from './constants';
 import { clearPassedPlaces, getRoundedDeviceLocation, passPlace, requestRecommendations, savePlace } from './service';
@@ -12,8 +12,7 @@ const falseModes = (): Record<DiscoverMode, boolean> => ({ activities: false, fo
 
 export function useDiscover() {
   const { session } = useAuth(); const userId = session?.user.id;
-  const { profile } = useProfile();
-  const preferredRadius = profile?.travel_radius_meters ?? DEFAULT_RADIUS_METERS;
+  const preferredRadius = DEFAULT_RADIUS_METERS;
   const [mode, setMode] = useState<DiscoverMode>('activities');
   const [location, setLocation] = useState<DiscoverLocation | null>(null);
   const [radiusMeters, setRadiusMeters] = useState(preferredRadius);
@@ -63,16 +62,23 @@ export function useDiscover() {
     try {
       if (choice === 'pass') {
         await passPlace(userId, current.id, mode);
-      } else if (choice === 'save') {
+      } else if (choice === 'save' || choice === 'details') {
         await savePlace(userId, current.id, mode);
       }
 
       const reachedEnd = indices[mode] + 1 >= items[mode].length;
-      if (reachedEnd) {
-        await fetchMode(mode, radiusMeters, location);
-      } else {
+      if (!reachedEnd) {
         setIndices((value) => ({ ...value, [mode]: value[mode] + 1 }));
       }
+
+      if (choice === 'details') {
+        router.push({
+          pathname: '/(tabs)/bucket-list/[id]',
+          params: { id: current.id, mode },
+        });
+      }
+
+      if (reachedEnd) await fetchMode(mode, radiusMeters, location);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not save that choice.'); }
     finally { setActing(false); }
   }, [acting, current, fetchMode, indices, items, location, mode, radiusMeters, userId]);

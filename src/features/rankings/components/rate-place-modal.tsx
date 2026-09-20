@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Image } from 'expo-image';
+import { router, type Href } from 'expo-router';
 import {
   ActivityIndicator,
   FlatList,
@@ -6,7 +8,6 @@ import {
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -16,16 +17,39 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/providers/auth-provider';
 import {
   calculateListRecalibration,
-  computeFinalScore,
   getBracketBounds,
+  getScoreTier,
   RecalibratedPlace,
   stepComparison,
   Vibe,
-  VIBE_CONFIGS,
 } from '../comparison';
 import { getCandidatePlaces } from '../service';
 import type { CandidatePlace, RankedPlace, RankingMode, SaveRatingInput } from '../types';
-import { ScoreBadge } from './score-badge';
+import { RatingPlaceSummary } from './rating-place-summary';
+
+const closeIcon = require('../../../../assets/images/rankings/close.svg');
+const vibeIcons = {
+  disliked: require('../../../../assets/images/rankings/vibe-disliked.svg'),
+  fine: require('../../../../assets/images/rankings/vibe-fine.svg'),
+  liked: require('../../../../assets/images/rankings/vibe-liked.svg'),
+  loved: require('../../../../assets/images/rankings/vibe-loved.svg'),
+} as const;
+
+const vibeOptions = [
+  { key: 'disliked', label: 'Didn’t like it.' },
+  { key: 'fine', label: 'It’s fine.' },
+  { key: 'liked', label: 'It’s good!' },
+  { key: 'loved', label: 'Loved it!' },
+] as const;
+
+function ShowdownScore({ score }: { score: number }) {
+  const tier = getScoreTier(score);
+  return (
+    <View style={[styles.showdownScore, { backgroundColor: tier.backgroundColor, borderColor: tier.color }]}>
+      <ThemedText style={[styles.showdownScoreText, { color: tier.textColor }]}>{score.toFixed(1)}</ThemedText>
+    </View>
+  );
+}
 
 interface RatePlaceModalProps {
   visible: boolean;
@@ -66,11 +90,9 @@ export function RatePlaceModal({
   const [currentMid, setCurrentMid] = useState<number | null>(null);
   const [comparisonCount, setComparisonCount] = useState(1);
 
-  // Score & Notes state
+  // Score state
   const [finalScore, setFinalScore] = useState<number>(7.8);
   const [recalibratedPlaces, setRecalibratedPlaces] = useState<RecalibratedPlace[]>([]);
-  const [recommend, setRecommend] = useState(true);
-  const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Reset modal state when opening
@@ -84,8 +106,6 @@ export function RatePlaceModal({
         setStep('select_place');
       }
       setSelectedVibe('liked');
-      setRecommend(true);
-      setNotes('');
       setSaving(false);
       setComparisonCount(1);
       setRecalibratedPlaces([]);
@@ -184,7 +204,7 @@ export function RatePlaceModal({
   }, [existingRankings, finalScore]);
 
   // Handle save
-  const handleSave = async () => {
+  const handleSave = async (openPost = false) => {
     if (!selectedPlace || saving) return;
     setSaving(true);
     try {
@@ -193,11 +213,23 @@ export function RatePlaceModal({
         mode,
         rating: finalScore,
         vibe: selectedVibe,
-        recommend,
-        notes,
+        recommend: true,
+        notes: '',
         recalibratedPlaces,
       });
       onClose();
+      if (openPost) {
+        router.push({
+          pathname: '/rankings/post',
+          params: {
+            placeId: selectedPlace.google_place_id,
+            name: selectedPlace.display_name,
+            category: selectedPlace.primary_type_display_name ?? '',
+            address: selectedPlace.formatted_address ?? '',
+            rating: finalScore.toFixed(1),
+          },
+        } as unknown as Href);
+      }
     } catch {
       setSaving(false);
     }
@@ -211,39 +243,33 @@ export function RatePlaceModal({
       >
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: theme.background,
-              borderColor: theme.border,
-            },
-          ]}
-        >
-          {/* Modal Header */}
+        <View style={styles.card}>
           <View style={styles.header}>
-            <View style={{ flex: 1 }}>
-              <ThemedText type="smallBold" themeColor="primary" style={styles.eyebrow}>
-                {step === 'select_place' && 'SELECT PLACE'}
-                {step === 'vibe_check' && 'VIBE CHECK'}
-                {step === 'showdown' && `SHOWDOWN · MATCH ${comparisonCount}`}
-                {step === 'score_reveal' && 'FINAL SCORE & REVIEW'}
-              </ThemedText>
-              <ThemedText type="subtitle" style={{ fontSize: 20 }}>
-                {step === 'select_place' && (mode === 'food' ? 'Rate a Restaurant' : 'Rate an Activity')}
-                {step === 'vibe_check' && 'How was your experience?'}
-                {step === 'showdown' && 'Which did you like more?'}
-                {step === 'score_reveal' && 'Calculated Score'}
-              </ThemedText>
+            <View style={styles.headerCopy}>
+              {step === 'select_place' ? (
+                <>
+                  <ThemedText type="smallBold" themeColor="primary" style={styles.eyebrow}>SELECT PLACE</ThemedText>
+                  <ThemedText type="subtitle" style={styles.selectTitle}>
+                    {mode === 'food' ? 'Rate a Restaurant' : 'Rate an Activity'}
+                  </ThemedText>
+                </>
+              ) : (
+                <ThemedText style={styles.stepTitle}>
+                  {step === 'vibe_check' && 'Vibe Check'}
+                  {step === 'showdown' && `Showdown Match ${comparisonCount}`}
+                  {step === 'score_reveal' && 'Final Score'}
+                </ThemedText>
+              )}
             </View>
 
             <Pressable
               onPress={onClose}
               accessibilityRole="button"
               accessibilityLabel="Close"
-              style={({ pressed }) => [styles.closeBtn, { opacity: pressed ? 0.6 : 1 }]}
+              hitSlop={8}
+              style={({ pressed }) => [styles.closeBtn, pressed && styles.pressed]}
             >
-              <ThemedText style={{ fontSize: 18, color: theme.textSecondary }}>✕</ThemedText>
+              <Image source={closeIcon} contentFit="contain" style={styles.closeIcon} />
             </Pressable>
           </View>
 
@@ -324,218 +350,99 @@ export function RatePlaceModal({
 
           {/* Step 2: Vibe Check */}
           {step === 'vibe_check' && selectedPlace && (
-            <View style={{ gap: 14 }}>
-              <View style={[styles.selectedBanner, { backgroundColor: theme.backgroundSelected }]}>
-                <ThemedText type="smallBold" numberOfLines={1}>
-                  {selectedPlace.display_name}
-                </ThemedText>
-                {selectedPlace.primary_type_display_name ? (
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {selectedPlace.primary_type_display_name}
-                  </ThemedText>
-                ) : null}
-              </View>
-
+            <View style={styles.stepContent}>
+              <RatingPlaceSummary place={selectedPlace} />
+              <ThemedText style={styles.prompt}>How was your experience?</ThemedText>
               <View style={styles.vibeGrid}>
-                {(['loved', 'liked', 'fine', 'disliked'] as const).map((vibeKey) => {
-                  const cfg = VIBE_CONFIGS[vibeKey];
-                  return (
-                    <Pressable
-                      key={vibeKey}
-                      onPress={() => handleSelectVibe(vibeKey)}
-                      style={({ pressed }) => [
-                        styles.vibeCard,
-                        {
-                          backgroundColor: theme.backgroundElement,
-                          borderColor: theme.border,
-                          opacity: pressed ? 0.8 : 1,
-                        },
-                      ]}
-                    >
-                      <ThemedText style={styles.vibeIcon}>{cfg.icon}</ThemedText>
-                      <View style={{ flex: 1 }}>
-                        <ThemedText type="smallBold" style={{ fontSize: 16 }}>
-                          {cfg.label}
-                        </ThemedText>
-                        <ThemedText type="small" themeColor="textSecondary" style={{ marginTop: 2 }}>
-                          {cfg.description}
-                        </ThemedText>
-                      </View>
-                    </Pressable>
-                  );
-                })}
+                {vibeOptions.map((option) => (
+                  <Pressable
+                    key={option.key}
+                    accessibilityLabel={option.label}
+                    accessibilityRole="button"
+                    onPress={() => handleSelectVibe(option.key)}
+                    style={({ pressed }) => [styles.vibeButton, pressed && styles.pressed]}
+                  >
+                    <Image source={vibeIcons[option.key]} contentFit="contain" style={styles.vibeIcon} />
+                    <ThemedText numberOfLines={1} style={styles.vibeLabel}>{option.label}</ThemedText>
+                  </Pressable>
+                ))}
               </View>
             </View>
           )}
 
           {/* Step 3: Showdown Comparison */}
           {step === 'showdown' && selectedPlace && currentMid !== null && existingRankings[currentMid] && (
-            <View style={{ gap: 16 }}>
-              <ThemedText themeColor="textSecondary" style={{ fontSize: 13 }}>
-                Compare this new spot against a place you’ve already rated:
-              </ThemedText>
-
-              {/* Showdown Contenders */}
+            <View style={styles.stepContent}>
+              <ThemedText style={[styles.prompt, styles.centeredPrompt]}>Which one is better?</ThemedText>
               <View style={styles.showdownRow}>
-                {/* New Contender */}
                 <Pressable
+                  accessibilityLabel={`${selectedPlace.display_name}, current place`}
+                  accessibilityRole="button"
                   onPress={() => handleShowdownChoice('new_better')}
-                  style={({ pressed }) => [
-                    styles.contenderCard,
-                    {
-                      backgroundColor: theme.backgroundElement,
-                      borderColor: theme.primary,
-                      borderWidth: 2,
-                      opacity: pressed ? 0.8 : 1,
-                    },
-                  ]}
+                  style={({ pressed }) => [styles.contenderCard, pressed && styles.pressed]}
                 >
-                  <ThemedText style={styles.contenderEmoji}>✨</ThemedText>
-                  <ThemedText type="smallBold" numberOfLines={2} style={{ textAlign: 'center' }}>
+                  <ThemedText numberOfLines={2} style={styles.contenderName}>
                     {selectedPlace.display_name}
                   </ThemedText>
-                  <ThemedText type="small" themeColor="primary" style={{ marginTop: 4 }}>
-                    New Place
-                  </ThemedText>
+                  <ThemedText style={styles.contenderName}>(Current)</ThemedText>
                 </Pressable>
 
-                <View style={styles.vsBadge}>
-                  <ThemedText type="smallBold" style={{ color: '#fff', fontSize: 12 }}>
-                    VS
-                  </ThemedText>
+                <View style={styles.vsColumn}>
+                  <ThemedText style={styles.vsLabel}>vs</ThemedText>
                 </View>
 
-                {/* Existing Contender */}
                 <Pressable
+                  accessibilityLabel={`${existingRankings[currentMid].display_name}, rated ${existingRankings[currentMid].rating.toFixed(1)}`}
+                  accessibilityRole="button"
                   onPress={() => handleShowdownChoice('existing_better')}
-                  style={({ pressed }) => [
-                    styles.contenderCard,
-                    {
-                      backgroundColor: theme.backgroundElement,
-                      borderColor: theme.border,
-                      borderWidth: 1.5,
-                      opacity: pressed ? 0.8 : 1,
-                    },
-                  ]}
+                  style={({ pressed }) => [styles.contenderCard, styles.comparedCard, pressed && styles.pressed]}
                 >
-                  <ThemedText style={styles.contenderEmoji}>
-                    {existingRankings[currentMid].category_icon ?? '📍'}
-                  </ThemedText>
-                  <ThemedText type="smallBold" numberOfLines={2} style={{ textAlign: 'center' }}>
+                  <ThemedText numberOfLines={2} style={styles.contenderName}>
                     {existingRankings[currentMid].display_name}
                   </ThemedText>
-                  <View style={{ marginTop: 6 }}>
-                    <ScoreBadge score={existingRankings[currentMid].rating} size="small" />
+                  <View style={styles.comparedScore}>
+                    <ShowdownScore score={existingRankings[currentMid].rating} />
                   </View>
                 </Pressable>
               </View>
 
-              {/* Tie Option */}
               <Pressable
+                accessibilityRole="button"
                 onPress={() => handleShowdownChoice('equal')}
-                style={({ pressed }) => [
-                  styles.equalBtn,
-                  {
-                    backgroundColor: theme.backgroundSelected,
-                    borderColor: theme.border,
-                    opacity: pressed ? 0.75 : 1,
-                  },
-                ]}
+                style={({ pressed }) => [styles.equalBtn, pressed && styles.pressed]}
               >
-                <ThemedText type="smallBold" themeColor="textSecondary">
-                  They’re about equal
-                </ThemedText>
+                <ThemedText style={styles.equalLabel}>They’re about the same</ThemedText>
               </Pressable>
             </View>
           )}
 
           {/* Step 4: Final Score Reveal & Review */}
           {step === 'score_reveal' && selectedPlace && (
-            <ScrollView
-              style={{ maxHeight: 460, flexShrink: 1 }}
-              contentContainerStyle={{ gap: 14, paddingBottom: 16 }}
-              showsVerticalScrollIndicator={false}
-            >
-              {/* Score Reveal Banner */}
-              <View style={[styles.scoreBanner, { backgroundColor: theme.backgroundElement }]}>
-                <ThemedText type="smallBold" style={{ fontSize: 16 }}>
-                  {selectedPlace.display_name}
-                </ThemedText>
-
-                <ScoreBadge score={finalScore} size="large" showLabel />
-
-                <ThemedText type="smallBold" themeColor="primary" style={{ marginTop: 2 }}>
-                  Ranks #{projectedRank} of {existingRankings.length + 1} in {mode === 'food' ? 'Food' : 'Activities'}
-                </ThemedText>
-              </View>
-
-              {/* Recommend Toggle */}
-              <View style={styles.recommendRow}>
-                <ThemedText type="smallBold" style={{ flex: 1 }}>
-                  Would you recommend or return?
-                </ThemedText>
+            <View style={styles.stepContent}>
+              <RatingPlaceSummary place={selectedPlace} />
+              <ThemedText style={styles.finalScore}>{finalScore.toFixed(1)}</ThemedText>
+              <ThemedText style={styles.rankCopy}>
+                Ranked {projectedRank}{projectedRank === 1 ? 'st' : projectedRank === 2 ? 'nd' : projectedRank === 3 ? 'rd' : 'th'} out of {existingRankings.length + 1} in {mode === 'food' ? 'Food' : 'Activities'}
+              </ThemedText>
+              <View style={styles.finalActions}>
                 <Pressable
-                  onPress={() => setRecommend(!recommend)}
-                  style={[
-                    styles.recommendBtn,
-                    {
-                      backgroundColor: recommend ? '#059669' : theme.backgroundSelected,
-                    },
-                  ]}
+                  accessibilityRole="button"
+                  disabled={saving}
+                  onPress={() => void handleSave()}
+                  style={({ pressed }) => [styles.finalButton, (pressed || saving) && styles.pressed]}
                 >
-                  <ThemedText
-                    type="smallBold"
-                    style={{ color: recommend ? '#fff' : theme.textSecondary }}
-                  >
-                    {recommend ? '👍 Yes' : '👎 No'}
-                  </ThemedText>
+                  {saving ? <ActivityIndicator size="small" color="#000000" /> : <ThemedText style={styles.finalButtonLabel}>Save</ThemedText>}
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={saving}
+                  onPress={() => void handleSave(true)}
+                  style={({ pressed }) => [styles.finalButton, (pressed || saving) && styles.pressed]}
+                >
+                  {saving ? <ActivityIndicator size="small" color="#000000" /> : <ThemedText style={styles.finalButtonLabel}>Save &amp; Post</ThemedText>}
                 </Pressable>
               </View>
-
-              {/* Notes Input */}
-              <View style={{ gap: 6 }}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Notes & Highlights (Optional)
-                </ThemedText>
-                <TextInput
-                  value={notes}
-                  onChangeText={setNotes}
-                  placeholder="What did you order? What stood out?"
-                  placeholderTextColor={theme.textSecondary}
-                  multiline
-                  numberOfLines={3}
-                  style={[
-                    styles.notesInput,
-                    {
-                      backgroundColor: theme.backgroundElement,
-                      borderColor: theme.border,
-                      color: theme.text,
-                    },
-                  ]}
-                />
-              </View>
-
-              {/* Save Button */}
-              <Pressable
-                onPress={handleSave}
-                disabled={saving}
-                style={({ pressed }) => [
-                  styles.saveBtn,
-                  {
-                    backgroundColor: theme.primary,
-                    opacity: saving ? 0.7 : pressed ? 0.85 : 1,
-                  },
-                ]}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <ThemedText type="smallBold" style={{ color: '#fff', fontSize: 16 }}>
-                    Save to Rankings
-                  </ThemedText>
-                )}
-              </Pressable>
-            </ScrollView>
+            </View>
           )}
         </View>
       </KeyboardAvoidingView>
@@ -553,20 +460,26 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
-    maxWidth: 440,
+    maxWidth: 382,
     maxHeight: '90%',
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: 20,
+    padding: 10,
+    backgroundColor: '#FFFFFF',
     shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 24,
-    elevation: 10,
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 8,
   },
   header: {
+    minHeight: 24,
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  headerCopy: {
+    flex: 1,
+    minWidth: 0,
   },
   eyebrow: {
     fontSize: 11,
@@ -574,9 +487,24 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 2,
   },
-  closeBtn: {
-    padding: 6,
+  selectTitle: {
+    color: '#000000',
+    fontSize: 20,
+    lineHeight: 24,
   },
+  stepTitle: {
+    color: '#000000',
+    fontSize: 10,
+    fontWeight: '600',
+    lineHeight: 12,
+  },
+  closeBtn: {
+    width: 24,
+    height: 24,
+    flexShrink: 0,
+  },
+  closeIcon: { width: 24, height: 24 },
+  pressed: { opacity: 0.55 },
   searchInput: {
     borderWidth: 1,
     borderRadius: 14,
@@ -603,84 +531,78 @@ const styles = StyleSheet.create({
   emptyList: {
     padding: 24,
   },
-  selectedBanner: {
-    padding: 12,
-    borderRadius: 12,
-  },
+  stepContent: { width: '100%', gap: 10 },
+  prompt: { width: '100%', color: '#000000', fontSize: 12, fontWeight: '600', lineHeight: 15 },
+  centeredPrompt: { textAlign: 'center' },
   vibeGrid: {
-    gap: 10,
-  },
-  vibeCard: {
+    height: 78,
     flexDirection: 'row',
+    gap: 10,
+    overflow: 'hidden',
+  },
+  vibeButton: {
+    flex: 1,
+    minWidth: 0,
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 14,
+    justifyContent: 'center',
+    padding: 10,
   },
-  vibeIcon: {
-    fontSize: 30,
-  },
+  vibeIcon: { width: 24, height: 24 },
+  vibeLabel: { color: '#000000', fontSize: 10, fontWeight: '600', lineHeight: 12, textAlign: 'center' },
   showdownRow: {
+    height: 96,
     flexDirection: 'row',
-    alignItems: 'center',
     gap: 10,
+    overflow: 'hidden',
   },
   contenderCard: {
+    flex: 4,
+    minWidth: 0,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  comparedCard: { gap: 10 },
+  contenderName: { color: '#000000', fontSize: 12, fontWeight: '600', lineHeight: 15, textAlign: 'center' },
+  comparedScore: { minHeight: 30, justifyContent: 'center' },
+  showdownScore: { minWidth: 45, height: 30, paddingHorizontal: 10, borderWidth: 1, borderRadius: 100, alignItems: 'center', justifyContent: 'center' },
+  showdownScoreText: { fontSize: 12, fontWeight: '400', lineHeight: 15, textAlign: 'center' },
+  vsColumn: {
     flex: 1,
-    padding: 14,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 130,
-  },
-  contenderEmoji: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  vsBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#374151',
+    minWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  vsLabel: { color: '#000000', fontSize: 12, fontWeight: '600', lineHeight: 15, textAlign: 'center' },
   equalBtn: {
+    minHeight: 36,
+    paddingHorizontal: 40,
     paddingVertical: 10,
-    borderRadius: 12,
     borderWidth: 1,
+    borderColor: '#000000',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  scoreBanner: {
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 20,
-    gap: 10,
-  },
-  recommendRow: {
+  equalLabel: { color: '#000000', fontSize: 12, fontWeight: '600', lineHeight: 15, textAlign: 'center' },
+  finalScore: { color: '#000000', fontSize: 40, fontWeight: '100', lineHeight: 48, textAlign: 'center' },
+  rankCopy: { width: '100%', color: '#000000', fontSize: 13, fontWeight: '600', lineHeight: 16, textAlign: 'center' },
+  finalActions: {
+    width: '100%',
+    height: 45,
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
+    gap: 10,
+    overflow: 'hidden',
   },
-  recommendBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  notesInput: {
+  finalButton: {
+    flex: 1,
+    minWidth: 0,
     borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 14,
-    minHeight: 70,
-    textAlignVertical: 'top',
-  },
-  saveBtn: {
-    paddingVertical: 14,
-    borderRadius: 16,
+    borderColor: '#000000',
+    padding: 10,
     alignItems: 'center',
-    marginTop: 6,
+    justifyContent: 'center',
   },
+  finalButtonLabel: { color: '#000000', fontSize: 13, fontWeight: '600', lineHeight: 16, textAlign: 'center' },
 });

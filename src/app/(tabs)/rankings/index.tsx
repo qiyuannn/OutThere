@@ -1,1 +1,1 @@
-export { default } from '@/features/rankings/screen';
+export { default } from '@/features/posts/feed-screen';
