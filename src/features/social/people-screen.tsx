@@ -38,6 +38,6 @@ export default function PeopleScreen() {
       {mode === 'outgoing' && <Button disabled={mutation.busy} label="Cancel request" onPress={() => void act('cancel', person.id)} />}
       {mode === 'blocked' && <Button disabled={mutation.busy} label="Unblock" onPress={() => void act('unblock', person.id)} />}
     </Card>)}
-    <SocialState loading={list.loading} error={list.error} empty={list.items.length === 0 && (!search || debounced.length >= 2)} onRetry={list.refresh} hasMore={list.hasMore} loadingMore={list.loadingMore} onMore={list.loadMore} />
+    <SocialState loading={list.loading} error={list.error} offline={list.offline} empty={list.items.length === 0 && (!search || debounced.length >= 2)} emptyTitle={search ? 'No matching people' : `No ${labels[mode].toLocaleLowerCase()}`} emptyMessage={search ? 'Try another name or username.' : mode === 'friends' ? 'Accepted friends will appear here.' : mode === 'incoming' ? 'New friend requests will appear here.' : mode === 'outgoing' ? 'Requests you send will appear here.' : 'People you block will appear here.'} onRetry={list.refresh} hasMore={list.hasMore} loadingMore={list.loadingMore} onMore={list.loadMore} />
   </Screen>;
 }

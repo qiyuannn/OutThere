@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { normalizeSocialSummary } from './model';
-import type { SocialMutation, SocialReadAction, SocialSummary } from './types';
+import type { ReportReason, ReportTarget, SocialMutation, SocialReadAction, SocialSummary } from './types';
 
 const listeners = new Set<() => void>();
 
@@ -34,4 +34,14 @@ export async function readSocialSummary(): Promise<SocialSummary> {
   const { data, error } = await client().rpc('social_summary');
   if (error) throw error;
   return normalizeSocialSummary(data as Partial<SocialSummary> | null);
+}
+
+export async function submitSocialReport(target: ReportTarget, id: string, reason: ReportReason, details: string): Promise<void> {
+  const { error } = await client().rpc('social_report', {
+    p_target_type: target,
+    p_target_id: id,
+    p_reason: reason,
+    p_details: details,
+  });
+  if (error) throw error;
 }

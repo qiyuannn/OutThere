@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/app-header';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
+import { enforceSearchAccess } from '@/features/subscriptions/model';
+import { useSubscription } from '@/providers/subscription-provider';
 import { AreaSheet } from './area-sheet';
 import { FilterSheet } from './filter-sheet';
 import { DEFAULT_FILTERS, type SearchArea, type SearchFilters, type SearchPlace } from './model';
@@ -17,6 +19,7 @@ import { usePlaceSearch } from './use-search';
 export function SearchScreen() {
   const theme = useTheme();
   const search = usePlaceSearch();
+  const { isPro } = useSubscription();
   const [query, setQuery] = useState('');
   const [area, setArea] = useState<SearchArea | null>(null);
   const [filters, setFilters] = useState<SearchFilters>({ ...DEFAULT_FILTERS });
@@ -45,7 +48,7 @@ export function SearchScreen() {
   }
 
   function apply(nextFilters: SearchFilters) {
-    setFilters(nextFilters);
+    setFilters(enforceSearchAccess(nextFilters, isPro));
     setSheet(null);
   }
 
@@ -144,7 +147,7 @@ export function SearchScreen() {
           }}
         />
       ) : null}
-      {sheet === 'filters' ? <FilterSheet filters={filters} onApply={apply} onClose={() => setSheet(null)} /> : null}
+      {sheet === 'filters' ? <FilterSheet filters={filters} isPro={isPro} onApply={apply} onClose={() => setSheet(null)} onUpgrade={() => { setSheet(null); router.push('/profile/subscription'); }} /> : null}
     </SafeAreaView>
   );
 }

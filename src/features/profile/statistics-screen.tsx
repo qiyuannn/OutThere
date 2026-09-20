@@ -4,9 +4,11 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDi
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/app-header';
+import { Button, Card } from '@/components/foundation';
 import { CATEGORY_GROUPS_BY_MODE } from '@/features/categories/catalog';
 import { getScoreTier } from '@/features/rankings/comparison';
 import { useAuth } from '@/providers/auth-provider';
+import { useSubscription } from '@/providers/subscription-provider';
 import { RadarChart, type RadarChartItem } from './components/radar-chart';
 import { loadDistributionStatistics, type DistributionStatistics } from './service';
 import type { ProfileMode } from './types';
@@ -15,6 +17,7 @@ const EMPTY_STATISTICS: DistributionStatistics = { averageRating: null, placesRa
 
 export default function StatisticsScreen() {
   const { session } = useAuth();
+  const billing = useSubscription();
   const { width } = useWindowDimensions();
   const [mode, setMode] = useState<ProfileMode>('activities');
   const [statistics, setStatistics] = useState<DistributionStatistics>(EMPTY_STATISTICS);
@@ -27,7 +30,7 @@ export default function StatisticsScreen() {
   useFocusEffect(useCallback(() => {
     let active = true;
     const userId = session?.user.id;
-    if (!userId) {
+    if (!userId || !billing.isPro) {
       setLoading(false);
       return () => { active = false; };
     }
@@ -38,7 +41,7 @@ export default function StatisticsScreen() {
       .catch(() => { if (active) { setStatistics(EMPTY_STATISTICS); setError(true); } })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [attempt, mode, session?.user.id]));
+  }, [attempt, billing.isPro, mode, session?.user.id]));
 
   const groups = CATEGORY_GROUPS_BY_MODE[mode];
   const chartItems: RadarChartItem[] = useMemo(() => groups.map((group) => ({
@@ -61,6 +64,12 @@ export default function StatisticsScreen() {
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <AppHeader description="Distribution & Statistics" showBack onBack={() => router.back()} />
       <ScrollView contentContainerStyle={styles.content}>
+        {!billing.ready ? <View style={styles.gateLoading}><ActivityIndicator accessibilityLabel="Checking OutThere Pro access" color="#000000" /></View>
+          : !billing.isPro ? <Card>
+            <Text style={styles.lockedTitle}>Personal taste insights are an OutThere Pro benefit.</Text>
+            <Text style={styles.lockedDescription}>Unlock your activity and food profiles, category strengths, averages and detailed rating breakdowns.</Text>
+            <Button label="View OutThere Pro" onPress={() => router.push('/profile/subscription')} />
+          </Card> : <>
         <View accessibilityRole="tablist" style={styles.filters}>
           {(['activities', 'food'] as const).map((value) => (
             <Pressable key={value} accessibilityRole="tab" accessibilityState={{ selected: mode === value }}
@@ -98,6 +107,7 @@ export default function StatisticsScreen() {
               score={(statistics.weights[group.key] ?? 0) * 10} loading={loading} />
           ))}
         </View>
+        </>}
       </ScrollView>
     </SafeAreaView>
   );
@@ -130,6 +140,9 @@ function CategoryRow({ description, label, loading, score }: { description: stri
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
   content: { width: '100%', maxWidth: 720, alignSelf: 'center', padding: 10, gap: 10, backgroundColor: '#FFFFFF' },
+  gateLoading: { minHeight: 240, alignItems: 'center', justifyContent: 'center' },
+  lockedTitle: { color: '#000000', fontSize: 18, lineHeight: 23, fontWeight: '700' },
+  lockedDescription: { color: '#637068', fontSize: 13, lineHeight: 19 },
   filters: { minHeight: 55, padding: 10, flexDirection: 'row' },
   filter: { flex: 1, minHeight: 35, alignItems: 'center', justifyContent: 'center' },
   filterLabel: { color: '#000000', fontSize: 20, lineHeight: 24, fontWeight: '600', letterSpacing: 0.25 },

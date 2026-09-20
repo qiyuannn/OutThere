@@ -34,7 +34,7 @@ export default function SocialPostScreen() {
 
   return <Screen title="Conversation" headerDescription="Conversation">
     <SocialBack />
-    <SocialState loading={post.loading} error={post.error} empty={false} onRetry={post.refresh} />
+    <SocialState loading={post.loading} error={post.error} offline={post.offline} empty={false} onRetry={post.refresh} />
     {post.data && <>
       <SocialPostCard post={post.data} place={places[post.data.google_place_id]} detail />
       {post.data.author.id === session?.user.id && <Card>
@@ -53,7 +53,8 @@ export default function SocialPostScreen() {
       <ThemedText>{comment.body}</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">{new Date(comment.created_at).toLocaleString()}</ThemedText>
       {comment.author.id === session?.user.id && <Button label="Delete my comment" disabled={mutation.busy} onPress={() => void mutation.run('delete_comment', { id: comment.id })} />}
+      {comment.author.id !== session?.user.id && <Button label="Report comment" onPress={() => router.push({ pathname: '/feed/report', params: { target: 'comment', id: comment.id } })} />}
     </Card>)}
-    {!!post.data && <SocialState loading={comments.loading} error={comments.error} empty={!comments.items.length} onRetry={comments.refresh} hasMore={comments.hasMore} loadingMore={comments.loadingMore} onMore={comments.loadMore} />}
+    {!!post.data && <SocialState loading={comments.loading} error={comments.error} offline={comments.offline} empty={!comments.items.length} emptyTitle="No comments yet" emptyMessage="Start the conversation about this rating." onRetry={comments.refresh} hasMore={comments.hasMore} loadingMore={comments.loadingMore} onMore={comments.loadMore} />}
   </Screen>;
 }

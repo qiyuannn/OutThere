@@ -7,6 +7,8 @@ import { AppHeader } from '@/components/app-header';
 import { Button } from '@/components/foundation';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
+import { enforceSearchAccess } from '@/features/subscriptions/model';
+import { useSubscription } from '@/providers/subscription-provider';
 import { DEFAULT_FILTERS, parseSearch, type SearchRequest } from './model';
 import { SearchResultItem } from './search-result-item';
 import { usePlaceSearch } from './use-search';
@@ -34,9 +36,13 @@ export function SearchResultsScreen() {
   const theme = useTheme();
   const params = useLocalSearchParams<ResultsParams>();
   const search = usePlaceSearch();
+  const { isPro } = useSubscription();
   const startedRequestKey = useRef<string | null>(null);
-  const requestKey = `${params.query ?? ''}|${params.latitude ?? ''}|${params.longitude ?? ''}|${params.filters ?? ''}`;
-  const request = useMemo(() => requestFromParams(params), [requestKey]);
+  const requestKey = `${params.query ?? ''}|${params.latitude ?? ''}|${params.longitude ?? ''}|${params.filters ?? ''}|pro:${isPro}`;
+  const request = useMemo(() => {
+    const parsed = requestFromParams(params);
+    return parsed ? { ...parsed, filters: enforceSearchAccess(parsed.filters, isPro) } : null;
+  }, [isPro, requestKey]);
 
   useEffect(() => {
     if (!request || startedRequestKey.current === requestKey) return;

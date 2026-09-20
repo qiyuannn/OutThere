@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useNetworkState } from 'expo-network';
 import { mutateSocial, readSocial, subscribeSocial } from './api';
-import { hasNextSocialPage, mergeSocialPage, socialError, visiblePage } from './model';
+import { hasNextSocialPage, mergeSocialPage, socialError, socialPagePayload, visiblePage } from './model';
 import type { SocialMutation, SocialReadAction } from './types';
 
+export function useNetworkStatus() {
+  const state = useNetworkState();
+  return { offline: state.isConnected === false || state.isInternetReachable === false };
+}
+
 export function useSocialQuery<T>(action: SocialReadAction, payload: Record<string, unknown> = {}, enabled = true) {
+  const { offline } = useNetworkStatus();
   const payloadKey = JSON.stringify(payload);
   const stablePayload = useMemo(() => JSON.parse(payloadKey) as Record<string, unknown>, [payloadKey]);
   const [data, setData] = useState<T | null>(null);
@@ -14,6 +21,7 @@ export function useSocialQuery<T>(action: SocialReadAction, payload: Record<stri
 
   const refresh = useCallback(async () => {
     if (!enabled) { setLoading(false); return; }
+    if (offline) { setLoading(false); setError(''); return; }
     const request = ++version.current;
     setLoading(true); setError('');
     try {
@@ -24,14 +32,15 @@ export function useSocialQuery<T>(action: SocialReadAction, payload: Record<stri
     } finally {
       if (request === version.current) setLoading(false);
     }
-  }, [action, enabled, stablePayload]);
+  }, [action, enabled, offline, stablePayload]);
 
   useFocusEffect(useCallback(() => { void refresh(); return () => { version.current++; }; }, [refresh]));
   useEffect(() => subscribeSocial(() => { void refresh(); }), [refresh]);
-  return { data, loading, error, refresh };
+  return { data, loading, error, offline, refresh };
 }
 
 export function useSocialList<T extends { id: string; created_at?: string }>(action: SocialReadAction, payload: Record<string, unknown> = {}, enabled = true, offsetBased = false) {
+  const { offline } = useNetworkStatus();
   const payloadKey = JSON.stringify(payload);
   const stablePayload = useMemo(() => JSON.parse(payloadKey) as Record<string, unknown>, [payloadKey]);
   const [items, setItems] = useState<T[]>([]);
@@ -45,16 +54,14 @@ export function useSocialList<T extends { id: string; created_at?: string }>(act
 
   const load = useCallback(async (more = false) => {
     if (!enabled) { setLoading(false); return; }
+    if (offline) { setLoading(false); setLoadingMore(false); setError(''); return; }
     const request = ++version.current;
     if (more) setLoadingMore(true);
     else setLoading(true);
     setError('');
     try {
       const currentItems = itemsRef.current;
-      const last = more ? currentItems[currentItems.length - 1] : undefined;
-      const pagePayload = offsetBased
-        ? { ...stablePayload, offset: more ? currentItems.length : 0 }
-        : { ...stablePayload, ...(last?.created_at ? { before: last.created_at, before_id: last.id } : {}) };
+      const pagePayload = socialPagePayload(stablePayload, currentItems, more, offsetBased);
       const page = await readSocial<T[]>(action, pagePayload);
       if (request !== version.current) return;
       const visible = visiblePage(page);
@@ -65,23 +72,25 @@ export function useSocialList<T extends { id: string; created_at?: string }>(act
     } finally {
       if (request === version.current) { setLoading(false); setLoadingMore(false); }
     }
-  }, [action, enabled, offsetBased, stablePayload]);
+  }, [action, enabled, offline, offsetBased, stablePayload]);
 
   const refresh = useCallback(() => load(false), [load]);
   useFocusEffect(useCallback(() => { void refresh(); return () => { version.current++; }; }, [refresh]));
   useEffect(() => subscribeSocial(() => { void refresh(); }), [refresh]);
-  return { items, loading, loadingMore, error, hasMore, refresh, loadMore: () => load(true) };
+  return { items, loading, loadingMore, error, hasMore, offline, refresh, loadMore: () => load(true) };
 }
 
 export function useSocialMutation() {
+  const { offline } = useNetworkStatus();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const run = useCallback(async (action: SocialMutation, payload: Record<string, unknown> = {}) => {
     if (busy) return false;
+    if (offline) { setError('You’re offline. Reconnect and try again.'); return false; }
     setBusy(true); setError('');
     try { await mutateSocial(action, payload); return true; }
     catch (reason) { setError(socialError(reason)); return false; }
     finally { setBusy(false); }
-  }, [busy]);
-  return { busy, error, clearError: () => setError(''), run };
+  }, [busy, offline]);
+  return { busy, error, offline, clearError: () => setError(''), run };
 }

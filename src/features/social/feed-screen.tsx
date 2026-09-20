@@ -18,12 +18,12 @@ export default function SocialFeedScreen() {
       <ThemedText themeColor="textSecondary">People can only find you after you opt in. Your existing ratings remain private.</ThemedText>
       <Button label="Set up social sharing" onPress={() => router.push('/feed/privacy')} />
     </Card>}
-    {!feed.loading && !feed.error && !feed.items.length && <Card>
+    {!feed.loading && !feed.error && !feed.offline && !feed.items.length && <Card>
       <ThemedText type="subtitle">Your next find starts with a friend.</ThemedText>
       <ThemedText themeColor="textSecondary">Add friends and share a rating with Friends to start the feed.</ThemedText>
       <Button label="Open my rankings" onPress={() => router.push('/rankings')} />
     </Card>}
     {feed.items.map((post) => <SocialPostCard key={post.id} post={post} place={places[post.google_place_id]} />)}
-    <SocialState loading={feed.loading} error={feed.error} empty={false} onRetry={feed.refresh} hasMore={feed.hasMore} loadingMore={feed.loadingMore} onMore={feed.loadMore} />
+    <SocialState loading={feed.loading} error={feed.error} offline={feed.offline} empty={false} onRetry={feed.refresh} hasMore={feed.hasMore} loadingMore={feed.loadingMore} onMore={feed.loadMore} />
   </Screen>;
 }

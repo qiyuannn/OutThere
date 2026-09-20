@@ -23,6 +23,6 @@ export default function NotificationsScreen() {
       <Button disabled={mutation.busy} label={item.post_id ? 'View conversation' : 'View profile'} onPress={() => void open(item)} />
       {!item.read && <Button disabled={mutation.busy} label="Mark as read" onPress={() => void mutation.run('mark_read', { id: item.id })} />}
     </Card>)}
-    <SocialState loading={list.loading} error={list.error} empty={!list.items.length} onRetry={list.refresh} hasMore={list.hasMore} loadingMore={list.loadingMore} onMore={list.loadMore} />
+    <SocialState loading={list.loading} error={list.error} offline={list.offline} empty={!list.items.length} emptyTitle="No notifications yet" emptyMessage="Friend requests, likes and comments will appear here." onRetry={list.refresh} hasMore={list.hasMore} loadingMore={list.loadingMore} onMore={list.loadMore} />
   </Screen>;
 }

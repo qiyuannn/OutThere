@@ -3,7 +3,7 @@ import { ActivityIndicator } from 'react-native';
 import { Button, Card, Screen } from '@/components/foundation';
 import { ThemedText } from '@/components/themed-text';
 import { useSubscription } from '@/providers/subscription-provider';
-import { availablePlans, PRO_ENTITLEMENT } from './model';
+import { availablePlans, PRO_BENEFITS, PRO_ENTITLEMENT } from './model';
 export default function SubscriptionScreen() {
   const billing = useSubscription();
   const plans = availablePlans(billing.offering);
@@ -13,6 +13,9 @@ export default function SubscriptionScreen() {
     {billing.testStore && <ThemedText type="small" themeColor="primary">Test Store · Test purchases only. No real charges.</ThemedText>}
     {billing.unavailable ? <Card><ThemedText>{billing.unavailable}</ThemedText></Card> : <>
       <Card><ThemedText type="subtitle" style={{ fontSize: 24 }}>{billing.isPro ? 'You’re a Pro member.' : billing.ready ? 'Find your membership.' : 'Checking your membership.'}</ThemedText>
+        {PRO_BENEFITS.map((benefit) => <ThemedText key={benefit.id}>
+          <ThemedText type="smallBold">{benefit.title}</ThemedText>{' · '}{benefit.description}
+        </ThemedText>)}
         {entitlement && <>
           <ThemedText>{entitlement.expirationDate ? `${entitlement.willRenew ? 'Renews' : 'Access until'} ${new Date(entitlement.expirationDate).toLocaleDateString()}` : 'Lifetime access · no recurring renewal'}</ThemedText>
           {entitlement.billingIssueDetectedAt && <ThemedText>There’s a billing issue. Open Manage membership to review your payment details.</ThemedText>}

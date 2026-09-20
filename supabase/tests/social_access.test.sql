@@ -41,7 +41,7 @@ end;
 $$;
 create function pg_temp.finish() returns setof text language sql as $$ select 'complete'::text where false; $$;
 
-select pg_temp.plan(27);
+select pg_temp.plan(37);
 
 insert into auth.users(id) values
   ('a2000000-0000-4000-8000-000000000001'),
@@ -108,6 +108,17 @@ select pg_temp.lives_ok(
   )),
   'Bob can comment on Alice rating'
 );
+select pg_temp.lives_ok(
+  format('select public.social_report(''post'', %L, ''spam'', ''QA report'')', current_setting('social.test_post')::uuid),
+  'Bob can report a visible post'
+);
+reset role;
+select pg_temp.is(
+  (select count(*)::integer from social_private.reports where reporter_id = 'a2000000-0000-4000-8000-000000000002'),
+  1,
+  'the report is stored once in the private review queue'
+);
+set local role authenticated;
 
 select set_config('request.jwt.claim.sub', 'a2000000-0000-4000-8000-000000000001', true);
 select pg_temp.is(
@@ -122,6 +133,16 @@ select pg_temp.is(
 );
 select pg_temp.is((public.social_summary()->>'unread')::integer, 2, 'Alice receives like and comment notifications');
 select pg_temp.is(jsonb_array_length(public.social_api('notifications')), 2, 'Alice can read both engagement notifications');
+select pg_temp.lives_ok(
+  $$select public.social_report('comment', 'b2000000-0000-4000-8000-000000000001', 'harassment', '')$$,
+  'Alice can report Bob comment'
+);
+select pg_temp.throws_ok(
+  format('select public.social_report(''post'', %L, ''other'', '''')', current_setting('social.test_post')::uuid),
+  '42501',
+  'This profile or content is no longer available.',
+  'Alice cannot report her own post'
+);
 select pg_temp.lives_ok(
   $$select public.social_api('block', '{"user_id":"a2000000-0000-4000-8000-000000000002"}')$$,
   'Alice can block Bob'
@@ -149,6 +170,32 @@ select pg_temp.is(
   'unblocking does not silently restore friendship'
 );
 select pg_temp.is((public.social_summary()->>'friends')::integer, 0, 'both users are no longer friends');
+
+reset role;
+create temp table qa_social_page_users(id uuid primary key, n integer not null) on commit drop;
+insert into qa_social_page_users select gen_random_uuid(), n from generate_series(1, 25) n;
+insert into auth.users(id) select id from qa_social_page_users;
+insert into public.profiles(user_id, username, display_name, onboarding_completed)
+  select id, 'qa_page_' || n, 'QA Page ' || n, true from qa_social_page_users;
+insert into social_private.settings(user_id, enabled, default_visibility)
+  select id, true, 'private' from qa_social_page_users;
+insert into social_private.connections(sender, recipient, status)
+  select 'a2000000-0000-4000-8000-000000000001', id, 'accepted' from qa_social_page_users;
+insert into social_private.notifications(recipient_id, actor_id, kind)
+  select 'a2000000-0000-4000-8000-000000000001', id, 'accepted' from qa_social_page_users;
+insert into social_private.comments(post_id, author_id, body)
+  select current_setting('social.test_post')::uuid, id, 'Pagination comment ' || n from qa_social_page_users;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', 'a2000000-0000-4000-8000-000000000001', true);
+
+select pg_temp.is(jsonb_array_length(public.social_api('connections', '{"mode":"friends","offset":0}')), 21, 'friend pagination returns twenty rows plus a look-ahead');
+select pg_temp.is(jsonb_array_length(public.social_api('connections', '{"mode":"friends","offset":20}')), 5, 'friend pagination returns the remaining rows');
+select set_config('social.notifications_page', public.social_api('notifications')::text, true);
+select pg_temp.is(jsonb_array_length(current_setting('social.notifications_page')::jsonb), 21, 'notification pagination returns twenty rows plus a look-ahead');
+select pg_temp.is(jsonb_array_length(public.social_api('notifications', jsonb_build_object('before', current_setting('social.notifications_page')::jsonb->19->>'created_at', 'before_id', current_setting('social.notifications_page')::jsonb->19->>'id'))), 5, 'notification cursor returns the remaining rows');
+select set_config('social.comments_page', public.social_api('comments', jsonb_build_object('post_id', current_setting('social.test_post')))::text, true);
+select pg_temp.is(jsonb_array_length(current_setting('social.comments_page')::jsonb), 21, 'comment pagination returns twenty rows plus a look-ahead');
+select pg_temp.is(jsonb_array_length(public.social_api('comments', jsonb_build_object('post_id', current_setting('social.test_post'), 'before', current_setting('social.comments_page')::jsonb->19->>'created_at', 'before_id', current_setting('social.comments_page')::jsonb->19->>'id'))), 6, 'comment cursor returns all remaining visible rows');
 
 select * from pg_temp.finish();
 rollback;

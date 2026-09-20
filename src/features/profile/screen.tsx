@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/app-header';
 import { SubscriptionCard } from '@/features/subscriptions/profile-card';
 import { readSocialSummary } from '@/features/social/api';
+import { useNetworkStatus } from '@/features/social/hooks';
 import type { SocialSummary } from '@/features/social/types';
 import { useAuth } from '@/providers/auth-provider';
 import { useProfile } from '@/providers/profile-provider';
@@ -24,6 +25,9 @@ export default function ProfileScreen() {
   const [summary, setSummary] = useState<ProfileVisitSummary>(EMPTY_SUMMARY);
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [social, setSocial] = useState<SocialSummary>(EMPTY_SOCIAL);
+  const [socialLoading, setSocialLoading] = useState(true);
+  const [socialError, setSocialError] = useState(false);
+  const { offline } = useNetworkStatus();
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -40,12 +44,18 @@ export default function ProfileScreen() {
     return () => { active = false; };
   }, [session?.user.id]));
 
-  useFocusEffect(useCallback(() => {
+  const loadSocial = useCallback(() => {
     let active = true;
-    if (!session?.user.id) return () => { active = false; };
-    void readSocialSummary().then((next) => { if (active) setSocial(next); }).catch(() => { if (active) setSocial(EMPTY_SOCIAL); });
+    if (!session?.user.id || offline) { setSocialLoading(false); return () => { active = false; }; }
+    setSocialLoading(true); setSocialError(false);
+    void readSocialSummary()
+      .then((next) => { if (active) setSocial(next); })
+      .catch(() => { if (active) setSocialError(true); })
+      .finally(() => { if (active) setSocialLoading(false); });
     return () => { active = false; };
-  }, [session?.user.id]));
+  }, [offline, session?.user.id]);
+
+  useFocusEffect(loadSocial);
 
   if (!profile) return null;
 
@@ -60,7 +70,10 @@ export default function ProfileScreen() {
           <View style={styles.identity}>
             <Text style={styles.name}>{profile.display_name}</Text>
             <Text style={styles.username}>@{profile.username}</Text>
-            <Text style={styles.socialCounts}>{social.friends} {social.friends === 1 ? 'friend' : 'friends'} · {social.incoming} incoming</Text>
+            {socialLoading ? <Text style={styles.socialCounts}>Loading social counts…</Text>
+              : offline ? <Text accessibilityRole="alert" style={styles.socialCounts}>Offline · counts may be outdated</Text>
+                : socialError ? <Pressable accessibilityRole="button" onPress={() => { loadSocial(); }}><Text style={styles.socialError}>Couldn’t load counts · Try again</Text></Pressable>
+                  : <Text style={styles.socialCounts}>{social.friends} {social.friends === 1 ? 'friend' : 'friends'} · {social.incoming} incoming</Text>}
           </View>
         </View>
 
@@ -114,6 +127,10 @@ export default function ProfileScreen() {
         </View>
 
         <SubscriptionCard />
+        <Pressable accessibilityRole="button" onPress={() => router.push('/profile/account')}
+          style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}>
+          <Text style={styles.buttonLabel}>Account & Privacy</Text>
+        </Pressable>
         <SignOutButton />
       </ScrollView>
     </SafeAreaView>
@@ -129,6 +146,7 @@ const styles = StyleSheet.create({
   name: { color: '#000000', fontSize: 20, lineHeight: 24, fontWeight: '700' },
   username: { color: '#000000', fontSize: 10, lineHeight: 15, fontWeight: '300', letterSpacing: 0.25 },
   socialCounts: { color: '#000000', fontSize: 10, lineHeight: 15, fontWeight: '500', letterSpacing: 0.25 },
+  socialError: { color: '#9A3412', fontSize: 10, lineHeight: 15, fontWeight: '600', letterSpacing: 0.25 },
   outlineButton: { minHeight: 37, borderWidth: 1, borderColor: '#000000', padding: 10, alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.55 },
   buttonLabel: { color: '#000000', fontSize: 12, lineHeight: 15, fontWeight: '600', textAlign: 'center' },

@@ -1,5 +1,47 @@
 import type { CustomerInfo, PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
 export const PRO_ENTITLEMENT = 'outthere_pro';
+export const PRO_BENEFITS = [
+  {
+    id: 'advanced_search',
+    title: 'Advanced place search',
+    description: 'Filter by opening hours, price and rating, sort by distance, and search up to 50 km away.',
+  },
+  {
+    id: 'taste_insights',
+    title: 'Personal taste insights',
+    description: 'See your activity and food profiles, category strengths, averages and detailed rating breakdowns.',
+  },
+] as const;
+
+export const FREE_SEARCH_RADIUS_METERS = 10_000;
+
+type ProSearchFilters = {
+  radiusMeters: number;
+  openNow: boolean;
+  price: string;
+  minRating: number;
+  sort: string;
+};
+
+export function usesProSearchFilters(filters: ProSearchFilters) {
+  return filters.radiusMeters > FREE_SEARCH_RADIUS_METERS
+    || filters.openNow
+    || filters.price !== ''
+    || filters.minRating > 0
+    || filters.sort === 'distance';
+}
+
+export function enforceSearchAccess<T extends ProSearchFilters>(filters: T, isPro: boolean): T {
+  if (isPro) return filters;
+  return {
+    ...filters,
+    radiusMeters: Math.min(filters.radiusMeters, FREE_SEARCH_RADIUS_METERS),
+    openNow: false,
+    price: '',
+    minRating: 0,
+    sort: 'relevance',
+  };
+}
 export const PLANS = [
   { id: 'lifetime', type: 'LIFETIME', label: 'Lifetime', period: 'one-time payment' },
   { id: 'yearly', type: 'ANNUAL', label: 'Yearly', period: 'per year' },

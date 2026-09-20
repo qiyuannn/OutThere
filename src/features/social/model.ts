@@ -1,4 +1,4 @@
-import type { SocialNotification, SocialSummary } from './types';
+import type { ReportReason, ReportTarget, SocialNotification, SocialSummary } from './types';
 
 export const SOCIAL_PAGE_SIZE = 20;
 
@@ -13,6 +13,18 @@ export function hasNextSocialPage(items: unknown[]): boolean {
 export function mergeSocialPage<T extends { id: string }>(current: T[], next: T[]): T[] {
   const ids = new Set(current.map((item) => item.id));
   return [...current, ...next.filter((item) => !ids.has(item.id))];
+}
+
+export function socialPagePayload<T extends { id: string; created_at?: string }>(
+  payload: Record<string, unknown>,
+  current: T[],
+  more: boolean,
+  offsetBased: boolean,
+): Record<string, unknown> {
+  if (!more) return offsetBased ? { ...payload, offset: 0 } : payload;
+  if (offsetBased) return { ...payload, offset: current.length };
+  const last = current[current.length - 1];
+  return last?.created_at ? { ...payload, before: last.created_at, before_id: last.id } : payload;
 }
 
 export function normalizeSocialSummary(value: Partial<SocialSummary> | null): SocialSummary {
@@ -49,7 +61,21 @@ export function socialError(error: unknown): string {
     /^Request is no longer available\.$/,
     /^Comments must be 1–1000 characters\.$/,
     /^Please wait before posting more comments\.$/,
+    /^Choose a valid report reason and keep details under 1000 characters\.$/,
+    /^You have submitted too many reports today\.$/,
   ];
   if (code === 'P0001' && safeValidation.some((pattern) => pattern.test(message))) return message;
   return 'Could not update social activity. Try again.';
+}
+
+export const REPORT_REASONS: { value: ReportReason; label: string }[] = [
+  { value: 'spam', label: 'Spam' },
+  { value: 'harassment', label: 'Harassment or bullying' },
+  { value: 'inappropriate', label: 'Inappropriate content' },
+  { value: 'misinformation', label: 'Misleading information' },
+  { value: 'other', label: 'Something else' },
+];
+
+export function validReportTarget(value: string | undefined): value is ReportTarget {
+  return value === 'user' || value === 'post' || value === 'comment';
 }

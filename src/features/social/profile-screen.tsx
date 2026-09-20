@@ -24,7 +24,7 @@ export default function SocialProfileScreen() {
 
   return <Screen title="Social Profile" headerDescription="Social Profile">
     <SocialBack />
-    <SocialState loading={profile.loading} error={profile.error} empty={false} onRetry={profile.refresh} />
+    <SocialState loading={profile.loading} error={profile.error} offline={profile.offline} empty={false} onRetry={profile.refresh} />
     {profile.data && <Card>
       <PersonRow person={profile.data.person} open={false} />
       {!!profile.data.person.bio && <ThemedText>{profile.data.person.bio}</ThemedText>}
@@ -33,9 +33,10 @@ export default function SocialProfileScreen() {
       {relationship === 'outgoing' && <Button disabled={mutation.busy} label="Cancel request" onPress={() => void run('cancel')} />}
       {relationship === 'friends' && <Button disabled={mutation.busy} label="Remove friend" onPress={() => confirm('remove_friend')} />}
       {relationship && relationship !== 'self' && <Button disabled={mutation.busy} label="Block person" onPress={() => confirm('block')} />}
+      {relationship && relationship !== 'self' && <Button label="Report user" onPress={() => router.push({ pathname: '/feed/report', params: { target: 'user', id } })} />}
     </Card>}
     <SocialError message={mutation.error} />
     {feed.items.map((post) => <SocialPostCard key={post.id} post={post} place={places[post.google_place_id]} />)}
-    {!!profile.data && <SocialState loading={feed.loading} error={feed.error} empty={!feed.items.length} onRetry={feed.refresh} hasMore={feed.hasMore} loadingMore={feed.loadingMore} onMore={feed.loadMore} />}
+    {!!profile.data && <SocialState loading={feed.loading} error={feed.error} offline={feed.offline} empty={!feed.items.length} emptyTitle="No shared ratings" emptyMessage="Ratings this person shares with friends will appear here." onRetry={feed.refresh} hasMore={feed.hasMore} loadingMore={feed.loadingMore} onMore={feed.loadMore} />}
   </Screen>;
 }

@@ -75,12 +75,26 @@ In the RevenueCat dashboard:
 5. Set prices and availability in the respective store/Test Store. The app uses
    `product.priceString`; it never invents prices, currency, discounts, or trials.
 
-This code does not invent paid feature benefits or lock existing features. Define
-what Pro includes before launch, then use the entitlement hook below at those
-feature boundaries. Do not sell a production membership without specifying and
-implementing its benefits.
+## 4. OutThere Pro product contract
 
-## 4. SDK initialization and customer identity
+`outthere_pro` unlocks two benefits:
+
+1. **Advanced place search** — open-now, price and minimum-rating filters,
+   distance sorting, and search radii above 10 km up to 50 km. Free members keep
+   place-name search, suggestions, food/activity and category filters, selectable
+   areas, and radii up to 10 km.
+2. **Personal taste insights** — the activity/food radar profiles, category
+   strengths, rating averages and detailed category breakdowns. Core rankings,
+   rating, saving places, discovery, profiles and social features remain free.
+
+The benefit definitions and entitlement checks live in
+`src/features/subscriptions/model.ts`. Search strips Pro-only values before a
+request is sent even when a stale or hand-built deep link includes them. The
+statistics screen checks the active entitlement at the route boundary. An active
+entitlement continues through a cancelled subscription's paid-through date;
+RevenueCat removes access when that entitlement expires.
+
+## 5. SDK initialization and customer identity
 
 `src/features/subscriptions/sdk.native.ts` contains the actual native adapter.
 `SubscriptionProvider` is mounted once beneath `AuthProvider` in the root layout.
@@ -110,7 +124,7 @@ would create an anonymous ID). The next account uses `logIn(newUUID)`. Late resu
 from a previous account cannot populate the current account's state. Raw SDK calls
 outside the adapter would bypass these protections; use the hook instead.
 
-## 5. Customer info, entitlement checks, purchase and restore
+## 6. Customer info, entitlement checks, purchase and restore
 
 This complete example uses the integrated provider and can be placed inside a
 protected screen. The provider handles errors and busy states rather than letting
@@ -178,7 +192,7 @@ Network/store/configuration errors show recoverable messages. Duplicate purchase
 taps are ignored while a request is open. Restoring with no entitlement shows a
 clear “no active purchase” result. Restore only runs on an explicit user action.
 
-## 6. RevenueCat Paywall
+## 7. RevenueCat Paywall
 
 The native adapter uses:
 
@@ -204,13 +218,13 @@ This standalone snippet illustrates SDK calls; app screens should call
 handling centralized. `PURCHASED`/`RESTORED` trigger entitlement verification;
 `CANCELLED`/`NOT_PRESENTED` do not grant access; `ERROR` produces a retry message.
 
-In the dashboard, design and publish a paywall attached to `default`. Include
-accurate Pro benefits, the relevant plans, renewal disclosures, restore support,
-and your actual privacy policy and terms links. Add a close action in the paywall
-editor: `displayCloseButton` applies to older template paywalls and is ignored by
-V2 paywalls. Dashboard paywall publication has not been performed by this change.
+In the dashboard, design and publish a paywall attached to `default`. Use the two
+benefits above, all three plans, accurate renewal disclosures, restore support,
+and the production privacy-policy and terms links. Add a close action in the
+paywall editor: `displayCloseButton` applies to older template paywalls and is
+ignored by V2 paywalls.
 
-## 7. Customer Center
+## 8. Customer Center
 
 The **Manage membership** action calls:
 
@@ -234,7 +248,29 @@ available management options. Actions vary by store/platform, purchase type, and
 project setup. A Test Store purchase does not validate real store cancellation,
 refund, or billing-management flows. Dashboard settings were not changed here.
 
-## 8. Production subscription management
+## 9. App Store and Google Play configuration
+
+The native product catalog must be created before a production offering can be
+published:
+
+| Store | Product | Store type | RevenueCat package |
+| --- | --- | --- | --- |
+| App Store | `monthly` | 1-month auto-renewing subscription | `$rc_monthly` |
+| App Store | `yearly` | 1-year auto-renewing subscription | `$rc_annual` |
+| App Store | `lifetime` | non-consumable | `$rc_lifetime` |
+| Google Play | `outthere_pro:monthly` | subscription monthly base plan | `$rc_monthly` |
+| Google Play | `outthere_pro:yearly` | subscription yearly base plan | `$rc_annual` |
+| Google Play | `lifetime` | one-time non-consumable product | `$rc_lifetime` |
+
+Put the two Apple subscriptions in one **OutThere Pro** subscription group. On
+Google Play, keep monthly and yearly as base plans of one subscription so a user
+can change plans cleanly. Import all products into RevenueCat, attach all of them
+to `outthere_pro`, add each platform product to the matching package in the
+`default` offering, and make `default` current. Store review metadata, prices,
+territories, tax settings, banking agreements and production SDK keys must be
+completed in the respective owner accounts.
+
+## 10. Production subscription management
 
 - Keep RevenueCat as the billing source of truth; do not write a client-controlled
   `is_pro` flag into Supabase and treat it as authorization.
@@ -251,7 +287,7 @@ refund, or billing-management flows. Dashboard settings were not changed here.
 - Test Apple/Google sandbox billing separately before launch. Configure store
   server notifications, products, agreements, and required app metadata.
 
-## 9. Verification
+## 11. Verification
 
 ```sh
 npm test
@@ -265,12 +301,13 @@ key isolation, purchase success/cancellation/pending approval, duplicate taps,
 account changes during purchases, empty restoration, missing offerings, paywall
 result verification, and customer-info/Customer Center updates.
 
-For a live Test Store acceptance pass: open Profile → View membership, verify all
-three prices, present the paywall, cancel once, then complete a simulated purchase
-and check Pro. Restart, restore, and switch Supabase accounts. Test failures and
-expiry/refund using Test Store controls. Do not approve a real store transaction
-as part of automated testing. Repeat separately with real store sandbox accounts
-for production, especially Customer Center management actions.
+The simulator acceptance pass verified all three Test Store products and prices,
+paywall dismissal, an empty restore, a valid monthly purchase, immediate
+`outthere_pro` activation, unlocked statistics, and Customer Center showing the
+active purchase. Automated tests cover cancellation, pending purchases, restore,
+expiration/inactive entitlements and account changes without making real charges.
+Repeat purchase, cancellation, renewal, expiration, refund and restore in both
+Apple Sandbox/TestFlight and Google Play license testing before store submission.
 
 ## Official references
 

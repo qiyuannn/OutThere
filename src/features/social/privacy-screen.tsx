@@ -24,7 +24,7 @@ export default function PrivacyScreen() {
 
   return <Screen title="Privacy & Sharing" headerDescription="Privacy & Sharing">
     <SocialBack />
-    <SocialState loading={settings.loading} error={settings.error} empty={false} onRetry={settings.refresh} />
+    <SocialState loading={settings.loading} error={settings.error} offline={settings.offline} empty={false} onRetry={settings.refresh} />
     {settings.data && <>
       <Card>
         <ThemedText type="subtitle">Social profile</ThemedText>

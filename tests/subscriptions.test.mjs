@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BillingController } from '../src/features/subscriptions/controller.ts';
-import { availablePlans, hasPro, billingError } from '../src/features/subscriptions/model.ts';
+import { availablePlans, hasPro, billingError, enforceSearchAccess, usesProSearchFilters } from '../src/features/subscriptions/model.ts';
 import { selectBillingKey } from '../src/features/subscriptions/config.ts';
 const info = (active = false) => ({ entitlements: { active: active ? { outthere_pro: { isActive: true } } : {}, all: {} } });
 const pkg = { identifier: '$rc_monthly', packageType: 'MONTHLY', product: { identifier: 'monthly', priceString: '$4.99' } };
@@ -18,6 +18,15 @@ function fixture(overrides = {}) {
 test('only active outthere_pro grants access, never historical products or another entitlement', () => {
   assert.equal(hasPro(null), false); assert.equal(hasPro(info()), false); assert.equal(hasPro(info(true)), true);
   assert.equal(hasPro({entitlements:{active:{other:{isActive:true},outthere_pro:{isActive:false}}}}), false);
+});
+test('free search keeps core discovery but strips every Pro filter', () => {
+  const premium = { mode: 'food', category: 'restaurant', radiusMeters: 50_000, openNow: true, price: '2', minRating: 4.5, sort: 'distance' };
+  assert.equal(usesProSearchFilters(premium), true);
+  assert.deepEqual(enforceSearchAccess(premium, false), {
+    mode: 'food', category: 'restaurant', radiusMeters: 10_000, openNow: false, price: '', minRating: 0, sort: 'relevance',
+  });
+  assert.strictEqual(enforceSearchAccess(premium, true), premium);
+  assert.equal(usesProSearchFilters(enforceSearchAccess(premium, false)), false);
 });
 test('maps standard annual/monthly/lifetime packages without requiring product IDs in UI', () => {
   assert.equal(availablePlans(offering)[0].id,'monthly');
@@ -76,4 +85,11 @@ test('customer updates and Customer Center dismissal refresh entitlement', async
   const {c,setInfo,emit}=fixture();c.setUser('a');await settle(c);
   setInfo(info(true));emit();await settle(c);assert.equal(hasPro(c.state.customerInfo),true);
   setInfo(info());await c.customerCenter();assert.equal(hasPro(c.state.customerInfo),false);
+});
+test('an expiration update removes Pro without changing the signed-in account', async () => {
+  const {c,setInfo,emit}=fixture();c.setUser('a');await settle(c);
+  setInfo(info(true));emit();await settle(c);
+  assert.equal(hasPro(c.state.customerInfo),true);
+  setInfo(info());emit();await settle(c);
+  assert.equal(c.state.userId,'a');assert.equal(hasPro(c.state.customerInfo),false);
 });

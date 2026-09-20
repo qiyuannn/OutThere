@@ -8,6 +8,7 @@ import { ScoreBadge } from '@/features/rankings/components/score-badge';
 import { getLivePlaceDetails } from '@/features/search/service';
 import type { SearchPlace } from '@/features/search/model';
 import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '@/providers/auth-provider';
 import { useSocialMutation } from './hooks';
 import type { SocialPerson, SocialPost } from './types';
 
@@ -20,10 +21,11 @@ export function SocialError({ message }: { message: string }) {
   return message ? <ThemedText accessibilityRole="alert" style={styles.error}>{message}</ThemedText> : null;
 }
 
-export function SocialState({ loading, error, empty, onRetry, hasMore, loadingMore, onMore }: { loading: boolean; error: string; empty: boolean; onRetry: () => void; hasMore?: boolean; loadingMore?: boolean; onMore?: () => void }) {
+export function SocialState({ loading, error, offline = false, empty, emptyTitle = 'Nothing here yet', emptyMessage = 'Nothing to show yet.', onRetry, hasMore, loadingMore, onMore }: { loading: boolean; error: string; offline?: boolean; empty: boolean; emptyTitle?: string; emptyMessage?: string; onRetry: () => void; hasMore?: boolean; loadingMore?: boolean; onMore?: () => void }) {
   if (loading) return <ActivityIndicator accessibilityLabel="Loading social activity" color="#000000" />;
   if (error) return <Card><SocialError message={error} /><Button label="Try again" onPress={onRetry} /></Card>;
-  if (empty) return <ThemedText themeColor="textSecondary">Nothing to show yet.</ThemedText>;
+  if (offline) return <Card><ThemedText type="subtitle">You’re offline</ThemedText><ThemedText themeColor="textSecondary">Reconnect to refresh social activity. Previously loaded items remain visible.</ThemedText><Button label="Try again" onPress={onRetry} /></Card>;
+  if (empty) return <Card><ThemedText type="subtitle">{emptyTitle}</ThemedText><ThemedText themeColor="textSecondary">{emptyMessage}</ThemedText></Card>;
   if (hasMore && onMore) return <Button disabled={loadingMore} label={loadingMore ? 'Loading…' : 'Load more'} onPress={onMore} />;
   return null;
 }
@@ -62,6 +64,7 @@ export function usePostPlaces(posts: SocialPost[]) {
 }
 
 export function SocialPostCard({ post, place, detail = false }: { post: SocialPost; place?: SearchPlace; detail?: boolean }) {
+  const { session } = useAuth();
   const mutation = useSocialMutation();
   const openPlace = () => router.push({ pathname: '/search/[id]', params: { id: post.google_place_id, mode: post.mode } });
   return <Card>
@@ -78,6 +81,7 @@ export function SocialPostCard({ post, place, detail = false }: { post: SocialPo
     <View style={styles.actions}>
       <Button disabled={mutation.busy} label={`${post.liked ? 'Unlike' : 'Like'} · ${post.like_count}`} onPress={() => void mutation.run(post.liked ? 'unlike' : 'like', { post_id: post.id })} />
       {!detail && <Button label={`Comments · ${post.comment_count}`} onPress={() => router.push({ pathname: '/feed/post/[id]', params: { id: post.id } })} />}
+      {post.author.id !== session?.user.id && <Button label="Report post" onPress={() => router.push({ pathname: '/feed/report', params: { target: 'post', id: post.id } })} />}
     </View>
     <SocialError message={mutation.error} />
   </Card>;

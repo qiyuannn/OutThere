@@ -1,5 +1,7 @@
 export type SocialVisibility = 'private' | 'friends';
 export type Relationship = 'self' | 'none' | 'incoming' | 'outgoing' | 'friends';
+export type ReportTarget = 'user' | 'post' | 'comment';
+export type ReportReason = 'spam' | 'harassment' | 'inappropriate' | 'misinformation' | 'other';
 
 export interface SocialPerson {
   id: string;

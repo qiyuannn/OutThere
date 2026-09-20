@@ -11,6 +11,8 @@ OutThere's social feature is opt-in and uses mutual friendships. It does not exp
 - View friends' shared ratings in the Friends Feed.
 - Like and comment on visible ratings and receive in-app notifications.
 - Make a shared rating private or delete its social post without deleting the underlying personal rating.
+- Report a visible user, post, or comment with a reason and optional details.
+- Delete an account after typing the current username and confirming the irreversible action.
 
 Blocking removes the friendship and notifications between the two accounts. It also hides both profiles and all shared activity from each other. Disabling the social profile makes every shared rating private.
 
@@ -21,6 +23,12 @@ Routes live below `src/app/(tabs)/feed`. Screens and client data access live in 
 `20260915114402_social_features.sql` is the migration already applied to the hosted project. `20260920190000_social_summary.sql` adds the count endpoint used by Profile. The consolidated base migrations describe a fresh installation and must keep the `user_place_ratings` UUID/rating schema expected by the social trigger.
 
 The rating trigger creates or updates a private social post when `social_visibility` changes. API calls check authentication, opt-in status, friendship, blocks, ownership, visibility, input size, and cursor limits in the database so deep links cannot bypass the UI rules.
+
+Reports are written through `public.social_report` into a private moderation queue. Mobile clients cannot read or modify that table. Report snapshots contain only the visible content needed for review, and repeat reports from the same account update the existing queue item.
+
+Account deletion runs in the authenticated `delete-account` Edge Function. It verifies the bearer token and typed username, deletes the Auth user so application rows cascade, then clears the avatar through the Storage API. Store subscriptions must be cancelled separately through Apple or Google.
+
+Friends and people search use bounded offset pages. Feed posts, notifications, and comments use timestamp-plus-ID cursors so records with equal timestamps are neither skipped nor duplicated. Screens retain loaded results, show a reconnect state when offline, and expose retry actions for server failures.
 
 ## Validation
 
