@@ -4,9 +4,11 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/app-header';
+import { SubscriptionCard } from '@/features/subscriptions/profile-card';
 import { useAuth } from '@/providers/auth-provider';
 import { useProfile } from '@/providers/profile-provider';
 import { Avatar } from './components/avatar';
+import { SignOutButton } from './components/sign-out';
 import { VisitedPlacesMap } from './components/visited-places-map';
 import { loadProfileVisitSummary, type ProfileVisitSummary } from './service';
 
@@ -46,13 +48,18 @@ export default function ProfileScreen() {
           <Avatar name={profile.display_name} path={profile.avatar_path} size={69} />
           <View style={styles.identity}>
             <Text style={styles.name}>{profile.display_name}</Text>
-            <Text style={styles.following}>12 Followers · 24 Following</Text>
+            <Text style={styles.username}>@{profile.username}</Text>
           </View>
         </View>
 
         <Pressable accessibilityRole="button" onPress={() => router.push('/profile/edit')}
           style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}>
           <Text style={styles.buttonLabel}>Edit Profile</Text>
+        </Pressable>
+
+        <Pressable accessibilityRole="button" onPress={() => router.push('/rankings')}
+          style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}>
+          <Text style={styles.buttonLabel}>My Rankings</Text>
         </Pressable>
 
         <View style={styles.statistics}>
@@ -82,6 +89,9 @@ export default function ProfileScreen() {
           {loadingSummary ? <View style={styles.mapLoading}><ActivityIndicator color="#000000" /></View>
             : <VisitedPlacesMap places={summary.places} />}
         </View>
+
+        <SubscriptionCard />
+        <SignOutButton />
       </ScrollView>
     </SafeAreaView>
   );
@@ -94,7 +104,7 @@ const styles = StyleSheet.create({
   profileDescription: { minHeight: 101, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
   identity: { flex: 1, minHeight: 81, justifyContent: 'center', paddingVertical: 16 },
   name: { color: '#000000', fontSize: 20, lineHeight: 24, fontWeight: '700' },
-  following: { color: '#000000', fontSize: 10, lineHeight: 15, fontWeight: '300', letterSpacing: 0.25 },
+  username: { color: '#000000', fontSize: 10, lineHeight: 15, fontWeight: '300', letterSpacing: 0.25 },
   outlineButton: { minHeight: 37, borderWidth: 1, borderColor: '#000000', padding: 10, alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.55 },
   buttonLabel: { color: '#000000', fontSize: 12, lineHeight: 15, fontWeight: '600', textAlign: 'center' },

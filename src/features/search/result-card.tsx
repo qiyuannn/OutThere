@@ -10,7 +10,7 @@ import { priceLabel, type SearchPlace } from './model';
 export function GoogleAttribution({ attributions = [], providersOnly = false }: { attributions?: { provider?: string; providerUri?: string }[]; providersOnly?: boolean }) {
   const theme = useTheme();
   return <View style={searchStyles.row}>
-    {!providersOnly && <ThemedText style={{ fontSize: 12, fontWeight: '400', letterSpacing: 0, color: theme.background === '#F7F8F2' ? '#5E5E5E' : '#FFFFFF' }}>Google Maps</ThemedText>}
+    {!providersOnly && <ThemedText style={{ fontSize: 12, fontWeight: '400', letterSpacing: 0, color: theme.textSecondary }}>Google Maps</ThemedText>}
     {attributions.map((a, i) => <Pressable key={i} accessibilityRole="link" disabled={!a.providerUri} onPress={() => a.providerUri && void Linking.openURL(a.providerUri).catch(() => {})}><ThemedText type="small">{a.provider}</ThemedText></Pressable>)}
   </View>;
 }

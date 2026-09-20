@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomNavigationIcon, type MainTabName } from '@/components/bottom-navigation';
 
 const tabs: { name: MainTabName; title: string }[] = [
-  { name: 'rankings', title: 'Feed' },
+  { name: 'feed', title: 'Feed' },
   { name: 'search', title: 'Search' },
   { name: '(discover)', title: 'Discover' },
   { name: 'bucket-list', title: 'Saved' },
@@ -57,6 +57,7 @@ export default function AppTabs() {
       ))}
       <Tabs.Screen name="explore/index" options={{ href: null }} />
       <Tabs.Screen name="friends" options={{ href: null }} />
+      <Tabs.Screen name="rankings" options={{ href: null }} />
     </Tabs>
   );
 }

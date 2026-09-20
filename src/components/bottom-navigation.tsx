@@ -5,7 +5,7 @@ import { Avatar } from '@/features/profile/components/avatar';
 import { useProfile } from '@/providers/profile-provider';
 
 const icons = {
-  rankings: require('../../assets/images/navigation/feed.svg'),
+  feed: require('../../assets/images/navigation/feed.svg'),
   search: require('../../assets/images/navigation/search.svg'),
   '(discover)': require('../../assets/images/navigation/discover.svg'),
   'bucket-list': require('../../assets/images/navigation/saved.svg'),

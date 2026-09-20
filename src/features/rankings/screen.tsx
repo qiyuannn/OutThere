@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,7 +14,6 @@ import { useTheme } from '@/hooks/use-theme';
 import { RankedPlaceCard } from './components/ranked-place-card';
 import { RatePlaceModal } from './components/rate-place-modal';
 import { ScoreBadge } from './components/score-badge';
-import type { RankingMode } from './types';
 import { useRankings } from './use-rankings';
 
 export default function RankingsScreen() {
@@ -37,7 +35,6 @@ export default function RankingsScreen() {
     stats,
     saveRating,
     removeRating,
-    refresh,
   } = useRankings('food');
 
   const groups = CATEGORY_GROUPS_BY_MODE[mode];
