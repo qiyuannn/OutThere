@@ -12,6 +12,7 @@ import {
 
 import { ThemedText } from '@/components/themed-text';
 import { getScoreTier } from '@/features/rankings/comparison';
+import { computeIsOpenNow } from '@/lib/opening-hours';
 import { formatFeedTimestamp, formatLikeCount, formatPlaceCategory } from './feed-model';
 import type { FeedPost } from './types';
 
@@ -23,10 +24,13 @@ type FeedItemProps = {
   post: FeedPost;
   liking: boolean;
   onToggleLike: (post: FeedPost) => void;
+  showAuthor?: boolean;
+  showOpeningStatus?: boolean;
 };
 
-export function FeedItem({ post, liking, onToggleLike }: FeedItemProps) {
+export function FeedItem({ post, liking, onToggleLike, showAuthor = true, showOpeningStatus = false }: FeedItemProps) {
   const category = formatPlaceCategory(post.placePriceLevel, post.placeCategory);
+  const openNow = showOpeningStatus ? computeIsOpenNow(post.placeRegularOpeningHours) : null;
   const scoreTier = getScoreTier(post.rating);
   const badgeColors = post.rating >= 9
     ? { backgroundColor: 'rgba(139, 242, 144, 0.74)', borderColor: '#66C152' }
@@ -39,22 +43,29 @@ export function FeedItem({ post, liking, onToggleLike }: FeedItemProps) {
 
   return (
     <View style={styles.item}>
-      <View style={styles.profileRow}>
-        <FeedAvatar name={post.displayName} uri={post.avatarUrl} />
-        <View style={styles.profileCopy}>
-          <ThemedText numberOfLines={1} style={styles.profileName}>{post.displayName}</ThemedText>
-          <ThemedText style={styles.meta}>{formatFeedTimestamp(post.createdAt)}</ThemedText>
+      {showAuthor ? (
+        <View style={styles.profileRow}>
+          <FeedAvatar name={post.displayName} uri={post.avatarUrl} />
+          <View style={styles.profileCopy}>
+            <ThemedText numberOfLines={1} style={styles.profileName}>{post.displayName}</ThemedText>
+            <ThemedText style={styles.meta}>{formatFeedTimestamp(post.createdAt)}</ThemedText>
+          </View>
         </View>
-        <View style={[styles.ratingBadge, badgeColors]}>
-          <ThemedText style={styles.ratingText}>{post.rating.toFixed(1)}</ThemedText>
+      ) : null}
+
+      <View style={styles.placeRow}>
+        <Pressable accessibilityRole="link" onPress={openPlace} style={({ pressed }) => [styles.placeDetails, pressed && styles.pressed]}>
+          <ThemedText numberOfLines={1} style={styles.placeName}>{post.placeName}</ThemedText>
+          {category ? <ThemedText numberOfLines={1} style={styles.meta}>{category}</ThemedText> : null}
+          {post.placeAddress ? <ThemedText numberOfLines={1} style={styles.meta}>{post.placeAddress}</ThemedText> : null}
+          {openNow !== null ? <ThemedText style={styles.meta}>{openNow ? 'Open Now' : 'Closed Now'}</ThemedText> : null}
+        </Pressable>
+        <View style={styles.ratingSlot}>
+          <View style={[styles.ratingBadge, badgeColors]}>
+            <ThemedText style={styles.ratingText}>{post.rating.toFixed(1)}</ThemedText>
+          </View>
         </View>
       </View>
-
-      <Pressable accessibilityRole="link" onPress={openPlace} style={({ pressed }) => [styles.placeDetails, pressed && styles.pressed]}>
-        <ThemedText numberOfLines={1} style={styles.placeName}>{post.placeName}</ThemedText>
-        {category ? <ThemedText numberOfLines={1} style={styles.meta}>{category}</ThemedText> : null}
-        {post.placeAddress ? <ThemedText numberOfLines={1} style={styles.meta}>{post.placeAddress}</ThemedText> : null}
-      </Pressable>
 
       {post.body ? <ThemedText style={styles.body}>{post.body}</ThemedText> : null}
       {post.photoUrls.length > 0 ? <PhotoGallery urls={post.photoUrls} placeName={post.placeName} /> : null}
@@ -144,7 +155,9 @@ const styles = StyleSheet.create({
   meta: { color: '#000000', fontSize: 10, lineHeight: 15, fontWeight: '300', letterSpacing: 0.25 },
   ratingBadge: { height: 30, minWidth: 45, flexShrink: 0, paddingHorizontal: 10, borderWidth: 1, borderRadius: 100, alignItems: 'center', justifyContent: 'center' },
   ratingText: { color: '#000000', fontSize: 12, lineHeight: 15, fontWeight: '400' },
-  placeDetails: { width: '100%', overflow: 'hidden' },
+  placeRow: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  placeDetails: { flex: 1, minWidth: 0, overflow: 'hidden' },
+  ratingSlot: { width: 60, height: 60, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
   placeName: { color: '#000000', fontSize: 16, lineHeight: 15, fontWeight: '600', letterSpacing: 0.25 },
   body: { width: '100%', color: '#000000', fontSize: 10, lineHeight: 15, fontWeight: '300', letterSpacing: 0.25 },
   photoViewport: { width: '100%', height: 227, overflow: 'hidden', backgroundColor: '#F3F4F6' },

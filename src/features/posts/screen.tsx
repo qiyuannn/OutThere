@@ -96,6 +96,7 @@ export default function PostScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          style={styles.scroller}
         >
           {!valid ? (
             <View style={styles.invalidState}>
@@ -129,19 +130,22 @@ export default function PostScreen() {
               />
 
               <PhotoGallery photos={photos} onAddPhotos={() => void addPhotos()} />
-              <View style={styles.spacer} />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ disabled: posting }}
-                disabled={posting}
-                onPress={() => void submit()}
-                style={({ pressed }) => [styles.postButton, (pressed || posting) && styles.pressed]}
-              >
-                {posting ? <ActivityIndicator size="small" color="#000000" /> : <ThemedText style={styles.postLabel}>Post</ThemedText>}
-              </Pressable>
             </>
           )}
         </ScrollView>
+        {valid ? (
+          <View style={styles.footer}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: posting }}
+              disabled={posting}
+              onPress={() => void submit()}
+              style={({ pressed }) => [styles.postButton, (pressed || posting) && styles.pressed]}
+            >
+              {posting ? <ActivityIndicator size="small" color="#000000" /> : <ThemedText style={styles.postLabel}>Post</ThemedText>}
+            </Pressable>
+          </View>
+        ) : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -200,6 +204,7 @@ function ActionButton({ label, onPress }: { label: string; onPress: () => void }
 const styles = StyleSheet.create({
   screen: { flex: 1, overflow: 'hidden', backgroundColor: '#FFFFFF' },
   keyboardArea: { flex: 1 },
+  scroller: { flex: 1 },
   content: { width: '100%', maxWidth: 402, minHeight: '100%', alignSelf: 'center', padding: 10, gap: 10 },
   invalidState: { gap: 14 },
   placeRow: { width: '100%', minHeight: 45, flexDirection: 'row', alignItems: 'flex-start', gap: 11, overflow: 'hidden' },
@@ -231,7 +236,7 @@ const styles = StyleSheet.create({
   photo: { width: '100%', height: '100%' },
   actionButton: { width: '100%', minHeight: 38, borderWidth: 1, borderColor: '#000000', padding: 10, alignItems: 'center', justifyContent: 'center' },
   actionLabel: { color: '#000000', fontSize: 12, fontWeight: '600', lineHeight: 15, letterSpacing: 0.25 },
-  spacer: { flex: 1, minHeight: 80 },
+  footer: { width: '100%', maxWidth: 402, alignSelf: 'center', paddingHorizontal: 10, paddingBottom: 10 },
   postButton: { width: '100%', minHeight: 38, borderWidth: 1, borderColor: '#000000', padding: 10, alignItems: 'center', justifyContent: 'center' },
   postLabel: { color: '#000000', fontSize: 12, fontWeight: '600', lineHeight: 15 },
   pressed: { opacity: 0.55 },

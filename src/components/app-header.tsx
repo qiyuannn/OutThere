@@ -9,6 +9,7 @@ const backIcon = require('../../assets/images/navigation/back.svg');
 const bellIcon = require('../../assets/images/navigation/bell.svg');
 
 type AppHeaderProps = {
+  brandLeading?: boolean;
   description: string;
   onBack?: () => void;
   onNotifications?: () => void;
@@ -16,6 +17,7 @@ type AppHeaderProps = {
 };
 
 export function AppHeader({
+  brandLeading = false,
   description,
   onBack,
   onNotifications,
@@ -29,7 +31,7 @@ export function AppHeader({
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.row}>
-          <View style={styles.actionSlot}>
+          <View style={[styles.actionSlot, brandLeading && styles.hiddenSlot]}>
             {showBack ? (
               <Pressable
                 accessibilityLabel="Go back"
@@ -43,7 +45,7 @@ export function AppHeader({
             ) : null}
           </View>
 
-          <Text accessibilityRole="header" style={styles.brand}>OutThere</Text>
+          <Text accessibilityRole="header" style={[styles.brand, brandLeading && styles.leadingBrand]}>OutThere</Text>
 
           <View style={[styles.actionSlot, styles.trailingSlot]}>
             {onNotifications ? (
@@ -93,6 +95,9 @@ const styles = StyleSheet.create({
   trailingSlot: {
     alignItems: 'flex-end',
   },
+  hiddenSlot: {
+    display: 'none',
+  },
   action: {
     width: 24,
     height: 24,
@@ -111,6 +116,9 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 24,
     textAlign: 'center',
+  },
+  leadingBrand: {
+    textAlign: 'left',
   },
   description: {
     color: '#000000',

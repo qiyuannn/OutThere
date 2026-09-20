@@ -40,14 +40,27 @@ export default function ResetPassword() {
     } catch (error) { setMessage(authErrorMessage(error)); }
     finally { submitting.current = false; setBusy(false); }
   }
-  return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><Screen title={success ? 'You’re ready to go.' : 'Choose a new password.'}><Card>
-    {success ? <><ThemedText>Your password has been updated.</ThemedText><Button label="Continue to OutThere" onPress={finishRecovery} /></> : <>
-      <ThemedText themeColor="textSecondary">Use at least 8 characters. Make it something you haven’t used before.</ThemedText>
-      <AuthField label="New password" password value={password} onChangeText={setPassword} autoComplete="new-password" textContentType="newPassword" editable={!busy} />
-      <AuthField label="Confirm new password" password value={confirmation} onChangeText={setConfirmation} autoComplete="new-password" textContentType="newPassword" editable={!busy} />
-      {!!message && <ThemedText accessibilityRole="alert">{message}</ThemedText>}
-      <Button label={busy ? 'Please wait…' : 'Update password'} onPress={update} disabled={busy} />
-      <Button label="Cancel and sign out" onPress={cancel} disabled={busy} />
-    </>}
-  </Card></Screen></KeyboardAvoidingView>;
+  return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Screen title={success ? 'You’re ready to go.' : 'Choose a new password.'}>
+        <Card>
+          {success ? (
+            <>
+              <ThemedText>Your password has been updated.</ThemedText>
+              <Button label="Continue to OutThere" onPress={finishRecovery} />
+            </>
+          ) : (
+            <>
+              <ThemedText themeColor="textSecondary">Use at least 8 characters. Make it something you haven’t used before.</ThemedText>
+              <AuthField label="New password" password value={password} onChangeText={setPassword} autoComplete="new-password" textContentType="newPassword" editable={!busy} />
+              <AuthField label="Confirm new password" password value={confirmation} onChangeText={setConfirmation} autoComplete="new-password" textContentType="newPassword" editable={!busy} />
+              {!!message && <ThemedText accessibilityRole="alert">{message}</ThemedText>}
+              <Button label={busy ? 'Please wait…' : 'Update password'} onPress={update} disabled={busy} />
+              <Button label="Cancel and sign out" onPress={cancel} disabled={busy} />
+            </>
+          )}
+        </Card>
+      </Screen>
+    </KeyboardAvoidingView>
+  );
 }

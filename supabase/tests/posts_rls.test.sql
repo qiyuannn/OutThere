@@ -38,20 +38,20 @@ select ok(
   'anonymous users have no post_likes privileges'
 );
 
-select ok(not has_table_privilege('authenticated', 'public.post_likes', 'select'), 'raw post like rows are not exposed to clients');
+select ok(has_table_privilege('authenticated', 'public.post_likes', 'select'), 'signed-in users can read likes allowed by RLS');
 select ok(has_table_privilege('authenticated', 'public.post_likes', 'insert'), 'signed-in users can like posts');
 select ok(has_table_privilege('authenticated', 'public.post_likes', 'delete'), 'signed-in users can remove their likes');
 select ok(not has_table_privilege('authenticated', 'public.post_likes', 'update'), 'post likes cannot be edited');
 
 select results_eq(
   $$select count(*)::bigint from pg_policies where schemaname = 'public' and tablename = 'post_likes'$$,
-  array[2::bigint],
-  'post_likes has one policy for each exposed write operation'
+  array[3::bigint],
+  'post_likes has one policy for each exposed operation'
 );
 
 select ok(
-  has_function_privilege('authenticated', 'public.get_feed_posts(timestamptz,bigint,integer)', 'execute')
-  and not has_function_privilege('anon', 'public.get_feed_posts(timestamptz,bigint,integer)', 'execute'),
+  has_function_privilege('authenticated', 'public.get_feed_posts(timestamptz,bigint,integer,boolean)', 'execute')
+  and not has_function_privilege('anon', 'public.get_feed_posts(timestamptz,bigint,integer,boolean)', 'execute'),
   'only signed-in users can call the feed function'
 );
 

@@ -6,7 +6,7 @@ import { ProfileForm } from './components/profile-form';
 import { ProfileStatus } from './components/profile-status';
 
 export default function OnboardingScreen() {
-  const { session, recovery } = useAuth();
+  const { session } = useAuth();
   const { profile, loading, error } = useProfile();
   async function signOut() {
     if (!supabase) throw new Error('Not configured');
@@ -14,7 +14,6 @@ export default function OnboardingScreen() {
     if (error) throw error;
   }
   if (!session) return <Redirect href="/auth" />;
-  if (recovery) return <Redirect href="/auth/reset-password" />;
   if (loading || error) return <ProfileStatus />;
   if (profile?.onboarding_completed) return <Redirect href="/" />;
   return <ProfileForm onboarding onDone={() => router.replace('/')} onCancel={signOut} />;

@@ -1,120 +1,110 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Button, Card, Screen } from '@/components/foundation';
-import { ThemedText } from '@/components/themed-text';
-import { SubscriptionCard } from '@/features/subscriptions/profile-card';
-import { useTheme } from '@/hooks/use-theme';
+import { useCallback, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { AppHeader } from '@/components/app-header';
 import { useAuth } from '@/providers/auth-provider';
 import { useProfile } from '@/providers/profile-provider';
 import { Avatar } from './components/avatar';
-import { CategoryWeightsCard } from './components/category-weights-card';
-import { SignOutButton } from './components/sign-out';
-import { BUDGETS, EXPLORATION, INTERESTS } from './model';
-import type { ProfileMode } from './types';
-import { useProfileCategories } from './use-profile-categories';
+import { VisitedPlacesMap } from './components/visited-places-map';
+import { loadProfileVisitSummary, type ProfileVisitSummary } from './service';
+
+const EMPTY_SUMMARY: ProfileVisitSummary = { averageRating: null, places: [], visitedCount: 0 };
 
 export default function ProfileScreen() {
   const { session } = useAuth();
   const { profile } = useProfile();
   const { updated } = useLocalSearchParams<{ updated?: string }>();
-  const theme = useTheme();
-  const [profileMode, setProfileMode] = useState<ProfileMode>('food');
+  const [summary, setSummary] = useState<ProfileVisitSummary>(EMPTY_SUMMARY);
+  const [loadingSummary, setLoadingSummary] = useState(true);
 
-  const categories = useProfileCategories(session?.user.id, profileMode);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    const userId = session?.user.id;
+    if (!userId) {
+      setLoadingSummary(false);
+      return () => { active = false; };
+    }
+    setLoadingSummary(true);
+    void loadProfileVisitSummary(userId)
+      .then((next) => { if (active) setSummary(next); })
+      .catch(() => { if (active) setSummary(EMPTY_SUMMARY); })
+      .finally(() => { if (active) setLoadingSummary(false); });
+    return () => { active = false; };
+  }, [session?.user.id]));
 
   if (!profile) return null;
 
   return (
-    <Screen title="A story only you can tell." headerDescription="A story only you can tell.">
-      {updated === '1' && (
-        <ThemedText accessibilityRole="alert" themeColor="primary">
-          Your profile is saved.
-        </ThemedText>
-      )}
+    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+      <AppHeader brandLeading description="My Profile" />
+      <ScrollView contentContainerStyle={styles.content}>
+        {updated === '1' ? <Text accessibilityRole="alert" style={styles.savedMessage}>Your profile is saved.</Text> : null}
 
-      {/* User Account Info */}
-      <Card>
-        <View style={{ alignItems: 'center', gap: 12 }}>
-          <Avatar name={profile.display_name} path={profile.avatar_path} />
-          <ThemedText type="subtitle">{profile.display_name}</ThemedText>
-          <ThemedText themeColor="textSecondary">@{profile.username}</ThemedText>
-          <ThemedText themeColor="primary">{profile.city}</ThemedText>
+        <View style={styles.profileDescription}>
+          <Avatar name={profile.display_name} path={profile.avatar_path} size={69} />
+          <View style={styles.identity}>
+            <Text style={styles.name}>{profile.display_name}</Text>
+            <Text style={styles.following}>12 Followers · 24 Following</Text>
+          </View>
         </View>
-        {!!profile.bio && <ThemedText>{profile.bio}</ThemedText>}
-        <Button label="Edit profile" onPress={() => router.push('/profile/edit')} />
-      </Card>
 
-      {/* Dual Profiles Segmented Mode Switcher */}
-      <View accessibilityRole="tablist" style={[styles.tabs, { backgroundColor: theme.backgroundSelected }]}>
-        {(['food', 'activities'] as const).map((mode) => (
-          <Pressable
-            key={mode}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: profileMode === mode }}
-            onPress={() => setProfileMode(mode)}
-            style={({ pressed }) => [
-              styles.tab,
-              {
-                backgroundColor: profileMode === mode ? theme.accent : 'transparent',
-                opacity: pressed ? 0.75 : 1,
-              },
-            ]}
-          >
-            <ThemedText
-              type="smallBold"
-              style={{ color: profileMode === mode ? theme.onAccent : theme.textSecondary }}
-            >
-              {mode === 'food' ? '🍕 Food Profile' : '🎯 Activities Profile'}
-            </ThemedText>
+        <Pressable accessibilityRole="button" onPress={() => router.push('/profile/edit')}
+          style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}>
+          <Text style={styles.buttonLabel}>Edit Profile</Text>
+        </Pressable>
+
+        <View style={styles.statistics}>
+          <View style={styles.statRow}>
+            <Text style={styles.statLabel}>Places Visited:</Text>
+            <Text style={styles.statValue}>{loadingSummary ? '—' : summary.visitedCount}</Text>
+          </View>
+          <View style={styles.statRow}>
+            <Text style={styles.statLabel}>Average Rating:</Text>
+            <Text style={styles.statValue}>{loadingSummary || summary.averageRating === null ? '—' : summary.averageRating.toFixed(1)}</Text>
+          </View>
+        </View>
+
+        <View style={styles.actions}>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/profile/statistics')}
+            style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
+            <Text style={styles.buttonLabel}>View Statistics</Text>
           </Pressable>
-        ))}
-      </View>
-
-      {/* Category Preferences Distribution & Radar Chart */}
-      <CategoryWeightsCard
-        mode={profileMode}
-        weights={categories.weights}
-        stats={categories.stats}
-        loading={categories.loading}
-        error={categories.error}
-      />
-
-      <Card>
-        <ThemedText type="subtitle" style={{ fontSize: 24 }}>Things that draw me out</ThemedText>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {INTERESTS.filter(([id]) => profile.interests.includes(id)).map(([id, label, icon]) => (
-            <View key={id} style={{ padding: 12, borderRadius: 14, backgroundColor: theme.accent }}>
-              <ThemedText type="smallBold" style={{ color: theme.onAccent }}>
-                {icon} {label}
-              </ThemedText>
-            </View>
-          ))}
+          <Pressable accessibilityRole="button" onPress={() => router.push('/profile/activities')}
+            style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
+            <Text style={styles.buttonLabel}>View Past Activities</Text>
+          </Pressable>
         </View>
-      </Card>
 
-      <Card>
-        <ThemedText type="subtitle" style={{ fontSize: 24 }}>My kind of adventure</ThemedText>
-        <ThemedText>Budget · {BUDGETS.find(([id]) => id === profile.budget)?.[1]}</ThemedText>
-        <ThemedText>Discovery range · {profile.travel_radius_meters / 1000} km</ThemedText>
-        <ThemedText>Exploration style · {EXPLORATION.find(([id]) => id === profile.exploration_style)?.[1]}</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          Your range sets the starting distance in Discover. Your other preferences are saved for future personalised recommendations.
-        </ThemedText>
-      </Card>
-
-      <SubscriptionCard />
-
-      <Card>
-        <ThemedText type="smallBold">SIGNED IN AS</ThemedText>
-        <ThemedText selectable>{session?.user.email}</ThemedText>
-        <SignOutButton />
-      </Card>
-    </Screen>
+        <View style={styles.mapSection}>
+          <Text style={styles.mapHeading}>Map</Text>
+          {loadingSummary ? <View style={styles.mapLoading}><ActivityIndicator color="#000000" /></View>
+            : <VisitedPlacesMap places={summary.places} />}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  tabs: { flexDirection: 'row', padding: 4, gap: 4, borderRadius: 28 },
-  tab: { flex: 1, minHeight: 44, padding: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 24 },
+  safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
+  content: { width: '100%', maxWidth: 720, alignSelf: 'center', padding: 10, gap: 10, backgroundColor: '#FFFFFF' },
+  savedMessage: { color: '#000000', fontSize: 12, lineHeight: 15, textAlign: 'center' },
+  profileDescription: { minHeight: 101, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  identity: { flex: 1, minHeight: 81, justifyContent: 'center', paddingVertical: 16 },
+  name: { color: '#000000', fontSize: 20, lineHeight: 24, fontWeight: '700' },
+  following: { color: '#000000', fontSize: 10, lineHeight: 15, fontWeight: '300', letterSpacing: 0.25 },
+  outlineButton: { minHeight: 37, borderWidth: 1, borderColor: '#000000', padding: 10, alignItems: 'center', justifyContent: 'center' },
+  pressed: { opacity: 0.55 },
+  buttonLabel: { color: '#000000', fontSize: 12, lineHeight: 15, fontWeight: '600', textAlign: 'center' },
+  statistics: { padding: 10, gap: 10 },
+  statRow: { flexDirection: 'row', gap: 10 },
+  statLabel: { flex: 1, color: '#000000', fontSize: 12, lineHeight: 15, fontWeight: '600' },
+  statValue: { flex: 1, color: '#000000', fontSize: 12, lineHeight: 15, fontWeight: '400' },
+  actions: { minHeight: 37, flexDirection: 'row', gap: 10 },
+  actionButton: { flex: 1, minHeight: 37, borderWidth: 1, borderColor: '#000000', paddingHorizontal: 10, paddingVertical: 7, alignItems: 'center', justifyContent: 'center' },
+  mapSection: { padding: 10, gap: 10 },
+  mapHeading: { color: '#000000', fontSize: 16, lineHeight: 19, fontWeight: '600' },
+  mapLoading: { width: '100%', height: 330, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D9D9D9' },
 });

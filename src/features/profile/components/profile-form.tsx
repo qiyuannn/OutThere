@@ -1,26 +1,26 @@
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-import { Screen, Card, Button } from '@/components/foundation';
-import { ThemedText } from '@/components/themed-text';
-import { useTheme } from '@/hooks/use-theme';
+import { StatusBar } from 'expo-status-bar';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppHeader } from '@/components/app-header';
+import { Fonts } from '@/constants/theme';
 import { useProfile } from '@/providers/profile-provider';
 import { Avatar } from './avatar';
-import { Choice, Field } from './fields';
-import { BUDGETS, EXPLORATION, INTERESTS, profileError, toDraft, validateProfile, type AvatarSelection, type ProfileDraft } from '../model';
+import { profileError, toDraft, validateProfile, type AvatarSelection, type ProfileDraft } from '../model';
+
+const backIcon = require('../../../../assets/images/navigation/back.svg');
 
 export function ProfileForm({ onboarding = false, onDone, onCancel }: { onboarding?: boolean; onDone: () => void; onCancel: () => void | Promise<void> }) {
-  const theme = useTheme();
   const { profile, save, reload } = useProfile();
   const [draft, setDraft] = useState(() => toDraft(profile));
-  const [step, setStep] = useState(onboarding ? profile?.onboarding_step ?? 0 : 0);
   const [avatar, setAvatar] = useState<AvatarSelection | null>(null);
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
   const [error, setError] = useState('');
   const [conflict, setConflict] = useState(false);
-  const [confirmCancel, setConfirmCancel] = useState(false);
   function update<K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]) { setDraft(current => ({ ...current, [key]: value })); setError(''); }
   async function pickAvatar() {
     if (working.current) return;
@@ -43,15 +43,13 @@ export function ProfileForm({ onboarding = false, onDone, onCancel }: { onboardi
   }
   async function submit() {
     if (working.current) return;
-    const validation = validateProfile(draft, onboarding && step < 2 ? step : undefined);
+    const validation = validateProfile(draft);
     if (validation) { setError(validation); return; }
     working.current = true; setBusy(true); setError(''); setConflict(false);
     try {
-      const complete = !onboarding || step === 2;
-      const nextStep = complete ? 2 : step + 1;
-      const saved = await save(draft, nextStep, complete, avatar);
+      const saved = await save(draft, true, avatar);
       setDraft(toDraft(saved)); setAvatar(null);
-      if (complete) onDone(); else setStep(nextStep);
+      onDone();
     } catch (reason) {
       setError(profileError(reason));
       setConflict(reason instanceof Error && reason.message.startsWith('Your profile changed'));
@@ -64,47 +62,314 @@ export function ProfileForm({ onboarding = false, onDone, onCancel }: { onboardi
     catch { setError('We couldn’t sign you out. Check your connection and try again.'); }
     finally { working.current = false; setBusy(false); }
   }
-  const show = (section: number) => !onboarding || step === section;
-  const titles = ['Make yourself at home.', 'What draws you outside?', 'Your kind of adventure.'];
-  return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <Screen title={onboarding ? titles[step] : 'Make it yours.'} eyebrow={onboarding ? `WELCOME · STEP ${step + 1} OF 3` : 'EDIT PROFILE'}>
-      {onboarding && <View accessibilityLabel={`Step ${step + 1} of 3`} style={{ flexDirection: 'row', gap: 8 }}>{[0, 1, 2].map(index => <View key={index} style={{ flex: 1, height: 5, borderRadius: 5, backgroundColor: index <= step ? theme.primary : theme.border }} />)}</View>}
-      {show(0) && <Card>
-        <View style={{ alignItems: 'center', gap: 12 }}><Avatar name={draft.display_name} path={draft.avatar_path} preview={avatar?.uri} />
-          <ThemedText type="small" themeColor="textSecondary">A photo is optional. Your initials work too.</ThemedText>
-          <Button disabled={busy} label="Choose photo" onPress={pickAvatar} />
-          {(draft.avatar_path || avatar) && <Button disabled={busy} label="Remove photo" onPress={() => { setAvatar(null); update('avatar_path', null); }} />}
+  if (!onboarding) {
+    return <KeyboardAvoidingView style={styles.editScreen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <AppHeader description="Make this yours" showBack onBack={() => { void cancel(); }} />
+      <ScrollView
+        automaticallyAdjustKeyboardInsets
+        contentContainerStyle={styles.editContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.avatarArea}>
+          <Avatar name={draft.display_name} path={draft.avatar_path} preview={avatar?.uri} size={69} />
         </View>
-        <Field label="Your name" value={draft.display_name} onChangeText={value => update('display_name', value)} maxLength={60} autoComplete="name" editable={!busy} placeholder="What should we call you?" />
-        <Field label="Username" value={draft.username} onChangeText={value => update('username', value.toLowerCase())} maxLength={24} autoCapitalize="none" autoCorrect={false} editable={!busy} placeholder="your_unique_name" help="3–24 letters, numbers, or underscores. You can change this later." />
-        <Field label="A little about you (optional)" multiline value={draft.bio} onChangeText={value => update('bio', value)} maxLength={240} editable={!busy} placeholder="Always searching for a quiet café…" help={`${draft.bio.length}/240 characters`} />
-      </Card>}
-      {show(1) && <Card>
-        <Field label="Home city" value={draft.city} onChangeText={value => update('city', value)} maxLength={80} editable={!busy} placeholder="e.g. Singapore" help="Your home base. Nearby discovery uses your device location separately." />
-        <ThemedText type="subtitle" style={{ fontSize: 24 }}>Follow your curiosity</ThemedText>
-        <ThemedText themeColor="textSecondary">Pick at least one interest. Choose as many as you like.</ThemedText>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>{INTERESTS.map(([id, label, icon]) => <Choice key={id} label={`${icon} ${label}`} selected={draft.interests.includes(id)} disabled={busy} onPress={() => update('interests', draft.interests.includes(id) ? draft.interests.filter(value => value !== id) : [...draft.interests, id])} />)}</View>
-      </Card>}
-      {show(2) && <>
-        <Card><ThemedText type="subtitle" style={{ fontSize: 24 }}>What feels comfortable?</ThemedText><ThemedText themeColor="textSecondary">Your usual spending preference for an outing.</ThemedText>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>{BUDGETS.map(([id, label, description]) => <Choice key={id} label={label} description={description} selected={draft.budget === id} disabled={busy} onPress={() => update('budget', id)} />)}</View>
-        </Card>
-        <Card><ThemedText type="subtitle" style={{ fontSize: 24 }}>How far would you go?</ThemedText><ThemedText themeColor="textSecondary">Your default discovery range. You can adjust it in Discover.</ThemedText>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <Button label="− 1 km" disabled={busy || draft.travel_radius_meters <= 1000} onPress={() => update('travel_radius_meters', draft.travel_radius_meters - 1000)} />
-            <ThemedText type="smallBold" accessibilityLiveRegion="polite">{draft.travel_radius_meters / 1000} km</ThemedText>
-            <Button label="+ 1 km" disabled={busy || draft.travel_radius_meters >= 50000} onPress={() => update('travel_radius_meters', draft.travel_radius_meters + 1000)} />
+
+        <View style={styles.photoActions}>
+          <EditButton disabled={busy} label="Choose Photo" onPress={() => { void pickAvatar(); }} />
+          <EditButton
+            disabled={busy}
+            label="Remove Photo"
+            onPress={() => { setAvatar(null); update('avatar_path', null); }}
+          />
+        </View>
+
+        <EditField
+          autoComplete="name"
+          editable={!busy}
+          label="Name"
+          maxLength={60}
+          onChangeText={value => update('display_name', value)}
+          value={draft.display_name}
+        />
+        <EditField
+          autoCapitalize="none"
+          autoCorrect={false}
+          editable={!busy}
+          label="Username"
+          maxLength={24}
+          onChangeText={value => update('username', value.toLowerCase())}
+          value={draft.username}
+        />
+        <EditField
+          editable={!busy}
+          label="Bio"
+          maxLength={240}
+          multiline
+          onChangeText={value => update('bio', value)}
+          value={draft.bio}
+        />
+
+        <View style={styles.editSpacer} />
+        {!!error && <Text accessibilityRole="alert" style={styles.editError}>{error}</Text>}
+        {conflict && <EditButton disabled={busy} label="Reload latest profile" onPress={() => { void reload(); }} />}
+        <EditButton disabled={busy || conflict} label={busy ? 'Saving…' : 'Save Changes'} onPress={() => { void submit(); }} />
+      </ScrollView>
+    </KeyboardAvoidingView>;
+  }
+  if (onboarding) {
+    return <KeyboardAvoidingView style={styles.onboardingScreen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.onboardingSafeArea}>
+        <StatusBar style="dark" />
+        <OnboardingHeader disabled={busy} onBack={() => { void cancel(); }} />
+        <ScrollView
+          automaticallyAdjustKeyboardInsets
+          contentContainerStyle={styles.onboardingContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.avatarArea}>
+            <Avatar name={draft.display_name} path={draft.avatar_path} preview={avatar?.uri} size={69} />
           </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{[5, 10, 25, 50].map(km => <Choice key={km} label={`${km} km`} selected={draft.travel_radius_meters === km * 1000} onPress={() => update('travel_radius_meters', km * 1000)} disabled={busy} />)}</View>
-        </Card>
-        <Card><ThemedText type="subtitle" style={{ fontSize: 24 }}>Leave room for discovery</ThemedText>{EXPLORATION.map(([id, label, description]) => <Choice key={id} label={label} description={description} selected={draft.exploration_style === id} onPress={() => update('exploration_style', id)} disabled={busy} />)}</Card>
-      </>}
-      {!!error && <ThemedText accessibilityRole="alert">{error}</ThemedText>}
-      {conflict && <Button label="Reload latest profile" disabled={busy} onPress={() => { void reload(); }} />}
-      <Button disabled={busy || conflict} label={busy ? 'Saving…' : onboarding ? step === 2 ? 'Let’s explore' : 'Save and continue' : 'Save changes'} onPress={submit} />
-      {onboarding && step > 0 && <Button disabled={busy} label="Back" onPress={() => { setStep(step - 1); setError(''); }} />}
-      {confirmCancel ? <Card><ThemedText>{onboarding ? 'Your completed steps are saved. Sign out now?' : 'Discard your unsaved changes?'}</ThemedText><Button label={onboarding ? 'Sign out' : 'Discard changes'} disabled={busy} onPress={cancel} /><Button label="Keep editing" disabled={busy} onPress={() => setConfirmCancel(false)} /></Card> : <Button disabled={busy} label={onboarding ? 'Finish later · sign out' : 'Cancel'} onPress={() => setConfirmCancel(true)} />}
-      {onboarding && <ThemedText type="small" themeColor="textSecondary">Each completed step is saved. You can edit these details in your profile anytime.</ThemedText>}
-    </Screen>
-  </KeyboardAvoidingView>;
+
+          <View style={styles.photoActions}>
+            <EditButton disabled={busy} label="Choose Photo" onPress={() => { void pickAvatar(); }} />
+            <EditButton
+              disabled={busy}
+              label="Remove Photo"
+              onPress={() => { setAvatar(null); update('avatar_path', null); }}
+            />
+          </View>
+
+          <EditField
+            autoComplete="name"
+            editable={!busy}
+            label="Name"
+            maxLength={60}
+            onChangeText={value => update('display_name', value)}
+            value={draft.display_name}
+          />
+          <EditField
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!busy}
+            label="Username"
+            maxLength={24}
+            onChangeText={value => update('username', value.toLowerCase())}
+            value={draft.username}
+          />
+          <EditField
+            editable={!busy}
+            label="Bio"
+            maxLength={240}
+            multiline
+            onChangeText={value => update('bio', value)}
+            value={draft.bio}
+          />
+
+          <View style={styles.onboardingSpacer} />
+          {!!error && <Text accessibilityRole="alert" style={styles.editError}>{error}</Text>}
+          {conflict && <EditButton disabled={busy} label="Reload latest profile" onPress={() => { void reload(); }} />}
+          <EditButton disabled={busy || conflict} label={busy ? 'Saving…' : 'Next'} onPress={() => { void submit(); }} />
+        </ScrollView>
+      </SafeAreaView>
+    </KeyboardAvoidingView>;
+  }
+  return null;
 }
+
+function OnboardingHeader({ disabled, onBack }: { disabled: boolean; onBack: () => void }) {
+  return <View style={styles.onboardingHeader}>
+    <View style={styles.onboardingHeaderRow}>
+      <Pressable
+        accessibilityLabel="Go back"
+        accessibilityRole="button"
+        disabled={disabled}
+        hitSlop={10}
+        onPress={onBack}
+        style={({ pressed }) => [styles.onboardingBackButton, disabled && styles.disabled, pressed && styles.pressed]}
+      >
+        <Image contentFit="contain" source={backIcon} style={styles.onboardingBackIcon} />
+      </Pressable>
+      <Text accessibilityRole="header" style={styles.onboardingBrand}>OutThere</Text>
+    </View>
+    <Text style={styles.onboardingDescription}>Getting Started</Text>
+  </View>;
+}
+
+function EditButton({ disabled, label, onPress }: { disabled?: boolean; label: string; onPress: () => void }) {
+  return <Pressable
+    accessibilityRole="button"
+    disabled={disabled}
+    onPress={onPress}
+    style={({ pressed }) => [styles.editButton, disabled && styles.disabled, pressed && styles.pressed]}
+  >
+    <Text style={styles.editButtonLabel}>{label}</Text>
+  </Pressable>;
+}
+
+type EditFieldProps = {
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  autoComplete?: 'name';
+  autoCorrect?: boolean;
+  editable: boolean;
+  label: string;
+  maxLength: number;
+  multiline?: boolean;
+  onChangeText: (value: string) => void;
+  value: string;
+};
+
+function EditField({ label, multiline = false, ...inputProps }: EditFieldProps) {
+  return <View style={styles.editField}>
+    <Text style={styles.editLabel}>{label}</Text>
+    <TextInput
+      accessibilityLabel={label}
+      multiline={multiline}
+      selectionColor="#000000"
+      style={[styles.editInput, multiline && styles.editBio]}
+      textAlignVertical={multiline ? 'top' : 'center'}
+      {...inputProps}
+    />
+  </View>;
+}
+
+const styles = StyleSheet.create({
+  onboardingScreen: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  onboardingSafeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  onboardingHeader: {
+    width: '100%',
+    gap: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    backgroundColor: '#FFFFFF',
+  },
+  onboardingHeaderRow: {
+    width: '100%',
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  onboardingBackButton: {
+    position: 'absolute',
+    top: 4,
+    left: 0,
+    width: 24,
+    height: 24,
+  },
+  onboardingBackIcon: {
+    width: 24,
+    height: 24,
+  },
+  onboardingBrand: {
+    color: '#000000',
+    fontFamily: Fonts.mono,
+    fontSize: 20,
+    fontWeight: '400',
+    lineHeight: 24,
+    textAlign: 'center',
+  },
+  onboardingDescription: {
+    color: '#000000',
+    fontSize: 10,
+    fontWeight: '600',
+    lineHeight: 12,
+    textAlign: 'center',
+  },
+  onboardingContent: {
+    width: '100%',
+    maxWidth: 402,
+    flexGrow: 1,
+    alignSelf: 'center',
+    gap: 10,
+    padding: 10,
+  },
+  onboardingSpacer: {
+    minHeight: 24,
+    flexGrow: 1,
+  },
+  editScreen: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  editContent: {
+    width: '100%',
+    maxWidth: 720,
+    flexGrow: 1,
+    alignSelf: 'center',
+    gap: 10,
+    padding: 10,
+  },
+  avatarArea: {
+    minHeight: 89,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  editButton: {
+    minHeight: 37,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#000000',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  editButtonLabel: {
+    color: '#000000',
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 15,
+    textAlign: 'center',
+  },
+  pressed: {
+    opacity: 0.55,
+  },
+  disabled: {
+    opacity: 0.45,
+  },
+  editField: {
+    gap: 10,
+  },
+  editLabel: {
+    color: '#000000',
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 15,
+  },
+  editInput: {
+    height: 42,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#F3F4F6',
+    color: '#000000',
+    fontSize: 16,
+    lineHeight: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 0,
+  },
+  editBio: {
+    height: 84,
+    paddingTop: 10,
+    paddingBottom: 10,
+  },
+  editSpacer: {
+    minHeight: 24,
+    flexGrow: 1,
+  },
+  editError: {
+    color: '#B42318',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+});

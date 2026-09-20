@@ -29,6 +29,7 @@ export type FeedPost = {
   placeCategory: string | null;
   placeAddress: string | null;
   placePriceLevel: string | null;
+  placeRegularOpeningHours: string[];
   photoUrls: string[];
   likeCount: number;
   likedByMe: boolean;

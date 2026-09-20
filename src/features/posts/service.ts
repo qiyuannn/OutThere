@@ -87,6 +87,7 @@ type FeedPostRow = {
   place_category: string | null;
   place_address: string | null;
   place_price_level: string | null;
+  regular_opening_hours?: unknown;
   like_count: number | string;
   liked_by_me: boolean;
 };
@@ -103,11 +104,12 @@ async function getSignedUrls(bucket: 'avatars' | 'post-photos', paths: string[])
   return new Map(data.flatMap((item) => item.path && item.signedUrl ? [[item.path, item.signedUrl] as const] : []));
 }
 
-export async function getFeedPage(cursor: FeedCursor | null = null): Promise<FeedPage> {
+async function getPostPage(onlyCurrentUser: boolean, cursor: FeedCursor | null): Promise<FeedPage> {
   const { data, error } = await client().rpc('get_feed_posts', {
     p_before_created_at: cursor?.createdAt ?? null,
     p_before_id: cursor?.id ?? null,
     p_limit: FEED_PAGE_SIZE,
+    p_only_current_user: onlyCurrentUser,
   });
   if (error) throw error;
 
@@ -130,6 +132,9 @@ export async function getFeedPage(cursor: FeedCursor | null = null): Promise<Fee
     placeCategory: row.place_category,
     placeAddress: row.place_address,
     placePriceLevel: row.place_price_level,
+    placeRegularOpeningHours: Array.isArray(row.regular_opening_hours)
+      ? row.regular_opening_hours.filter((value): value is string => typeof value === 'string')
+      : [],
     photoUrls: (row.photo_paths ?? []).flatMap((path) => {
       const url = postPhotoUrls.get(path);
       return url ? [url] : [];
@@ -145,6 +150,14 @@ export async function getFeedPage(cursor: FeedCursor | null = null): Promise<Fee
       ? { createdAt: last.created_at, id: Number(last.id) }
       : null,
   };
+}
+
+export function getFeedPage(cursor: FeedCursor | null = null): Promise<FeedPage> {
+  return getPostPage(false, cursor);
+}
+
+export function getMyPostsPage(cursor: FeedCursor | null = null): Promise<FeedPage> {
+  return getPostPage(true, cursor);
 }
 
 export async function setPostLiked(postId: number, userId: string, liked: boolean): Promise<void> {

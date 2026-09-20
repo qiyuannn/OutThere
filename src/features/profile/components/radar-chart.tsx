@@ -13,7 +13,14 @@ export interface RadarChartItem {
 }
 
 interface RadarChartProps {
+  accentColor?: string;
+  backgroundColor?: string;
+  gridColor?: string;
   items: readonly RadarChartItem[];
+  labelColor?: string;
+  showAllPoints?: boolean;
+  showLegend?: boolean;
+  showPoints?: boolean;
   size?: number;
 }
 
@@ -38,8 +45,22 @@ const SHORT_LABELS: Record<string, string> = {
   social_nightlife_venues: 'Nightlife',
 };
 
-export function RadarChart({ items, size = 320 }: RadarChartProps) {
+export function RadarChart({
+  accentColor,
+  backgroundColor,
+  gridColor,
+  items,
+  labelColor,
+  showAllPoints = false,
+  showLegend = true,
+  showPoints = true,
+  size = 320,
+}: RadarChartProps) {
   const theme = useTheme();
+  const accent = accentColor ?? theme.primary;
+  const background = backgroundColor ?? theme.background;
+  const grid = gridColor ?? theme.border;
+  const labels = labelColor ?? theme.textSecondary;
 
   const chartData = useMemo(() => {
     const count = items.length;
@@ -141,7 +162,7 @@ export function RadarChart({ items, size = 320 }: RadarChartProps) {
             key={`grid-${idx}`}
             points={gp.points}
             fill="none"
-            stroke={theme.border}
+            stroke={grid}
             strokeWidth={idx === chartData.gridPolygons.length - 1 ? '1.5' : '1'}
             opacity={idx === chartData.gridPolygons.length - 1 ? 0.9 : 0.45}
           />
@@ -155,7 +176,7 @@ export function RadarChart({ items, size = 320 }: RadarChartProps) {
             y1={spoke.y1}
             x2={spoke.x2}
             y2={spoke.y2}
-            stroke={theme.border}
+            stroke={grid}
             strokeWidth="1"
             opacity={0.5}
           />
@@ -164,28 +185,28 @@ export function RadarChart({ items, size = 320 }: RadarChartProps) {
         {/* Data polygon with translucent fill and accent stroke */}
         <Polygon
           points={chartData.dataPolygonPoints}
-          fill={theme.primary}
+          fill={accent}
           fillOpacity={0.22}
-          stroke={theme.primary}
+          stroke={accent}
           strokeWidth="2.5"
           strokeLinejoin="round"
         />
 
         {/* Vertex markers for points with affinity */}
-        {chartData.dataPointsArray.map((pt, idx) => {
-          if (pt.weight <= 0) return null;
+        {showPoints ? chartData.dataPointsArray.map((pt, idx) => {
+          if (!showAllPoints && pt.weight <= 0) return null;
           return (
             <Circle
               key={`dot-${idx}`}
               cx={pt.x}
               cy={pt.y}
               r={4}
-              fill={theme.primary}
-              stroke={theme.background}
+              fill={accent}
+              stroke={background}
               strokeWidth="1.5"
             />
           );
-        })}
+        }) : null}
 
         {/* Outer Axis Category Labels */}
         {chartData.labels.map((lbl) => (
@@ -196,7 +217,7 @@ export function RadarChart({ items, size = 320 }: RadarChartProps) {
             textAnchor={lbl.textAnchor}
             fontSize="10.5"
             fontWeight="600"
-            fill={theme.textSecondary}
+            fill={labels}
           >
             {lbl.text}
           </SvgText>
@@ -204,12 +225,12 @@ export function RadarChart({ items, size = 320 }: RadarChartProps) {
       </Svg>
 
       {/* Legend row matching Hevy screenshot */}
-      <View style={styles.legendRow}>
-        <View style={[styles.legendDot, { backgroundColor: theme.primary }]} />
-        <ThemedText type="smallBold" themeColor="textSecondary" style={styles.legendText}>
-          Current
-        </ThemedText>
-      </View>
+      {showLegend ? (
+        <View style={styles.legendRow}>
+          <View style={[styles.legendDot, { backgroundColor: accent }]} />
+          <ThemedText type="smallBold" themeColor="textSecondary" style={styles.legendText}>Current</ThemedText>
+        </View>
+      ) : null}
     </View>
   );
 }

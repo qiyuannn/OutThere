@@ -49,7 +49,7 @@ export function SwipeableRecommendation({ place, disabled, onChoice }: Props) {
     const offscreen = width + 160;
     const target = choice === 'pass'
       ? { x: -offscreen, y: 0 }
-      : choice === 'go'
+      : choice === 'details'
         ? { x: offscreen, y: 0 }
         : { x: 0, y: height + 160 };
 
@@ -74,7 +74,7 @@ export function SwipeableRecommendation({ place, disabled, onChoice }: Props) {
       || (gesture.dy >= FLICK_DISTANCE && gesture.vy >= FLICK_VELOCITY);
 
     if (horizontal && left) completeChoice('pass');
-    else if (horizontal && right) completeChoice('go');
+    else if (horizontal && right) completeChoice('details');
     else if (!horizontal && down) completeChoice('save');
     else resetPosition();
   }, [completeChoice, resetPosition]);
@@ -118,7 +118,7 @@ export function SwipeableRecommendation({ place, disabled, onChoice }: Props) {
     outputRange: [1, 0, 0],
     extrapolate: 'clamp',
   });
-  const goOpacity = position.x.interpolate({
+  const detailsOpacity = position.x.interpolate({
     inputRange: [0, 24, SWIPE_DISTANCE],
     outputRange: [0, 0, 1],
     extrapolate: 'clamp',
@@ -132,7 +132,7 @@ export function SwipeableRecommendation({ place, disabled, onChoice }: Props) {
   const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
     if (event.nativeEvent.actionName === 'pass') completeChoice('pass');
     if (event.nativeEvent.actionName === 'save') completeChoice('save');
-    if (event.nativeEvent.actionName === 'go') completeChoice('go');
+    if (event.nativeEvent.actionName === 'details') completeChoice('details');
   };
 
   return <View style={styles.container}>
@@ -150,12 +150,12 @@ export function SwipeableRecommendation({ place, disabled, onChoice }: Props) {
           }]}>
             <ThemedText type="smallBold" themeColor="textSecondary" style={styles.choiceText}>PASS</ThemedText>
           </Animated.View>
-          <Animated.View pointerEvents="none" style={[styles.choiceBadge, styles.goBadge, {
+          <Animated.View pointerEvents="none" style={[styles.choiceBadge, styles.detailsBadge, {
             backgroundColor: theme.accent,
             borderColor: theme.onAccent,
-            opacity: goOpacity,
+            opacity: detailsOpacity,
           }]}>
-            <ThemedText type="smallBold" style={[styles.choiceText, { color: theme.onAccent }]}>LET’S GO</ThemedText>
+            <ThemedText type="smallBold" style={[styles.choiceText, { color: theme.onAccent }]}>SAVE &amp; VIEW</ThemedText>
           </Animated.View>
           <Animated.View pointerEvents="none" style={[styles.choiceBadge, styles.saveBadge, {
             backgroundColor: theme.backgroundElement,
@@ -172,16 +172,16 @@ export function SwipeableRecommendation({ place, disabled, onChoice }: Props) {
       accessible
       accessibilityRole="adjustable"
       accessibilityLabel={`Choose what to do with ${place.name}`}
-      accessibilityHint="Swipe left to pass, down to save, or right to go."
+      accessibilityHint="Swipe left to pass, down to save, or right to save and view details."
       accessibilityActions={[
         { name: 'pass', label: 'Pass' },
         { name: 'save', label: 'Save' },
-        { name: 'go', label: 'Go' },
+        { name: 'details', label: 'Save and view details' },
       ]}
       onAccessibilityAction={handleAccessibilityAction}
       style={[styles.guide, { opacity: disabled ? 0.45 : 1 }]}
     >
-      <ThemedText style={styles.guideText}>SWIPE LEFT TO PASS   ·   DOWN TO SAVE   ·   RIGHT TO GO</ThemedText>
+      <ThemedText style={styles.guideText}>SWIPE LEFT TO PASS   ·   DOWN TO SAVE   ·   RIGHT TO SAVE &amp; VIEW</ThemedText>
     </View>
   </View>;
 }
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   passBadge: { top: 24, right: 24, transform: [{ rotate: '7deg' }] },
-  goBadge: { top: 24, left: 24, transform: [{ rotate: '-7deg' }] },
+  detailsBadge: { top: 24, left: 24, transform: [{ rotate: '-7deg' }] },
   saveBadge: { top: 24, alignSelf: 'center' },
   choiceText: { fontSize: 12, lineHeight: 16, letterSpacing: 1.2 },
   guide: {

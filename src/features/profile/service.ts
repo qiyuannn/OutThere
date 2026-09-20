@@ -2,7 +2,13 @@ import { decode } from 'base64-arraybuffer';
 import { supabase } from '@/lib/supabase';
 import { normalizeProfile, type AvatarSelection, type Profile, type ProfileDraft } from './model';
 function client() { if (!supabase) throw new Error('Supabase is not configured.'); return supabase; }
-const fields = 'user_id,username,display_name,bio,city,interests,budget,travel_radius_meters,exploration_style,avatar_path,onboarding_step,onboarding_completed,version,created_at,updated_at';
+const fields = 'user_id,username,display_name,bio,avatar_path,onboarding_completed,version,created_at,updated_at';
+
+export type VisitedPlace = { googlePlaceId: string; latitude: number; longitude: number; name: string; rating: number };
+export type ProfileVisitSummary = { averageRating: number | null; places: VisitedPlace[]; visitedCount: number };
+export type DistributionStatistics = { averageRating: number | null; placesRated: number; weights: Record<string, number> };
+type VisitPlaceRow = { display_name: string | null; latitude: number | null; longitude: number | null };
+type VisitRow = { google_place_id: string; rating: number | string; places: VisitPlaceRow | VisitPlaceRow[] | null };
 export async function loadProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await client().from('profiles').select(fields).eq('user_id', userId).maybeSingle();
   if (error) throw error;
@@ -14,7 +20,33 @@ export async function avatarUrl(path: string | null): Promise<string | null> {
   if (error) return null;
   return data.signedUrl;
 }
-export async function saveProfile(userId: string, current: Profile | null, draft: ProfileDraft, step: number, completed: boolean, avatar: AvatarSelection | null): Promise<Profile> {
+
+export async function loadProfileVisitSummary(userId: string): Promise<ProfileVisitSummary> {
+  const pageSize = 500;
+  const rows: VisitRow[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await client().from('user_place_ratings')
+      .select('google_place_id,rating,places(display_name,latitude,longitude)')
+      .eq('user_id', userId).order('rated_at', { ascending: false }).range(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = (data ?? []) as VisitRow[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
+
+  let ratingTotal = 0;
+  let ratingCount = 0;
+  const places = rows.flatMap((row): VisitedPlace[] => {
+    const rating = typeof row.rating === 'number' ? row.rating : Number.parseFloat(row.rating);
+    if (Number.isFinite(rating)) { ratingTotal += rating; ratingCount += 1; }
+    const place = Array.isArray(row.places) ? row.places[0] : row.places;
+    if (!place || typeof place.latitude !== 'number' || typeof place.longitude !== 'number') return [];
+    return [{ googlePlaceId: row.google_place_id, latitude: place.latitude, longitude: place.longitude,
+      name: place.display_name?.trim() || 'Visited place', rating: Number.isFinite(rating) ? rating : 0 }];
+  });
+  return { averageRating: ratingCount ? ratingTotal / ratingCount : null, places, visitedCount: rows.length };
+}
+export async function saveProfile(userId: string, current: Profile | null, draft: ProfileDraft, completed: boolean, avatar: AvatarSelection | null): Promise<Profile> {
   const db = client();
   let uploaded: string | null = null;
   let committed = false;
@@ -28,7 +60,7 @@ export async function saveProfile(userId: string, current: Profile | null, draft
     }
     const normalized = normalizeProfile(draft);
     const row = { ...normalized, username: normalized.username || null, avatar_path: uploaded ?? normalized.avatar_path,
-      user_id: userId, onboarding_step: step, onboarding_completed: completed || !!current?.onboarding_completed };
+      user_id: userId, onboarding_completed: completed || !!current?.onboarding_completed };
     const query = current
       ? db.from('profiles').update(row).eq('user_id', userId).eq('version', current.version)
       : db.from('profiles').insert(row);
@@ -64,6 +96,36 @@ export async function getUserCategoryWeights(
     weights[row.category_key] = Number.isFinite(val) ? Math.max(0, Math.min(1, Math.round(val * 100) / 100)) : 0;
   }
   return weights;
+}
+
+export async function loadDistributionStatistics(
+  userId: string,
+  mode: 'food' | 'activities',
+): Promise<DistributionStatistics> {
+  const pageSize = 500;
+  const ratings: number[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await client()
+      .from('user_place_ratings')
+      .select('rating')
+      .eq('user_id', userId)
+      .eq('mode', mode)
+      .order('rated_at', { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = (data ?? []) as Array<{ rating: number | string }>;
+    for (const row of page) {
+      const rating = typeof row.rating === 'number' ? row.rating : Number.parseFloat(row.rating);
+      if (Number.isFinite(rating)) ratings.push(rating);
+    }
+    if (page.length < pageSize) break;
+  }
+  const weights = await getUserCategoryWeights(userId, mode);
+  return {
+    averageRating: ratings.length ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : null,
+    placesRated: ratings.length,
+    weights,
+  };
 }
 
 export async function updateCategoryWeight(
