@@ -1,4 +1,6 @@
 import { Tabs } from 'expo-router';
+import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
+import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomNavigationIcon, type MainTabName } from '@/components/bottom-navigation';
@@ -11,6 +13,24 @@ const tabs: { name: MainTabName; title: string }[] = [
   { name: 'profile', title: 'Profile' },
 ];
 
+function GlassTabBackground() {
+  const liquidGlass = Platform.OS === 'ios' && isGlassEffectAPIAvailable();
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {liquidGlass ? (
+        <GlassView
+          colorScheme="light"
+          glassEffectStyle="regular"
+          isInteractive={false}
+          style={styles.glassSurface}
+          tintColor="rgba(246, 250, 255, 0.46)"
+        />
+      ) : <View style={styles.fallbackSurface} />}
+      <View style={styles.glassEdge} />
+    </View>
+  );
+}
+
 export default function AppTabs() {
   const insets = useSafeAreaInsets();
 
@@ -20,26 +40,32 @@ export default function AppTabs() {
         headerShown: false,
         tabBarShowLabel: false,
         tabBarActiveTintColor: '#000000',
-        tabBarInactiveTintColor: '#000000',
+        tabBarInactiveTintColor: '#4F565D',
         tabBarHideOnKeyboard: true,
+        tabBarBackground: () => <GlassTabBackground />,
         tabBarStyle: {
-          height: 44 + insets.bottom,
+          height: 58,
+          marginHorizontal: 20,
+          marginBottom: Math.max(insets.bottom, 12),
+          paddingHorizontal: 8,
           paddingTop: 0,
-          paddingBottom: insets.bottom,
-          paddingHorizontal: 11,
-          backgroundColor: '#FFFFFF',
-          borderTopColor: 'rgba(0, 0, 0, 0.1)',
-          borderTopWidth: 0.5,
-          elevation: 0,
+          paddingBottom: 0,
+          backgroundColor: 'transparent',
+          borderTopWidth: 0,
+          borderRadius: 30,
+          shadowColor: '#101820',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: Platform.OS === 'ios' ? 0.18 : 0,
+          shadowRadius: 18,
+          elevation: 12,
         },
         tabBarItemStyle: {
-          height: 44,
-          maxWidth: 76,
+          height: 58,
           padding: 0,
         },
         tabBarIconStyle: {
-          width: 24,
-          height: 24,
+          width: 46,
+          height: 46,
           margin: 0,
         },
       }}
@@ -51,7 +77,7 @@ export default function AppTabs() {
           options={{
             title,
             tabBarAccessibilityLabel: title,
-            tabBarIcon: () => <BottomNavigationIcon name={name} />,
+            tabBarIcon: ({ focused }) => <BottomNavigationIcon active={focused} name={name} />,
           }}
         />
       ))}
@@ -61,3 +87,21 @@ export default function AppTabs() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  glassSurface: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 30,
+  },
+  fallbackSurface: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 30,
+    backgroundColor: 'rgba(242, 246, 250, 0.88)',
+  },
+  glassEdge: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.82)',
+  },
+});
