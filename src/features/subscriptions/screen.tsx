@@ -44,6 +44,11 @@ export default function SubscriptionScreen() {
         <ThemedText type="small" selectable>Support ID: {billing.userId}</ThemedText>
       </Card>
     </>}
+    <Card>
+      <ThemedText type="subtitle">Policies</ThemedText>
+      <Button label="Privacy Policy" onPress={() => router.push('/profile/privacy-policy')} />
+      <Button label="Terms of Use" onPress={() => router.push('/profile/terms')} />
+    </Card>
     <Button label="Back to profile" onPress={() => router.replace('/profile')} />
   </Screen>;
 }

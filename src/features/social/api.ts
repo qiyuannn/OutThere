@@ -28,6 +28,11 @@ export async function mutateSocial(action: SocialMutation, payload: Record<strin
   const { error } = await client().rpc('social_api', { action, payload });
   if (error) throw error;
   invalidateSocial();
+  if (['request', 'accept', 'like', 'comment'].includes(action)) {
+    // The social write has already succeeded. Push is best-effort and must not
+    // make an interaction appear to fail or cause the client to retry it.
+    void client().functions.invoke('social-push', { body: {} });
+  }
 }
 
 export async function readSocialSummary(): Promise<SocialSummary> {

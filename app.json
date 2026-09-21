@@ -53,6 +53,13 @@
           "microphonePermission": false
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "color": "#111111",
+          "defaultChannel": "social"
+        }
+      ],
       "./plugins/with-revenuecat"
     ],
     "experiments": {

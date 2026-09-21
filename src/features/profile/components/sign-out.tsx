@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { authErrorMessage } from '@/lib/auth-validation';
+import { disablePush } from '@/features/notifications/push-service';
 
 export function SignOutButton() {
   const [busy, setBusy] = useState(false);
@@ -12,6 +13,7 @@ export function SignOutButton() {
     setBusy(true);
     setError('');
     try {
+      try { await disablePush(); } catch { /* Sign-out must still succeed if token cleanup is offline. */ }
       const result = await supabase.auth.signOut({ scope: 'local' });
       if (result.error) throw result.error;
     } catch (reason) {

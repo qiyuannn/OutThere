@@ -7,6 +7,7 @@ import { SubscriptionProvider } from '@/providers/subscription-provider';
 import { ProfileProvider } from '@/providers/profile-provider';
 import { BackendProvider } from '@/providers/backend-provider';
 import { AuthProvider, useAuth } from '@/providers/auth-provider';
+import { PushListener } from '../features/notifications/push-listener';
 export { ErrorBoundary } from 'expo-router';
 
 function Navigation() {
@@ -97,6 +98,6 @@ export default function RootLayout() {
   const colors = useTheme();
   const base = dark ? DarkTheme : DefaultTheme;
   return <SafeAreaProvider><ThemeProvider value={{ ...base, colors: { ...base.colors, primary: colors.primary, background: colors.background, card: colors.backgroundElement, text: colors.text, border: colors.border } }}>
-    <BackendProvider><AuthProvider><SubscriptionProvider><ProfileProvider><StatusBar style={dark ? 'light' : 'dark'} /><Navigation /></ProfileProvider></SubscriptionProvider></AuthProvider></BackendProvider>
+    <BackendProvider><AuthProvider><SubscriptionProvider><ProfileProvider><StatusBar style={dark ? 'light' : 'dark'} /><PushListener /><Navigation /></ProfileProvider></SubscriptionProvider></AuthProvider></BackendProvider>
   </ThemeProvider></SafeAreaProvider>;
 }
