@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import type { PropsWithChildren } from 'react';
-import { Button, Card, Screen } from '@/components/foundation';
+import { Card, Screen } from '@/components/foundation';
 import { ThemedText } from '@/components/themed-text';
 
 const Row = ({ title, children }: PropsWithChildren<{ title: string }>) => <Card>
@@ -9,8 +9,7 @@ const Row = ({ title, children }: PropsWithChildren<{ title: string }>) => <Card
 </Card>;
 
 export default function PrivacyPolicyScreen() {
-  return <Screen title="Privacy Policy" headerDescription="Privacy Policy">
-    <Button label="Back" onPress={() => router.canGoBack() ? router.back() : router.replace('/profile/account')} />
+  return <Screen title="Privacy Policy" headerDescription="Privacy Policy" showBack onBack={() => router.canGoBack() ? router.back() : router.replace('/profile/account')}>
     <ThemedText type="small" themeColor="textSecondary">Effective 21 September 2026</ThemedText>
     <Row title="Information OutThere uses">Your account email and sign-in data; profile name, username, bio and avatar; saved places, ratings and notes; friend relationships, posts, likes, comments, blocks and reports; subscription status; and a push token only when you enable notifications.</Row>
     <Row title="Location and place search">Your device location is requested only after permission and is used to search nearby places. Search requests are processed through OutThere’s backend and Google Places. OutThere does not save your precise device location to your profile.</Row>

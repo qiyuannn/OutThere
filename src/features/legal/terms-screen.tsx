@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import type { PropsWithChildren } from 'react';
-import { Button, Card, Screen } from '@/components/foundation';
+import { Card, Screen } from '@/components/foundation';
 import { ThemedText } from '@/components/themed-text';
 
 const Row = ({ title, children }: PropsWithChildren<{ title: string }>) => <Card>
@@ -9,8 +9,7 @@ const Row = ({ title, children }: PropsWithChildren<{ title: string }>) => <Card
 </Card>;
 
 export default function TermsScreen() {
-  return <Screen title="Terms of Use" headerDescription="Terms of Use">
-    <Button label="Back" onPress={() => router.canGoBack() ? router.back() : router.replace('/profile/account')} />
+  return <Screen title="Terms of Use" headerDescription="Terms of Use" showBack onBack={() => router.canGoBack() ? router.back() : router.replace('/profile/account')}>
     <ThemedText type="small" themeColor="textSecondary">Effective 21 September 2026</ThemedText>
     <Row title="Using OutThere">Use accurate account information, keep your sign-in secure and use the app only in lawful ways. Place details can change; confirm opening hours, prices, accessibility and safety with the venue before visiting.</Row>
     <Row title="Social content">You remain responsible for ratings, notes, comments and profile content you share. Do not post harassment, threats, spam, impersonation, illegal content or another person’s private information. Friends-only sharing limits the intended audience but recipients can still capture what they see.</Row>

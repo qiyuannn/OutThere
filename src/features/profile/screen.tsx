@@ -4,14 +4,12 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/app-header';
-import { SubscriptionCard } from '@/features/subscriptions/profile-card';
 import { readSocialSummary } from '@/features/social/api';
 import { useNetworkStatus } from '@/features/social/hooks';
 import type { SocialSummary } from '@/features/social/types';
 import { useAuth } from '@/providers/auth-provider';
 import { useProfile } from '@/providers/profile-provider';
 import { Avatar } from './components/avatar';
-import { SignOutButton } from './components/sign-out';
 import { VisitedPlacesMap } from './components/visited-places-map';
 import { loadProfileVisitSummary, type ProfileVisitSummary } from './service';
 import { SectionHeading, StatusBanner } from '@/components/ui-system';
@@ -103,14 +101,6 @@ export default function ProfileScreen() {
           {loadingSummary ? <View style={styles.mapLoading}><ActivityIndicator color="#000000" /></View>
             : <VisitedPlacesMap places={summary.places} />}
         </View>
-
-        <SectionHeading eyebrow="Account" title="More for you" />
-        <View style={styles.menuGrid}>
-          <ProfileButton label="Friends" onPress={() => router.push('/feed/people')} />
-          <ProfileButton label="Privacy & sharing" onPress={() => router.push('/feed/privacy')} />
-        </View>
-        <SubscriptionCard />
-        <SignOutButton />
       </ScrollView>
     </SafeAreaView>
   );
@@ -160,5 +150,4 @@ const styles = StyleSheet.create({
   tabLabel: { color: '#637068', fontSize: 11, lineHeight: 14, fontWeight: '600' },
   mapSection: { gap: 12 },
   mapLoading: { width: '100%', height: 330, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6', overflow: 'hidden' },
-  menuGrid: { flexDirection: 'row', gap: 10 },
 });

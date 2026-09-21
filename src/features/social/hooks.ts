@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useNetworkState } from 'expo-network';
-import { mutateSocial, readSocial, subscribeSocial } from './api';
+import { mutateSocial, readSocial, readSocialSummary, subscribeSocial } from './api';
+import { useAuth } from '@/providers/auth-provider';
 import { hasNextSocialPage, mergeSocialPage, socialError, socialPagePayload, visiblePage } from './model';
 import type { SocialMutation, SocialReadAction } from './types';
 
@@ -93,4 +94,34 @@ export function useSocialMutation() {
     finally { setBusy(false); }
   }, [busy, offline]);
   return { busy, error, offline, clearError: () => setError(''), run };
+}
+
+export function useUnreadNotificationsCount() {
+  const { session } = useAuth();
+  const { offline } = useNetworkStatus();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const refresh = useCallback(async () => {
+    if (!session?.user.id || offline) return;
+    try {
+      const summary = await readSocialSummary();
+      setUnreadCount(summary.unread);
+    } catch {
+      // Non-blocking
+    }
+  }, [offline, session?.user.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refresh();
+    }, [refresh])
+  );
+
+  useEffect(() => {
+    return subscribeSocial(() => {
+      void refresh();
+    });
+  }, [refresh]);
+
+  return { unreadCount, setUnreadCount, refresh };
 }

@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Button, Card, Screen } from '@/components/foundation';
 import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/providers/auth-provider';
-import { PersonRow, SocialBack, SocialError, SocialField, SocialPostCard, SocialState, usePostPlaces } from './components';
+import { PersonRow, SocialError, SocialField, SocialPostCard, SocialState, usePostPlaces } from './components';
 import { useSocialList, useSocialMutation, useSocialQuery } from './hooks';
 import type { SocialComment, SocialPost } from './types';
 
@@ -32,8 +32,12 @@ export default function SocialPostScreen() {
     { text: 'Delete', style: 'destructive', onPress: () => { void mutation.run('delete_post', { post_id: id }).then((ok) => { if (ok) router.replace('/feed'); }); } },
   ]);
 
-  return <Screen title="Conversation" headerDescription="Conversation">
-    <SocialBack />
+  return <Screen
+    title="Conversation"
+    headerDescription="Conversation"
+    showBack
+    onBack={() => (router.canGoBack() ? router.back() : router.replace('/feed'))}
+  >
     <SocialState loading={post.loading} error={post.error} offline={post.offline} empty={false} onRetry={post.refresh} />
     {post.data && <>
       <SocialPostCard post={post.data} place={places[post.data.google_place_id]} detail />

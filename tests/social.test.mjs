@@ -33,10 +33,11 @@ test('friends use offset pagination while notifications and comments use stable 
 });
 
 test('social summary accepts Postgres JSON counts and guards malformed values', () => {
-  assert.deepEqual(normalizeSocialSummary({ enabled: true, friends: '4', incoming: 2 }), {
-    enabled: true, friends: 4, incoming: 2, outgoing: 0, unread: 0,
+  assert.deepEqual(normalizeSocialSummary({ enabled: true, friends: '4', incoming: 2, unread: 5 }), {
+    enabled: true, friends: 4, incoming: 2, outgoing: 0, unread: 5,
   });
   assert.equal(normalizeSocialSummary({ unread: -2 }).unread, 0);
+  assert.equal(normalizeSocialSummary({ unread: '12' }).unread, 12);
   assert.equal(normalizeSocialSummary({ friends: 'not-a-number' }).friends, 0);
 });
 

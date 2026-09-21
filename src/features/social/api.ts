@@ -41,6 +41,26 @@ export async function readSocialSummary(): Promise<SocialSummary> {
   return normalizeSocialSummary(data as Partial<SocialSummary> | null);
 }
 
+export async function markAllNotificationsRead(ids?: string[]): Promise<void> {
+  if (ids && ids.length > 0) {
+    try {
+      await Promise.allSettled(
+        ids.map((id) => client().rpc('social_api', { action: 'mark_read', payload: { id } }))
+      );
+      invalidateSocial();
+      return;
+    } catch {
+      // Best-effort
+    }
+  }
+  try {
+    await client().rpc('social_api', { action: 'mark_read', payload: {} });
+    invalidateSocial();
+  } catch {
+    // Best-effort
+  }
+}
+
 export async function submitSocialReport(target: ReportTarget, id: string, reason: ReportReason, details: string): Promise<void> {
   const { error } = await client().rpc('social_report', {
     p_target_type: target,

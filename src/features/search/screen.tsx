@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { router, type Href } from 'expo-router';
-import { FlatList, Keyboard, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { FlatList, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/app-header';
@@ -102,10 +103,53 @@ export function SearchScreen() {
           activeFilterCount={activeFilterCount}
         />
         <ScrollView horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickFilters}>
-          <QuickFilter active={filters.mode === 'food'} label="Food" onPress={() => setFilters((current) => ({ ...current, mode: current.mode === 'food' ? 'all' : 'food', category: '' }))} />
-          <QuickFilter active={filters.mode === 'activities'} label="Activities" onPress={() => setFilters((current) => ({ ...current, mode: current.mode === 'activities' ? 'all' : 'activities', category: '' }))} />
-          <QuickFilter active={filters.openNow} label="Open now" onPress={() => setFilters((current) => ({ ...current, openNow: !current.openNow }))} />
-          <QuickFilter active={filters.sort === 'distance'} label="Nearest" onPress={() => setFilters((current) => ({ ...current, sort: current.sort === 'distance' ? 'relevance' : 'distance' }))} />
+          <QuickFilter
+            active={filters.mode === 'food'}
+            label="🍕 Food"
+            onPress={() => setFilters((current) => ({ ...current, mode: current.mode === 'food' ? 'all' : 'food', category: '' }))}
+          />
+          <QuickFilter
+            active={filters.mode === 'activities'}
+            label="🎯 Activities"
+            onPress={() => setFilters((current) => ({ ...current, mode: current.mode === 'activities' ? 'all' : 'activities', category: '' }))}
+          />
+          <QuickFilter
+            active={query.toLowerCase() === 'coffee'}
+            label="☕ Coffee"
+            onPress={() => {
+              const next = query.toLowerCase() === 'coffee' ? '' : 'Coffee';
+              setQuery(next);
+              if (next) submit(next);
+            }}
+          />
+          <QuickFilter
+            active={query.toLowerCase() === 'cocktails'}
+            label="🍸 Cocktails"
+            onPress={() => {
+              const next = query.toLowerCase() === 'cocktails' ? '' : 'Cocktails';
+              setQuery(next);
+              if (next) submit(next);
+            }}
+          />
+          <QuickFilter
+            active={query.toLowerCase() === 'parks'}
+            label="🌳 Parks"
+            onPress={() => {
+              const next = query.toLowerCase() === 'parks' ? '' : 'Parks';
+              setQuery(next);
+              if (next) submit(next);
+            }}
+          />
+          <QuickFilter
+            active={filters.openNow}
+            label="⚡ Open now"
+            onPress={() => setFilters((current) => ({ ...current, openNow: !current.openNow }))}
+          />
+          <QuickFilter
+            active={filters.sort === 'distance'}
+            label="📍 Nearest"
+            onPress={() => setFilters((current) => ({ ...current, sort: current.sort === 'distance' ? 'relevance' : 'distance' }))}
+          />
         </ScrollView>
 
         {autocompleteVisible ? (
@@ -130,7 +174,7 @@ export function SearchScreen() {
               ListEmptyComponent={
                 search.recentPlacesLoading
                   ? <View style={styles.skeletons} accessibilityLabel="Loading recent places"><SkeletonBlock height={82} /><SkeletonBlock height={82} /></View>
-                  : <View style={styles.emptyCard}><ThemedText style={styles.emptyTitle}>Start exploring</ThemedText><ThemedText style={styles.emptyCopy}>Search for a restaurant, activity, dish or neighbourhood. Places you open will appear here.</ThemedText></View>
+                  : <View style={[styles.emptyCard, { backgroundColor: theme.backgroundSelected, borderColor: theme.border }]}><ThemedText style={[styles.emptyTitle, { color: theme.text }]}>Start exploring</ThemedText><ThemedText style={[styles.emptyCopy, { color: theme.textSecondary }]}>Search for a restaurant, activity, dish or neighbourhood. Places you open will appear here.</ThemedText></View>
               }
               showsVerticalScrollIndicator={false}
             />
@@ -158,9 +202,29 @@ export function SearchScreen() {
 }
 
 function QuickFilter({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
-  return <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} onPress={onPress} style={[styles.quickFilter, active && styles.activeQuickFilter]}>
-    <ThemedText style={[styles.quickFilterLabel, active && styles.activeQuickFilterLabel]}>{label}</ThemedText>
-  </Pressable>;
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={() => {
+        if (Platform.OS !== 'web') void Haptics.selectionAsync();
+        onPress();
+      }}
+      style={({ pressed }) => [
+        styles.quickFilter,
+        {
+          backgroundColor: active ? theme.primary : theme.backgroundElement,
+          borderColor: active ? theme.primary : theme.border,
+        },
+        pressed && styles.quickFilterPressed,
+      ]}
+    >
+      <ThemedText style={[styles.quickFilterLabel, { color: active ? theme.onPrimary : theme.text }]}>
+        {label}
+      </ThemedText>
+    </Pressable>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -169,13 +233,22 @@ const styles = StyleSheet.create({
   recentList: { paddingBottom: 120 },
   recentSeparator: { height: 12 },
   emptyList: { flexGrow: 1 },
-  emptyCard: { minHeight: 180, borderRadius: 28, padding: 24, justifyContent: 'center', gap: 8, backgroundColor: '#F3F4F6' },
-  emptyTitle: { color: '#000000', fontSize: 20, lineHeight: 25, fontWeight: '700' },
-  emptyCopy: { color: '#637068', fontSize: 15, lineHeight: 21 },
+  emptyCard: { minHeight: 180, borderRadius: 28, borderWidth: 1, padding: 24, justifyContent: 'center', gap: 8 },
+  emptyTitle: { fontSize: 20, lineHeight: 25, fontWeight: '700' },
+  emptyCopy: { fontSize: 14, lineHeight: 20 },
   skeletons: { gap: 12 },
   quickFilters: { gap: 8, paddingRight: 16 },
-  quickFilter: { minHeight: 38, borderRadius: 19, paddingHorizontal: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6' },
-  activeQuickFilter: { backgroundColor: '#000000' },
-  quickFilterLabel: { color: '#637068', fontSize: 13, lineHeight: 17, fontWeight: '700' },
-  activeQuickFilterLabel: { color: '#FFFFFF' },
+  quickFilter: {
+    minHeight: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    paddingHorizontal: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickFilterPressed: {
+    transform: [{ scale: 0.94 }],
+    opacity: 0.8,
+  },
+  quickFilterLabel: { fontSize: 13, lineHeight: 17, fontWeight: '700' },
 });

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Button, Card, Screen } from '@/components/foundation';
 import { ThemedText } from '@/components/themed-text';
-import { PersonRow, SocialBack, SocialError, SocialField, SocialState } from './components';
+import { useTheme } from '@/hooks/use-theme';
+import { PersonRow, SocialError, SocialField, SocialState } from './components';
 import { useSocialList, useSocialMutation } from './hooks';
 import type { SocialPerson } from './types';
 
@@ -10,6 +12,7 @@ type PeopleMode = 'search' | 'friends' | 'incoming' | 'outgoing' | 'blocked';
 const labels: Record<PeopleMode, string> = { search: 'Search', friends: 'Friends', incoming: 'Requests', outgoing: 'Sent', blocked: 'Blocked' };
 
 export default function PeopleScreen() {
+  const theme = useTheme();
   const [mode, setMode] = useState<PeopleMode>('search');
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -22,14 +25,41 @@ export default function PeopleScreen() {
     if (await mutation.run(action, { user_id: id })) await list.refresh();
   };
 
-  return <Screen title="Friends" headerDescription="Friends">
-    <SocialBack />
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modes}>
-      {(Object.keys(labels) as PeopleMode[]).map((value) => <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === value }} key={value}
-        onPress={() => setMode(value)} style={[styles.mode, mode === value && styles.selectedMode]}>
-        <ThemedText style={[styles.modeLabel, mode === value && styles.selectedModeLabel]}>{labels[value]}</ThemedText>
-      </Pressable>)}
-    </ScrollView>
+  return <Screen
+    title="Find People"
+    headerDescription="Find People"
+    showBack
+    onBack={() => (router.canGoBack() ? router.back() : router.replace('/feed'))}
+  >
+    <View style={styles.modesRow} accessibilityRole="tablist">
+      {(Object.keys(labels) as PeopleMode[]).map((value) => {
+        const isSelected = mode === value;
+        return (
+          <Pressable
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isSelected }}
+            key={value}
+            onPress={() => setMode(value)}
+            style={[
+              styles.mode,
+              {
+                backgroundColor: isSelected ? theme.text : theme.backgroundSelected,
+                borderColor: isSelected ? theme.text : theme.border,
+              },
+            ]}
+          >
+            <ThemedText
+              style={[
+                styles.modeLabel,
+                { color: isSelected ? theme.backgroundElement : theme.textSecondary },
+              ]}
+            >
+              {labels[value]}
+            </ThemedText>
+          </Pressable>
+        );
+      })}
+    </View>
     {search && <>
       <SocialField accessibilityLabel="Search people" autoCapitalize="none" autoCorrect={false} maxLength={80} placeholder="Name or username" value={query} onChangeText={setQuery} />
       <ThemedText type="small" themeColor="textSecondary">Enter at least two characters. Only opted-in profiles appear.</ThemedText>
@@ -46,9 +76,24 @@ export default function PeopleScreen() {
 }
 
 const styles = StyleSheet.create({
-  modes: { gap: 8, paddingRight: 16 },
-  mode: { minHeight: 42, borderRadius: 21, paddingHorizontal: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6' },
-  selectedMode: { backgroundColor: '#000000' },
-  modeLabel: { color: '#637068', fontSize: 13, lineHeight: 17, fontWeight: '700' },
-  selectedModeLabel: { color: '#FFFFFF' },
+  modesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
+    marginVertical: 4,
+  },
+  mode: {
+    paddingHorizontal: 7,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeLabel: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '600',
+  },
 });

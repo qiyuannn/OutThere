@@ -13,15 +13,35 @@ type ScreenProps = PropsWithChildren<{
   headerDescription?: string;
   showBack?: boolean;
   onBack?: () => void;
+  onFindPeople?: () => void;
+  onNotifications?: () => void;
+  notificationsCount?: number;
 }>;
 
-export function Screen({ children, title, eyebrow, headerDescription, showBack, onBack }: ScreenProps) {
+export function Screen({
+  children,
+  title,
+  eyebrow,
+  headerDescription,
+  showBack,
+  onBack,
+  onFindPeople,
+  onNotifications,
+  notificationsCount,
+}: ScreenProps) {
   const theme = useTheme();
   const description = headerDescription ?? title;
 
   return (
     <SafeAreaView edges={['left', 'right']} style={[styles.screen, { backgroundColor: theme.background }]}>
-      <AppHeader description={description} showBack={showBack} onBack={onBack} />
+      <AppHeader
+        description={description}
+        showBack={showBack}
+        onBack={onBack}
+        onFindPeople={onFindPeople}
+        onNotifications={onNotifications}
+        notificationsCount={notificationsCount}
+      />
       <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentContainerStyle={styles.content}>
         {children}
       </ScrollView>

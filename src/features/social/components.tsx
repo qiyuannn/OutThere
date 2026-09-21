@@ -13,6 +13,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { useSocialMutation } from './hooks';
 import type { SocialPerson, SocialPost } from './types';
 
+const backIcon = require('../../../assets/images/navigation/back.svg');
 const likeIcon = require('../../../assets/images/posts/thumbs-up.svg');
 const commentIcon = require('../../../assets/images/posts/chat-dots.svg');
 const shareIcon = require('../../../assets/images/posts/share-fat.svg');
@@ -36,7 +37,18 @@ export function SocialState({ loading, error, offline = false, empty, emptyTitle
 }
 
 export function SocialBack() {
-  return <Button label="Back" onPress={() => router.canGoBack() ? router.back() : router.replace('/feed')} />;
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityLabel="Go back"
+      accessibilityRole="button"
+      hitSlop={10}
+      onPress={() => (router.canGoBack() ? router.back() : router.replace('/feed'))}
+      style={({ pressed }) => [styles.backButton, { backgroundColor: theme.backgroundSelected }, pressed && styles.pressed]}
+    >
+      <Image source={backIcon} style={[styles.backIcon, { tintColor: theme.text }]} contentFit="contain" />
+    </Pressable>
+  );
 }
 
 export function PersonRow({ person, open = true, prominent = false }: { person: SocialPerson; open?: boolean; prominent?: boolean }) {
@@ -133,5 +145,7 @@ const styles = StyleSheet.create({
   actionIcon: { width: 17, height: 17 },
   actionLabel: { flexShrink: 1, fontSize: 11, lineHeight: 15, fontWeight: '700' },
   timestamp: { fontSize: 12, lineHeight: 16 },
+  backButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  backIcon: { width: 20, height: 20 },
   pressed: { opacity: 0.65, transform: [{ scale: 0.98 }] },
 });

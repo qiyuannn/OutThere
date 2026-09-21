@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Button, Card, Screen } from '@/components/foundation';
 import { ThemedText } from '@/components/themed-text';
 import { submitSocialReport } from './api';
-import { SocialBack, SocialError, SocialField } from './components';
+import { SocialError, SocialField } from './components';
 import { REPORT_REASONS, socialError, validReportTarget } from './model';
 import { useNetworkStatus } from './hooks';
 import type { ReportReason } from './types';
@@ -27,8 +27,7 @@ export default function ReportScreen() {
     finally { setBusy(false); }
   };
 
-  return <Screen title="Report" headerDescription="Report">
-    <SocialBack />
+  return <Screen title="Report" headerDescription="Report" showBack onBack={() => (router.canGoBack() ? router.back() : router.replace('/feed'))}>
     {!valid ? <Card>
       <ThemedText type="subtitle">This content is unavailable.</ThemedText>
       <Button label="Return to Feed" onPress={() => router.replace('/feed')} />

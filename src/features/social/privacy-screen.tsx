@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Alert } from 'react-native';
+import { router } from 'expo-router';
 import { Button, Card, Screen } from '@/components/foundation';
 import { ThemedText } from '@/components/themed-text';
-import { SocialBack, SocialError, SocialState } from './components';
+import { SocialError, SocialState } from './components';
 import { useSocialMutation, useSocialQuery } from './hooks';
 import type { SocialSettings, SocialVisibility } from './types';
 
@@ -22,8 +23,7 @@ export default function PrivacyScreen() {
     } else void apply();
   };
 
-  return <Screen title="Privacy & Sharing" headerDescription="Privacy & Sharing">
-    <SocialBack />
+  return <Screen title="Privacy & Sharing" headerDescription="Privacy & Sharing" showBack onBack={() => (router.canGoBack() ? router.back() : router.replace('/profile/account'))}>
     <SocialState loading={settings.loading} error={settings.error} offline={settings.offline} empty={false} onRetry={settings.refresh} />
     {settings.data && <>
       <Card>

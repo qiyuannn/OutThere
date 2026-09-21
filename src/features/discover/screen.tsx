@@ -28,8 +28,14 @@ export default function DiscoverScreen() {
           <PrimaryButton label="Try again" onPress={discover.retry} />
         </StateCard> : discover.loading ? <StateCard title="Finding a good match…" description="Looking around your current location." loading />
           : discover.current ?
-          <SwipeableRecommendation key={`${discover.mode}:${discover.current.id}`} place={discover.current}
-            disabled={discover.acting} onChoice={discover.choose} />
+          <SwipeableRecommendation
+            key={`${discover.mode}:${discover.current.id}`}
+            place={discover.current}
+            disabled={discover.acting}
+            onChoice={discover.choose}
+            canRewind={discover.passedCount > 0}
+            onRewind={discover.reviewPassed}
+          />
           : <StateCard icon="↻" title="You’ve seen everything we found in this range."
             description={discover.passedCount > 0 ? 'Review your passed places, or increase the range to explore somewhere new.' : 'Increase the range or try searching again for a fresh set.'} accent>
             {discover.exhausted && discover.passedCount > 0 ? <PrimaryButton label="Review passed places" onPress={discover.reviewPassed} disabled={discover.acting} /> : null}

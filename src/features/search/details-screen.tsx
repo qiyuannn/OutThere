@@ -31,5 +31,5 @@ export function SearchDetailsScreen() {
   }, [id, mode, attempt, userId]);
   const back = () => router.canGoBack() ? router.back() : router.replace('/search' as Href);
   if (place) return <PlaceDetailsScreen key={place.id} place={place} onBack={back} />;
-  return <Screen title="Place details"><Button label="Back to search" onPress={back} />{error ? <><ThemedText accessibilityRole="alert">{error}</ThemedText><Button label="Retry" onPress={() => setAttempt(n => n + 1)} /></> : <ActivityIndicator accessibilityLabel="Loading place details" />}</Screen>;
+  return <Screen title="Place details" headerDescription="Place details" showBack onBack={back}>{error ? <><ThemedText accessibilityRole="alert">{error}</ThemedText><Button label="Retry" onPress={() => setAttempt(n => n + 1)} /></> : <ActivityIndicator accessibilityLabel="Loading place details" />}</Screen>;
 }

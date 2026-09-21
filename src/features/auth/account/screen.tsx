@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
 import {
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,6 +12,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,7 +28,7 @@ WebBrowser.maybeCompleteAuthSession();
 
 const backIcon = require('../../../../assets/images/navigation/back.svg');
 
-type Mode = 'welcome' | 'login' | 'signup' | 'forgot';
+type Mode = 'welcome' | 'create_account' | 'login' | 'signup' | 'forgot';
 
 type OutlineButtonProps = {
   disabled?: boolean;
@@ -112,6 +114,35 @@ function AuthInput({ label, password = false, ...props }: AuthInputProps) {
   );
 }
 
+interface CarouselSlide {
+  title: string;
+  description: string;
+  highlight: string;
+}
+
+const CAROUSEL_SLIDES: CarouselSlide[] = [
+  {
+    title: 'Discover Extraordinary Places',
+    description: 'Find food, dining, and unique local activities tailored to where you are.',
+    highlight: 'Curated places · Smart search · Real reviews',
+  },
+  {
+    title: 'Rate & Track Your Footprint',
+    description: 'Build your personal place collection, assign tiers, and watch your interactive map grow.',
+    highlight: 'Interactive map · Custom rankings · Visit history',
+  },
+  {
+    title: 'Share With Friends',
+    description: 'Exchange trusted recommendations, share ratings, and see where your circle loves to go.',
+    highlight: 'Friends-only feed · Social activity · Privacy controls',
+  },
+  {
+    title: 'Unlock OutThere Pro',
+    description: 'Get custom search radius, advanced filters, unlimited badges, and priority discovery tools.',
+    highlight: 'Ready to begin your journey? Create your account now.',
+  },
+];
+
 export default function AuthScreen() {
   const { session, recovery } = useAuth();
   const [mode, setMode] = useState<Mode>('welcome');
@@ -125,6 +156,20 @@ export default function AuthScreen() {
   const [isError, setIsError] = useState(false);
   const [canResend, setCanResend] = useState(false);
 
+  const [activeSlide, setActiveSlide] = useState(0);
+  const carouselRef = useRef<ScrollView>(null);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const { width: windowWidth } = useWindowDimensions();
+  const [carouselWidth, setCarouselWidth] = useState(0);
+  const slideWidth = carouselWidth > 0 ? carouselWidth : windowWidth;
+
+  function goToSlide(index: number) {
+    const target = Math.max(0, Math.min(index, CAROUSEL_SLIDES.length - 1));
+    setActiveSlide(target);
+    carouselRef.current?.scrollTo({ x: target * slideWidth, animated: true });
+  }
+
   useEffect(() => {
     isMounted.current = true;
     return () => {
@@ -135,12 +180,28 @@ export default function AuthScreen() {
   if (session) return <Redirect href={recovery ? '/auth/reset-password' : '/'} />;
 
   function switchMode(next: Mode) {
+    fadeAnim.setValue(0);
+    slideAnim.setValue(8);
     setMode(next);
+    setActiveSlide(0);
+    carouselRef.current?.scrollTo({ x: 0, animated: false });
     setPassword('');
     setConfirmation('');
     setMessage('');
     setCanResend(false);
     setIsError(false);
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 220,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start();
   }
 
   async function submit(resend = false) {
@@ -286,7 +347,7 @@ export default function AuthScreen() {
     return (
       <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.safeArea}>
         <StatusBar style="dark" />
-        <View style={styles.welcome}>
+        <Animated.View style={[styles.welcome, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <View style={styles.wordmarkStage}>
             <Wordmark />
           </View>
@@ -299,81 +360,81 @@ export default function AuthScreen() {
 
           <View style={styles.welcomeActions}>
             <OutlineButton
-              disabled={busy || !supabase}
-              label={busy ? 'Please wait…' : 'Get started with Google'}
-              onPress={signInWithGoogle}
+              disabled={busy}
+              label="Log In"
+              onPress={() => switchMode('login')}
             />
-            <OutlineButton disabled={busy} label="Get started with Email" onPress={() => switchMode('login')} />
+            <OutlineButton
+              disabled={busy}
+              label="Create Account"
+              onPress={() => switchMode('create_account')}
+            />
           </View>
-        </View>
+        </Animated.View>
       </SafeAreaView>
     );
   }
 
-  const description = mode === 'signup'
-    ? 'Sign up with Email'
-    : mode === 'forgot'
-      ? 'Reset your Password'
-      : 'Sign in with Email';
-  const backMode: Mode = mode === 'login' ? 'welcome' : 'login';
+  if (mode === 'create_account') {
+    const isLastSlide = activeSlide === CAROUSEL_SLIDES.length - 1;
 
-  return (
-    <KeyboardAvoidingView style={styles.keyboardView} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    return (
       <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.safeArea}>
         <StatusBar style="dark" />
-        <AuthHeader description={description} onPress={() => switchMode(backMode)} />
+        <AuthHeader description="Create Account" onPress={() => switchMode('welcome')} />
+        <Animated.View style={[styles.carouselContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+          <ScrollView
+            ref={carouselRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onLayout={(e) => {
+              const w = Math.round(e.nativeEvent.layout.width);
+              if (w > 0 && w !== carouselWidth) {
+                setCarouselWidth(w);
+                if (activeSlide > 0) {
+                  carouselRef.current?.scrollTo({ x: activeSlide * w, animated: false });
+                }
+              }
+            }}
+            onMomentumScrollEnd={(e) => {
+              const currentSlideWidth = slideWidth > 0 ? slideWidth : windowWidth;
+              const nextIndex = Math.round(e.nativeEvent.contentOffset.x / currentSlideWidth);
+              if (nextIndex >= 0 && nextIndex < CAROUSEL_SLIDES.length) {
+                setActiveSlide(nextIndex);
+              }
+            }}
+            style={styles.carouselScroll}
+            contentContainerStyle={styles.carouselContent}
+          >
+            {CAROUSEL_SLIDES.map((slide, index) => (
+              <View key={index} style={[styles.slide, { width: slideWidth }]}>
+                <View style={styles.slideCard}>
+                  <Text style={styles.slideTitle}>{slide.title}</Text>
+                  <Text style={styles.slideDescription}>{slide.description}</Text>
+                  <View style={styles.slideHighlightPill}>
+                    <Text style={styles.slideHighlightText}>{slide.highlight}</Text>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
 
-        <ScrollView
-          automaticallyAdjustKeyboardInsets
-          contentContainerStyle={styles.formContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.formFields}>
-            <AuthInput
-              autoComplete="email"
-              editable={!busy}
-              keyboardType="email-address"
-              label="Email"
-              onChangeText={setEmail}
-              textContentType="emailAddress"
-              value={email}
-            />
-
-            {mode !== 'forgot' && (
-              <AuthInput
-                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                editable={!busy}
-                label="Password"
-                onChangeText={setPassword}
-                password
-                textContentType={mode === 'signup' ? 'newPassword' : 'password'}
-                value={password}
-              />
-            )}
-
-            {mode === 'signup' && (
-              <AuthInput
-                autoComplete="new-password"
-                editable={!busy}
-                label="Confirm password"
-                onChangeText={setConfirmation}
-                password
-                textContentType="newPassword"
-                value={confirmation}
-              />
-            )}
-
-            {mode === 'login' && (
-              <Pressable
-                accessibilityRole="button"
-                disabled={busy}
-                hitSlop={10}
-                onPress={() => switchMode('forgot')}
-                style={({ pressed }) => [styles.forgotButton, pressed && styles.pressed]}
-              >
-                <Text style={styles.linkLabel}>Forgot password?</Text>
-              </Pressable>
-            )}
+          <View style={styles.carouselFooter}>
+            <View style={styles.dotsRow}>
+              {CAROUSEL_SLIDES.map((_, i) => (
+                <Pressable
+                  key={i}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Go to slide ${i + 1}`}
+                  onPress={() => goToSlide(i)}
+                  style={[
+                    styles.dot,
+                    i === activeSlide && styles.activeDot,
+                  ]}
+                />
+              ))}
+            </View>
 
             {!!message && (
               <Text accessibilityRole={isError ? 'alert' : undefined} accessibilityLiveRegion="polite" style={styles.message}>
@@ -381,41 +442,160 @@ export default function AuthScreen() {
               </Text>
             )}
 
-            <OutlineButton
-              disabled={busy || !supabase}
-              label={
-                busy
-                  ? 'Please wait…'
-                  : mode === 'signup'
-                    ? 'Create Account'
-                    : mode === 'forgot'
-                      ? 'Send Reset Link'
-                      : 'Sign In'
-              }
-              onPress={() => submit()}
-            />
+            <View style={styles.welcomeActions}>
+              {isLastSlide ? (
+                <>
+                  <OutlineButton
+                    disabled={busy || !supabase}
+                    label={busy ? 'Please wait…' : 'Get started with Google'}
+                    onPress={signInWithGoogle}
+                  />
+                  <OutlineButton
+                    disabled={busy}
+                    label="Get started with Email"
+                    onPress={() => switchMode('signup')}
+                  />
+                </>
+              ) : (
+                <OutlineButton
+                  label="Next"
+                  onPress={() => goToSlide(activeSlide + 1)}
+                />
+              )}
+            </View>
 
-            {canResend && (
+            <Pressable
+              accessibilityRole="button"
+              disabled={busy}
+              hitSlop={10}
+              onPress={() => switchMode('login')}
+              style={({ pressed }) => [styles.bottomLink, pressed && styles.pressed]}
+            >
+              <Text style={styles.linkLabel}>
+                Already have an account? Log In here.
+              </Text>
+            </Pressable>
+          </View>
+        </Animated.View>
+      </SafeAreaView>
+    );
+  }
+
+  const description = mode === 'signup'
+    ? 'Create Account'
+    : mode === 'forgot'
+      ? 'Reset your Password'
+      : 'Log In';
+  const backMode: Mode = mode === 'signup' ? 'create_account' : mode === 'forgot' ? 'login' : 'welcome';
+
+  return (
+    <KeyboardAvoidingView style={styles.keyboardView} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.safeArea}>
+        <StatusBar style="dark" />
+        <AuthHeader description={description} onPress={() => switchMode(backMode)} />
+        <Animated.View style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+          <ScrollView
+            automaticallyAdjustKeyboardInsets
+            contentContainerStyle={styles.formContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.formFields}>
+              <AuthInput
+                autoComplete="email"
+                editable={!busy}
+                keyboardType="email-address"
+                label="Email"
+                onChangeText={setEmail}
+                textContentType="emailAddress"
+                value={email}
+              />
+
+              {mode !== 'forgot' && (
+                <AuthInput
+                  autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                  editable={!busy}
+                  label="Password"
+                  onChangeText={setPassword}
+                  password
+                  textContentType={mode === 'signup' ? 'newPassword' : 'password'}
+                  value={password}
+                />
+              )}
+
+              {mode === 'signup' && (
+                <AuthInput
+                  autoComplete="new-password"
+                  editable={!busy}
+                  label="Confirm password"
+                  onChangeText={setConfirmation}
+                  password
+                  textContentType="newPassword"
+                  value={confirmation}
+                />
+              )}
+
+              {mode === 'login' && (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={busy}
+                  hitSlop={10}
+                  onPress={() => switchMode('forgot')}
+                  style={({ pressed }) => [styles.forgotButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.linkLabel}>Forgot password?</Text>
+                </Pressable>
+              )}
+
+              {!!message && (
+                <Text accessibilityRole={isError ? 'alert' : undefined} accessibilityLiveRegion="polite" style={styles.message}>
+                  {message}
+                </Text>
+              )}
+
               <OutlineButton
                 disabled={busy || !supabase}
-                label="Resend Confirmation Email"
-                onPress={() => submit(true)}
+                label={
+                  busy
+                    ? 'Please wait…'
+                    : mode === 'signup'
+                      ? 'Create Account'
+                      : mode === 'forgot'
+                        ? 'Send Reset Link'
+                        : 'Log In'
+                }
+                onPress={() => submit()}
               />
-            )}
-          </View>
 
-          <Pressable
-            accessibilityRole="button"
-            disabled={busy}
-            hitSlop={10}
-            onPress={() => switchMode(mode === 'login' ? 'signup' : 'login')}
-            style={({ pressed }) => [styles.bottomLink, pressed && styles.pressed]}
-          >
-            <Text style={styles.linkLabel}>
-              {mode === 'login' ? 'Don’t have an account ? Sign Up here.' : 'Already have an account? Sign In here.'}
-            </Text>
-          </Pressable>
-        </ScrollView>
+              {mode === 'login' && (
+                <OutlineButton
+                  disabled={busy || !supabase}
+                  label={busy ? 'Please wait…' : 'Sign in with Google'}
+                  onPress={signInWithGoogle}
+                />
+              )}
+
+              {canResend && (
+                <OutlineButton
+                  disabled={busy || !supabase}
+                  label="Resend Confirmation Email"
+                  onPress={() => submit(true)}
+                />
+              )}
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              disabled={busy}
+              hitSlop={10}
+              onPress={() => switchMode(mode === 'login' ? 'create_account' : 'login')}
+              style={({ pressed }) => [styles.bottomLink, pressed && styles.pressed]}
+            >
+              <Text style={styles.linkLabel}>
+                {mode === 'login' ? 'Don’t have an account? Create account here.' : 'Already have an account? Log In here.'}
+              </Text>
+            </Pressable>
+          </ScrollView>
+        </Animated.View>
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
@@ -585,5 +765,78 @@ const styles = StyleSheet.create({
   },
   bottomLink: {
     alignSelf: 'center',
+  },
+  carouselContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  carouselScroll: {
+    flex: 1,
+  },
+  carouselContent: {
+    flexGrow: 1,
+  },
+  slide: {
+    flex: 1,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  slideCard: {
+    width: '100%',
+    maxWidth: 340,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  slideTitle: {
+    color: '#000000',
+    fontSize: 26,
+    fontWeight: '700',
+    lineHeight: 32,
+    textAlign: 'center',
+  },
+  slideDescription: {
+    color: '#637068',
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  slideHighlightPill: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginTop: 4,
+  },
+  slideHighlightText: {
+    color: '#000000',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  carouselFooter: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    gap: 14,
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#D1D5DB',
+  },
+  activeDot: {
+    width: 24,
+    backgroundColor: '#000000',
   },
 });

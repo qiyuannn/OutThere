@@ -23,6 +23,7 @@ export function GlassSurface({ children, interactive = false, style }: PropsWith
   interactive?: boolean;
   style?: StyleProp<ViewStyle>;
 }>) {
+  const theme = useTheme();
   const [reduceTransparency, setReduceTransparency] = useState(false);
   useEffect(() => {
     void AccessibilityInfo.isReduceTransparencyEnabled().then(setReduceTransparency);
@@ -31,13 +32,31 @@ export function GlassSurface({ children, interactive = false, style }: PropsWith
   }, []);
   if (nativeGlass && !reduceTransparency) {
     return (
-      <GlassView colorScheme="light" glassEffectStyle="regular" isInteractive={interactive}
-        style={[styles.glass, style]} tintColor="rgba(255,255,255,0.48)">
+      <GlassView
+        colorScheme="light"
+        glassEffectStyle="regular"
+        isInteractive={interactive}
+        style={[styles.glass, style]}
+        tintColor="rgba(255,255,255,0.48)"
+      >
         {children}
       </GlassView>
     );
   }
-  return <View style={[styles.fallbackGlass, style]}>{children}</View>;
+  return (
+    <View
+      style={[
+        styles.fallbackGlass,
+        {
+          backgroundColor: theme.backgroundElement,
+          borderColor: theme.border,
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
 }
 
 export function PressableScale({ children, haptic = false, style, ...props }: PressableProps & {
@@ -52,18 +71,26 @@ export function PressableScale({ children, haptic = false, style, ...props }: Pr
   }, []);
   const animate = (toValue: number) => {
     if (reduceMotion.current) return;
-    Animated.spring(scale, { toValue, useNativeDriver: true, speed: 32, bounciness: 2 }).start();
+    Animated.spring(scale, { toValue, useNativeDriver: true, speed: 36, bounciness: 3 }).start();
   };
   return (
     <Animated.View style={[{ transform: [{ scale }] }, style]}>
       <Pressable
         {...props}
         onPress={(event) => {
-          if (haptic && Platform.OS !== 'web') void Haptics.selectionAsync();
+          if (haptic && Platform.OS !== 'web') {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }
           props.onPress?.(event);
         }}
-        onPressIn={(event) => { animate(0.975); props.onPressIn?.(event); }}
-        onPressOut={(event) => { animate(1); props.onPressOut?.(event); }}
+        onPressIn={(event) => {
+          animate(0.96);
+          props.onPressIn?.(event);
+        }}
+        onPressOut={(event) => {
+          animate(1);
+          props.onPressOut?.(event);
+        }}
         style={styles.fill}
       >
         {children}
@@ -86,16 +113,31 @@ export function SectionHeading({ action, eyebrow, title }: { action?: ReactNode;
 
 export function SkeletonBlock({ height = 18, style }: { height?: number; style?: StyleProp<ViewStyle> }) {
   const theme = useTheme();
-  const pulse = useRef(new Animated.Value(0.35)).current;
+  const pulse = useRef(new Animated.Value(0.3)).current;
   useEffect(() => {
-    const animation = Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 0.75, duration: 700, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 0.35, duration: 700, useNativeDriver: true }),
-    ]));
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.75, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+      ])
+    );
     animation.start();
     return () => animation.stop();
   }, [pulse]);
-  return <Animated.View accessibilityElementsHidden style={[styles.skeleton, { height, backgroundColor: theme.border, opacity: pulse }, style]} />;
+  return (
+    <Animated.View
+      accessibilityElementsHidden
+      style={[
+        styles.skeleton,
+        {
+          height,
+          backgroundColor: theme.border,
+          opacity: pulse,
+        },
+        style,
+      ]}
+    />
+  );
 }
 
 export function StatusBanner({ children, tone = 'neutral' }: PropsWithChildren<{ tone?: 'neutral' | 'error' }>) {
@@ -112,9 +154,7 @@ const styles = StyleSheet.create({
   glass: { overflow: 'hidden' },
   fallbackGlass: {
     overflow: 'hidden',
-    backgroundColor: 'rgba(250,252,251,0.92)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.92)',
     ...Shadows.floating,
   },
   sectionHeading: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },

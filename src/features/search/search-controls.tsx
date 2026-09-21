@@ -1,7 +1,9 @@
 import { Image } from 'expo-image';
-import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import { Platform, Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { ThemedText } from '@/components/themed-text';
 import { Shadows } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 const searchIcon = require('../../../assets/images/search/field-search.svg');
 const filterIcon = require('../../../assets/images/search/filter-menu.svg');
@@ -13,17 +15,19 @@ type SearchControlsProps = Pick<TextInputProps,
 };
 
 export function SearchControls({ onOpenFilters, activeFilterCount = 0, ...inputProps }: SearchControlsProps) {
+  const theme = useTheme();
+
   return (
     <View style={styles.controls}>
-      <View style={styles.field}>
-        <Image source={searchIcon} contentFit="contain" style={styles.searchIcon} />
+      <View style={[styles.field, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+        <Image source={searchIcon} contentFit="contain" style={[styles.searchIcon, { tintColor: theme.textSecondary }]} />
         <TextInput
           accessibilityLabel="Search places, dishes or cuisines"
           autoCorrect={false}
           maxLength={160}
           placeholder="Search places, dishes or cuisines"
-          placeholderTextColor="#637068"
-          style={styles.input}
+          placeholderTextColor={theme.textSecondary}
+          style={[styles.input, { color: theme.text }]}
           {...inputProps}
         />
       </View>
@@ -32,11 +36,22 @@ export function SearchControls({ onOpenFilters, activeFilterCount = 0, ...inputP
         accessibilityLabel={activeFilterCount ? `Search filters, ${activeFilterCount} active` : 'Search filters'}
         accessibilityRole="button"
         hitSlop={4}
-        onPress={onOpenFilters}
-        style={({ pressed }) => [styles.filterButton, pressed && styles.pressed]}
+        onPress={() => {
+          if (Platform.OS !== 'web') void Haptics.selectionAsync();
+          onOpenFilters();
+        }}
+        style={({ pressed }) => [
+          styles.filterButton,
+          { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+          pressed && styles.pressed,
+        ]}
       >
-        <Image source={filterIcon} contentFit="contain" style={styles.filterIcon} />
-        {activeFilterCount > 0 ? <View style={styles.filterBadge}><ThemedText style={styles.filterBadgeLabel}>{activeFilterCount}</ThemedText></View> : null}
+        <Image source={filterIcon} contentFit="contain" style={[styles.filterIcon, { tintColor: theme.text }]} />
+        {activeFilterCount > 0 ? (
+          <View style={[styles.filterBadge, { backgroundColor: theme.primary }]}>
+            <ThemedText style={[styles.filterBadgeLabel, { color: theme.onPrimary }]}>{activeFilterCount}</ThemedText>
+          </View>
+        ) : null}
       </Pressable>
     </View>
   );
@@ -44,12 +59,42 @@ export function SearchControls({ onOpenFilters, activeFilterCount = 0, ...inputP
 
 const styles = StyleSheet.create({
   controls: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  field: { flex: 1, minWidth: 0, height: 56, paddingHorizontal: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(0,0,0,0.10)', borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.94)', flexDirection: 'row', alignItems: 'center', gap: 11, ...Shadows.card },
+  field: {
+    flex: 1,
+    minWidth: 0,
+    height: 56,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderRadius: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    ...Shadows.card,
+  },
   searchIcon: { width: 22, height: 22, flexShrink: 0 },
-  input: { flex: 1, minWidth: 0, height: '100%', padding: 0, color: '#14221D', fontSize: 15, fontWeight: '400', lineHeight: 21 },
-  filterButton: { width: 52, height: 52, flexShrink: 0, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(0,0,0,0.10)', borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.94)', alignItems: 'center', justifyContent: 'center', ...Shadows.card },
+  input: { flex: 1, minWidth: 0, height: '100%', padding: 0, fontSize: 15, fontWeight: '500', lineHeight: 21 },
+  filterButton: {
+    width: 52,
+    height: 52,
+    flexShrink: 0,
+    borderWidth: 1,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.card,
+  },
   filterIcon: { width: 22, height: 22 },
-  filterBadge: { position: 'absolute', right: -1, top: -1, minWidth: 19, height: 19, borderRadius: 10, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000' },
-  filterBadgeLabel: { color: '#FFFFFF', fontSize: 10, lineHeight: 12, fontWeight: '800' },
-  pressed: { opacity: 0.55 },
+  filterBadge: {
+    position: 'absolute',
+    right: -1,
+    top: -1,
+    minWidth: 19,
+    height: 19,
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterBadgeLabel: { fontSize: 10, lineHeight: 12, fontWeight: '800' },
+  pressed: { opacity: 0.6, transform: [{ scale: 0.94 }] },
 });

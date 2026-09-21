@@ -54,8 +54,7 @@ export default function ModerationScreen() {
     finally { setLoadingMore(false); }
   };
   useEffect(() => { void load(); }, [load]);
-  return <Screen title="Moderation" headerDescription="Moderation">
-    <Button label="Back" onPress={() => router.canGoBack() ? router.back() : router.replace('/profile/account')} />
+  return <Screen title="Moderation" headerDescription="Moderation" showBack onBack={() => router.canGoBack() ? router.back() : router.replace('/profile/account')}>
     <Card>
       <ThemedText type="subtitle">Review queue</ThemedText>
       <ThemedText themeColor="textSecondary">Evidence and notes are private. Removal and suspension decisions are recorded in an audit log.</ThemedText>

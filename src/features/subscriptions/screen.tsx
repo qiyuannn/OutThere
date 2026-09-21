@@ -9,7 +9,7 @@ export default function SubscriptionScreen() {
   const plans = availablePlans(billing.offering);
   const entitlement = billing.customerInfo?.entitlements.active[PRO_ENTITLEMENT];
   const disabled = billing.busy || !billing.ready;
-  return <Screen title="OutThere Pro" eyebrow="MEMBERSHIP">
+  return <Screen title="OutThere Pro" eyebrow="MEMBERSHIP" showBack onBack={() => router.canGoBack() ? router.back() : router.replace('/profile/account')}>
     {billing.testStore && <ThemedText type="small" themeColor="primary">Test Store · Test purchases only. No real charges.</ThemedText>}
     {billing.unavailable ? <Card><ThemedText>{billing.unavailable}</ThemedText></Card> : <>
       <Card><ThemedText type="subtitle" style={{ fontSize: 24 }}>{billing.isPro ? 'You’re a Pro member.' : billing.ready ? 'Find your membership.' : 'Checking your membership.'}</ThemedText>
@@ -49,6 +49,5 @@ export default function SubscriptionScreen() {
       <Button label="Privacy Policy" onPress={() => router.push('/profile/privacy-policy')} />
       <Button label="Terms of Use" onPress={() => router.push('/profile/terms')} />
     </Card>
-    <Button label="Back to profile" onPress={() => router.replace('/profile')} />
   </Screen>;
 }
