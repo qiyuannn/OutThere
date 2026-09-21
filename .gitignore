@@ -48,3 +48,6 @@ example
 
 # supabase
 supabase/.temp/
+
+#agents 
+.agents/

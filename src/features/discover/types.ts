@@ -6,6 +6,14 @@ export interface DiscoverLocation {
   longitude: number;
 }
 
+export type QueueTier = 'high' | 'med' | 'low';
+
+export interface QueueRecommendations {
+  high: Recommendation[];
+  med: Recommendation[];
+  low: Recommendation[];
+}
+
 export interface Recommendation {
   id: string;
   name: string;
@@ -29,17 +37,21 @@ export interface Recommendation {
   phoneNumber?: string | null;
   regularOpeningHours?: string[];
   amenities?: Record<string, boolean>;
+  queueTier?: QueueTier;
+  circleIndex?: number;
 }
 
 export interface PlacePhoto {
   name: string | null;
   widthPx: number | null;
   heightPx: number | null;
-  authorAttributions: Array<{ displayName: string | null; uri: string | null; photoUri?: string | null }>;
+  authorAttributions: { displayName: string | null; uri: string | null; photoUri?: string | null }[];
 }
 
 export interface RecommendationResponse {
   recommendations: Recommendation[];
+  queues?: QueueRecommendations;
+  circleIndex?: number;
   exhausted: boolean;
   passedCount: number;
 }

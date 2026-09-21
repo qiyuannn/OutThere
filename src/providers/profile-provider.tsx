@@ -6,7 +6,7 @@ interface ProfileState {
   profile: Profile | null;
   loading: boolean;
   error: boolean;
-  reload: () => Promise<void>;
+  reload: (options?: { background?: boolean }) => Promise<void>;
   save: (draft: ProfileDraft, completed: boolean, avatar: AvatarSelection | null) => Promise<Profile>;
 }
 const Context = createContext<ProfileState | null>(null);
@@ -21,15 +21,22 @@ function ProfileSession({ children, userId }: PropsWithChildren<{ userId?: strin
   const request = useRef(0);
   const saving = useRef(false);
   const current = useRef<Profile | null>(null);
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (options?: { background?: boolean }) => {
     if (!userId || saving.current) return;
+    const background = options?.background ?? false;
     const id = ++request.current;
-    setLoading(true); setError(false);
+    if (!background) {
+      setLoading(true);
+      setError(false);
+    }
     try {
       const next = await loadProfile(userId);
       if (id === request.current) { current.current = next; setProfile(next); }
-    } catch { if (id === request.current) setError(true); }
-    finally { if (id === request.current) setLoading(false); }
+    } catch {
+      if (id === request.current && !background) setError(true);
+    } finally {
+      if (id === request.current && !background) setLoading(false);
+    }
   }, [userId]);
   useEffect(() => { void reload(); return () => { request.current += 1; }; }, [reload]);
   async function save(draft: ProfileDraft, completed: boolean, avatar: AvatarSelection | null) {

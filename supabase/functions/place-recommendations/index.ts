@@ -190,77 +190,156 @@ const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body)
 const number = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : null;
 const fieldMask = "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.primaryTypeDisplayName,places.types,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours.openNow,places.googleMapsUri,places.photos,places.websiteUri,places.nationalPhoneNumber,places.internationalPhoneNumber,places.regularOpeningHours.weekdayDescriptions,places.dineIn,places.takeout,places.delivery,places.reservable,places.outdoorSeating,places.servesBeer,places.servesWine,places.servesVegetarianFood,places.goodForChildren,places.goodForGroups,places.parkingOptions,places.restroom";
 const strings = (value: unknown, max: number) => Array.isArray(value)
-  ? [...new Set(value.filter((item): item is string => typeof item === "string").map((item) => item.trim().toLowerCase()).filter(Boolean))].slice(0, max) : [];
+  ? [...new Set(value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean))].slice(0, max) : [];
 
-type SearchCenter = { latitude: number; longitude: number };
-type SearchPlan = { center: SearchCenter; radius: number; includedTypes: string[] };
+const EARTH_RADIUS_METERS = 6_371_000;
+const MODERATE_OVERLAP_RADIUS_RATIO = 0.48; // r = 0.48 * R
+const MODERATE_OVERLAP_OFFSET_RATIO = 0.54; // d = 0.54 * R
+const BEARING_STEP_DEGREES = 60;
+const EPSILON_METERS = 1e-6;
 
-function shuffle<T>(values: T[]) {
-  const result = [...values];
-  for (let index = result.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+type Coordinates = { latitude: number; longitude: number };
+type SearchCenter = Coordinates;
+type SearchCircle = {
+  index: number;
+  center: Coordinates;
+  radiusMeters: number;
+  bearingDegrees?: number;
+  offsetMeters?: number;
+};
+
+function normalizeLongitude(lng: number): number {
+  if (lng === 180 || lng === -180) return lng;
+  const mod = (lng + 180) % 360;
+  const wrapped = mod < 0 ? mod + 360 : mod;
+  return wrapped === 0 ? 180 : wrapped - 180;
+}
+
+function haversineDistanceMeters(a: Coordinates, b: Coordinates): number {
+  const rad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = rad(b.latitude - a.latitude);
+  const dLng = rad(b.longitude - a.longitude);
+  const lat1 = rad(a.latitude);
+  const lat2 = rad(b.latitude);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  const clampedH = Math.min(1, Math.max(0, h));
+  return 2 * EARTH_RADIUS_METERS * Math.asin(Math.sqrt(clampedH));
+}
+
+function computeOffsetLocation(origin: Coordinates, distanceMeters: number, bearingDegrees: number): Coordinates {
+  if (distanceMeters === 0) {
+    return { latitude: origin.latitude, longitude: normalizeLongitude(origin.longitude) };
   }
-  return result;
+  const rad = (deg: number) => (deg * Math.PI) / 180;
+  const deg = (r: number) => (r * 180) / Math.PI;
+  const delta = distanceMeters / EARTH_RADIUS_METERS;
+  const theta = rad(bearingDegrees);
+  const phi1 = rad(origin.latitude);
+  const lambda1 = rad(origin.longitude);
+  const sinPhi1 = Math.sin(phi1);
+  const cosPhi1 = Math.cos(phi1);
+  const sinDelta = Math.sin(delta);
+  const cosDelta = Math.cos(delta);
+  const sinPhi2 = sinPhi1 * cosDelta + cosPhi1 * sinDelta * Math.cos(theta);
+  const clampedSinPhi2 = Math.min(1, Math.max(-1, sinPhi2));
+  const phi2 = Math.asin(clampedSinPhi2);
+  const y = Math.sin(theta) * sinDelta * cosPhi1;
+  const x = cosDelta - sinPhi1 * Math.sin(phi2);
+  const lambda2 = lambda1 + Math.atan2(y, x);
+  return { latitude: deg(phi2), longitude: normalizeLongitude(deg(lambda2)) };
 }
 
-function distance(fromLat: number, fromLng: number, toLat: number, toLng: number) {
-  const rad = (degrees: number) => degrees * Math.PI / 180;
-  const lat = rad(toLat - fromLat); const lng = rad(toLng - fromLng);
-  const a = Math.sin(lat / 2) ** 2 + Math.cos(rad(fromLat)) * Math.cos(rad(toLat)) * Math.sin(lng / 2) ** 2;
-  return 6_371_000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+function computeCircleGeometry(origin: Coordinates, radiusMeters: number, circleIndex: number): SearchCircle {
+  const subRadiusMeters = Math.round(radiusMeters * MODERATE_OVERLAP_RADIUS_RATIO);
+  if (circleIndex === 0) {
+    return {
+      index: 0,
+      center: { latitude: origin.latitude, longitude: normalizeLongitude(origin.longitude) },
+      radiusMeters: subRadiusMeters,
+      bearingDegrees: 0,
+      offsetMeters: 0,
+    };
+  }
+  const bearingDegrees = (circleIndex - 1) * BEARING_STEP_DEGREES;
+  const offsetMeters = radiusMeters * MODERATE_OVERLAP_OFFSET_RATIO;
+  const center = computeOffsetLocation(origin, offsetMeters, bearingDegrees);
+  return {
+    index: circleIndex,
+    center,
+    radiusMeters: subRadiusMeters,
+    bearingDegrees,
+    offsetMeters,
+  };
 }
 
-function offsetLocation(origin: SearchCenter, meters: number, bearingDegrees: number): SearchCenter {
-  const angularDistance = meters / 6_371_000;
-  const bearing = bearingDegrees * Math.PI / 180;
-  const latitude = origin.latitude * Math.PI / 180;
-  const longitude = origin.longitude * Math.PI / 180;
-  const shiftedLatitude = Math.asin(Math.sin(latitude) * Math.cos(angularDistance)
-    + Math.cos(latitude) * Math.sin(angularDistance) * Math.cos(bearing));
-  const shiftedLongitude = longitude + Math.atan2(
-    Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(latitude),
-    Math.cos(angularDistance) - Math.sin(latitude) * Math.sin(shiftedLatitude),
-  );
-  return { latitude: shiftedLatitude * 180 / Math.PI, longitude: shiftedLongitude * 180 / Math.PI };
+function allocateTierPlaceTypes(mode: Mode, weightsMap: Map<string, number>) {
+  const groupKeys = Object.keys(groups[mode]);
+  // 1. Uniform Fisher-Yates pre-shuffle for equal weight tie-breaking
+  for (let i = groupKeys.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = groupKeys[i];
+    groupKeys[i] = groupKeys[j];
+    groupKeys[j] = temp;
+  }
+  // 2. Stable sort descending by weight
+  groupKeys.sort((a, b) => (weightsMap.get(b) ?? 0.00) - (weightsMap.get(a) ?? 0.00));
+
+  const highCount = mode === "food" ? 2 : 1;
+  const medCount = mode === "food" ? 3 : 2;
+
+  const highGroups = groupKeys.slice(0, highCount);
+  const medGroups = groupKeys.slice(highCount, highCount + medCount);
+  const lowGroups = groupKeys.slice(highCount + medCount);
+
+  const extractTypes = (keys: string[]): string[] => {
+    const typesSet = new Set<string>();
+    for (const key of keys) {
+      for (const t of groups[mode][key] ?? []) {
+        typesSet.add(t);
+      }
+    }
+    const list = Array.from(typesSet).slice(0, 50);
+    return list.length > 0 ? list : defaults[mode];
+  };
+
+  return {
+    highTypes: extractTypes(highGroups),
+    medTypes: extractTypes(medGroups),
+    lowTypes: extractTypes(lowGroups),
+  };
 }
 
-function buildSearchPlan(mode: Mode, origin: SearchCenter, radius: number): SearchPlan[] {
-  const rotation = Math.random() * 90;
-  const anchorDistance = radius * 0.55;
-  const anchorRadius = Math.min(50_000, Math.max(1_000, Math.round(radius * 0.65)));
-  const anchors = shuffle([0, 90, 180, 270].map((bearing) => offsetLocation(origin, anchorDistance, bearing + rotation)));
-
-  const modeGroups = groups[mode];
-  const categoryGroups = shuffle(Object.values(modeGroups).map((types) => [...new Set(types)]));
-
-  return [
-    { center: origin, radius, includedTypes: defaults[mode] },
-    ...categoryGroups.map((includedTypes, index) => ({ center: anchors[index % anchors.length], radius: anchorRadius, includedTypes: includedTypes.slice(0, 50) })),
-    ...anchors.map((center) => ({ center, radius: anchorRadius, includedTypes: defaults[mode] })),
-  ];
-}
-
-async function searchNearby(apiKey: string, plan: SearchPlan) {
+async function searchNearby(apiKey: string, center: Coordinates, radius: number, includedTypes: string[]) {
+  if (includedTypes.length === 0) return { ok: true, places: [] as Place[] };
   try {
     const response = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": fieldMask },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": fieldMask,
+        "X-Goog-Maps-Solution-ID": "gmp_git_agentskills_v1",
+      },
       body: JSON.stringify({
-        includedTypes: plan.includedTypes,
+        includedTypes: includedTypes.slice(0, 50),
         maxResultCount: 20,
-        rankPreference: "DISTANCE",
-        locationRestriction: { circle: { center: plan.center, radius: plan.radius } },
+        rankPreference: "POPULARITY",
+        locationRestriction: {
+          circle: {
+            center: { latitude: center.latitude, longitude: center.longitude },
+            radius,
+          },
+        },
       }),
     });
     if (!response.ok) {
-      console.error("Google Places distance request failed", response.status, await response.text());
+      console.error("Google Places searchNearby failed", response.status, await response.text());
       return { ok: false, places: [] as Place[] };
     }
-    const payload = await response.json() as { places?: Place[] };
+    const payload = (await response.json()) as { places?: Place[] };
     return { ok: true, places: payload.places ?? [] };
   } catch (error) {
-    console.error("Google Places distance request failed", error);
+    console.error("Google Places searchNearby exception", error);
     return { ok: false, places: [] as Place[] };
   }
 }
@@ -269,12 +348,27 @@ async function photo(apiKey: string, place: Place) {
   const source = place.photos?.[0];
   if (!source?.name) return { photoUrl: null, photoAttribution: null };
   try {
-    const response = await fetch(`https://places.googleapis.com/v1/${source.name}/media?maxWidthPx=1200&skipHttpRedirect=true`, { headers: { "X-Goog-Api-Key": apiKey } });
+    const response = await fetch(
+      `https://places.googleapis.com/v1/${source.name}/media?maxWidthPx=1200&skipHttpRedirect=true`,
+      {
+        headers: {
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-Maps-Solution-ID": "gmp_git_agentskills_v1",
+        },
+      }
+    );
     if (!response.ok) return { photoUrl: null, photoAttribution: null };
-    const data = await response.json() as { photoUri?: string }; const by = source.authorAttributions?.[0];
-    return { photoUrl: data.photoUri ?? null, photoAttribution: by?.displayName ? { displayName: by.displayName, uri: by.uri ?? null } : null };
-  } catch { return { photoUrl: null, photoAttribution: null }; }
+    const data = (await response.json()) as { photoUri?: string };
+    const by = source.authorAttributions?.[0];
+    return {
+      photoUrl: data.photoUri ?? null,
+      photoAttribution: by?.displayName ? { displayName: by.displayName, uri: by.uri ?? null } : null,
+    };
+  } catch {
+    return { photoUrl: null, photoAttribution: null };
+  }
 }
+
 
 function extractAmenities(place: Place): Record<string, boolean> {
   const amenities: Record<string, boolean> = {};
@@ -388,7 +482,12 @@ Deno.serve(async (request) => {
           try {
             const res = await fetch(
               `https://places.googleapis.com/v1/${p.name}/media?maxWidthPx=1200&skipHttpRedirect=true`,
-              { headers: { "X-Goog-Api-Key": googleKey } }
+              {
+                headers: {
+                  "X-Goog-Api-Key": googleKey,
+                  "X-Goog-Maps-Solution-ID": "gmp_git_agentskills_v1",
+                },
+              }
             );
             if (res.ok) {
               const data = (await res.json()) as { photoUri?: string };
@@ -446,7 +545,12 @@ Deno.serve(async (request) => {
             try {
               const res = await fetch(
                 `https://places.googleapis.com/v1/${p.name}/media?maxWidthPx=1200&skipHttpRedirect=true`,
-                { headers: { "X-Goog-Api-Key": googleKey } }
+                {
+                  headers: {
+                    "X-Goog-Api-Key": googleKey,
+                    "X-Goog-Maps-Solution-ID": "gmp_git_agentskills_v1",
+                  },
+                }
               );
               if (res.ok) {
                 const data = (await res.json()) as { photoUri?: string };
@@ -472,139 +576,240 @@ Deno.serve(async (request) => {
   if (userError || !user) return reply({ error: "Your session has expired. Please sign in again." }, 401);
 
   const mode: Mode | null = body.mode === "activities" ? "activities" : body.mode === "food" ? "food" : null;
-  const latitude = number(body.latitude); const longitude = number(body.longitude); const requestedRadius = number(body.radiusMeters);
-  if (!mode || latitude === null || longitude === null || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return reply({ error: "Choose a valid discovery area." }, 400);
+  const latitude = number(body.latitude);
+  const longitude = number(body.longitude);
+  const requestedRadius = number(body.radiusMeters);
+
+  if (
+    !mode ||
+    latitude === null ||
+    longitude === null ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    return reply({ error: "Choose a valid discovery area." }, 400);
+  }
+
+  let circleIndex = 0;
+  if (body.circleIndex !== undefined && body.circleIndex !== null) {
+    if (
+      typeof body.circleIndex !== "number" ||
+      !Number.isInteger(body.circleIndex) ||
+      body.circleIndex < 0 ||
+      body.circleIndex > 6
+    ) {
+      return reply({ error: "circleIndex must be an integer between 0 and 6." }, 400);
+    }
+    circleIndex = body.circleIndex;
+  }
+
   const radius = Math.min(50_000, Math.max(1_000, Math.round(requestedRadius ?? 10_000)));
+  const origin: Coordinates = { latitude, longitude };
+
   const weightsTable = mode === "food" ? "user_food_category_weights" : "user_activity_category_weights";
   const [
     { data: savedPlaces, error: savedPlacesError },
     { data: passedPlaces, error: passedPlacesError },
-    { data: categoryWeights },
+    { data: categoryWeights, error: categoryWeightsError },
   ] = await Promise.all([
     client.from("saved_places").select("google_place_id").eq("user_id", user.id),
     client.from("passed_places").select("google_place_id").eq("user_id", user.id).eq("mode", mode),
     client.from(weightsTable).select("category_key, weight").eq("user_id", user.id),
   ]);
-  if (savedPlacesError || passedPlacesError) return reply({ error: "Could not load your recommendation history." }, 500);
+
+  if (savedPlacesError || passedPlacesError) {
+    return reply({ error: "Could not load your recommendation history." }, 500);
+  }
+  if (categoryWeightsError) {
+    console.warn("Could not load category weights, defaulting to 0.00:", categoryWeightsError);
+  }
+
   const excluded = new Set([
     ...(savedPlaces ?? []).map((row) => row.google_place_id),
     ...(passedPlaces ?? []).map((row) => row.google_place_id),
-    ...strings(body.excludedPlaceIds, 100),
+    ...strings(body.excludedPlaceIds, 5000),
   ]);
 
   const weightsMap = new Map<string, number>();
-  for (const row of (categoryWeights ?? []) as Array<{ category_key: string; weight: number }>) {
-    if (typeof row.category_key === "string" && typeof row.weight === "number") {
-      weightsMap.set(row.category_key, row.weight);
+  for (const row of (categoryWeights ?? []) as Array<{ category_key?: string | null; weight?: number | string | null }>) {
+    const key = row?.category_key;
+    if (typeof key === "string" && key.length > 0) {
+      const raw = row.weight;
+      const num = typeof raw === "number" ? raw : typeof raw === "string" ? parseFloat(raw) : NaN;
+      weightsMap.set(key, Number.isFinite(num) ? Math.max(0.00, Math.min(1.00, num)) : 0.00);
     }
   }
 
-  const candidates = new Map<string, {
-    place: Place;
-    meters: number;
-    score: number;
-    categoryKey: string | null;
-    categoryKeys: string[];
-  }>();
+  // 1. Compute Active Circle Geometry (Moderate Overlap r = 0.48 R, d = 0.54 R)
+  const activeCircle = computeCircleGeometry(origin, radius, circleIndex);
+
+  // 2. Allocate 3 Tiers (High, Med, Low) with 50-type cap
+  const { highTypes, medTypes, lowTypes } = allocateTierPlaceTypes(mode, weightsMap);
+
+  // 3. Dispatch 3 Concurrent Google Places searchNearby Queries (POPULARITY, max 20)
+  const [highRes, medRes, lowRes] = await Promise.all([
+    searchNearby(googleKey, activeCircle.center, activeCircle.radiusMeters, highTypes),
+    searchNearby(googleKey, activeCircle.center, activeCircle.radiusMeters, medTypes),
+    searchNearby(googleKey, activeCircle.center, activeCircle.radiusMeters, lowTypes),
+  ]);
+
+  if (!highRes.ok && !medRes.ok && !lowRes.ok) {
+    return reply({ error: "Nearby places are temporarily unavailable." }, 502);
+  }
+
+  // 4. Cache all fetched venues into Supabase places table (keyed by ID to avoid duplicate upsert crash)
   const fetchedPlaces = new Map<string, Place>();
-  const searchPlan = buildSearchPlan(mode, { latitude, longitude }, radius);
-  let successfulSearches = 0;
-  for (const plan of searchPlan) {
-    const result = await searchNearby(googleKey, plan);
-    if (!result.ok) continue;
-    successfulSearches += 1;
-    for (const place of result.places) {
-      if (place.id) fetchedPlaces.set(place.id, place);
-      const placeLat = place.location?.latitude; const placeLng = place.location?.longitude;
-      if (!place.id || !place.displayName?.text || placeLat === undefined || placeLng === undefined || excluded.has(place.id) || candidates.has(place.id)) continue;
-      const meters = distance(latitude, longitude, placeLat, placeLng);
-      if (meters > radius) continue;
-
-      const candidateCategoryKeys = new Set<string>();
-      if (place.primaryType && typeToGroup[mode][place.primaryType]) {
-        candidateCategoryKeys.add(typeToGroup[mode][place.primaryType]);
-      }
-      if (Array.isArray(place.types)) {
-        for (const t of place.types) {
-          if (typeToGroup[mode][t]) {
-            candidateCategoryKeys.add(typeToGroup[mode][t]);
-          }
-        }
-      }
-      const matchedKeys = Array.from(candidateCategoryKeys);
-      let maxWeight = 0.00;
-      for (const k of matchedKeys) {
-        const w = weightsMap.get(k) ?? 0.00;
-        if (w > maxWeight) maxWeight = w;
-      }
-
-      const wCategory = 0.5 + 1.5 * Math.min(1.0, Math.max(0.0, maxWeight));
-      const proximity = Math.max(0, 1 - meters / radius);
-      const wProximity = 0.5 + 0.5 * proximity;
-      const ratingValue = typeof place.rating === "number" ? Math.min(5, Math.max(0, place.rating)) : 3.5;
-      const wQuality = 0.7 + 0.3 * (ratingValue / 5);
-      const rawScore = wCategory * wProximity * wQuality;
-      const normalizedScore = Math.min(1.0, Math.max(0.0, rawScore / 2.0));
-
-      candidates.set(place.id, {
-        place,
-        meters,
-        score: normalizedScore,
-        categoryKey: matchedKeys[0] ?? null,
-        categoryKeys: matchedKeys,
-      });
-    }
-    if (candidates.size >= 40) break;
+  for (const place of [...highRes.places, ...medRes.places, ...lowRes.places]) {
+    if (place.id) fetchedPlaces.set(place.id, place);
   }
-  if (successfulSearches === 0) return reply({ error: "Nearby places are temporarily unavailable." }, 502);
   try {
     await cacheFetchedPlaces(admin, fetchedPlaces.values());
   } catch (error) {
     console.error("Could not cache fetched Google Places", error);
     return reply({ error: "Could not store nearby places." }, 500);
   }
-  if (candidates.size === 0 && successfulSearches < searchPlan.length) {
-    return reply({ error: "We could not finish searching this area. Please try again." }, 502);
+
+  // 5. Cross-Queue Deduplication (Highest Tier Wins) & Boundary Distance Enforcement (distance <= R)
+  const seenPlaceIds = new Set<string>(excluded);
+
+  function filterTierPlaces(places: Place[]): Place[] {
+    const valid: Place[] = [];
+    for (const place of places) {
+      if (
+        !place.id ||
+        !place.displayName?.text ||
+        typeof place.location?.latitude !== "number" ||
+        !Number.isFinite(place.location.latitude) ||
+        typeof place.location?.longitude !== "number" ||
+        !Number.isFinite(place.location.longitude)
+      ) {
+        continue;
+      }
+
+      // Strict boundary check: distance from user origin (lat0, lng0) must not exceed radius R
+      const metersFromUser = haversineDistanceMeters(origin, {
+        latitude: place.location.latitude,
+        longitude: place.location.longitude,
+      });
+      if (metersFromUser > radius + EPSILON_METERS) {
+        continue;
+      }
+
+      // Cross-queue deduplication & excluded check
+      if (seenPlaceIds.has(place.id)) {
+        continue;
+      }
+
+      seenPlaceIds.add(place.id);
+      valid.push(place);
+    }
+    return valid;
   }
-  const ranked = [...candidates.values()]
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 20);
-  const recommendations = await Promise.all(ranked.map(async ({ place, meters, score, categoryKey, categoryKeys }) => {
-    const photoInfo = await photo(googleKey, place);
-    const photos = (place.photos ?? []).slice(0, 10).map((p, index) => ({
-      name: p.name ?? null,
-      widthPx: p.widthPx ?? null,
-      heightPx: p.heightPx ?? null,
-      url: index === 0 ? photoInfo.photoUrl : null,
-      authorAttributions: (p.authorAttributions ?? []).map((a) => ({
-        displayName: a.displayName ?? null,
-        uri: a.uri ?? null,
-      })),
-    }));
-    return {
-      id: place.id,
-      name: place.displayName?.text,
-      category: place.primaryTypeDisplayName?.text ?? "Place",
-      categoryKey,
-      categoryKeys,
-      address: place.formattedAddress ?? null,
-      distanceMeters: Math.round(meters),
-      rating: place.rating ?? null,
-      ratingCount: place.userRatingCount ?? null,
-      priceLevel: place.priceLevel ?? null,
-      openNow: place.currentOpeningHours?.openNow ?? null,
-      mapsUrl: place.googleMapsUri ?? null,
-      websiteUri: place.websiteUri ?? null,
-      phoneNumber: place.nationalPhoneNumber ?? place.internationalPhoneNumber ?? null,
-      regularOpeningHours: place.regularOpeningHours?.weekdayDescriptions ?? [],
-      amenities: extractAmenities(place),
-      reason: meters < radius * 0.3 ? "A nearby option within your chosen range." : "A different corner of your chosen search area.",
-      score: Number(score.toFixed(4)),
-      matchPercent: Math.round(score * 100),
-      photos,
-      photoUrl: photoInfo.photoUrl,
-      photoAttribution: photoInfo.photoAttribution,
-    };
-  }));
-  return reply({ recommendations, exhausted: recommendations.length === 0, passedCount: passedPlaces?.length ?? 0 });
+
+  const rawHigh = filterTierPlaces(highRes.places);
+  const rawMed = filterTierPlaces(medRes.places);
+  const rawLow = filterTierPlaces(lowRes.places);
+
+  // 6. Enrich Places with Scores, Details, and Photo Media URLs
+  async function enrichPlaces(places: Place[], tier: "high" | "med" | "low") {
+    return Promise.all(
+      places.map(async (place) => {
+        const placeLat = place.location!.latitude!;
+        const placeLng = place.location!.longitude!;
+        const meters = haversineDistanceMeters(origin, { latitude: placeLat, longitude: placeLng });
+
+        const candidateCategoryKeys = new Set<string>();
+        if (place.primaryType && typeToGroup[mode][place.primaryType]) {
+          candidateCategoryKeys.add(typeToGroup[mode][place.primaryType]);
+        }
+        if (Array.isArray(place.types)) {
+          for (const t of place.types) {
+            if (typeToGroup[mode][t]) {
+              candidateCategoryKeys.add(typeToGroup[mode][t]);
+            }
+          }
+        }
+        const matchedKeys = Array.from(candidateCategoryKeys);
+        let maxWeight = 0.00;
+        for (const k of matchedKeys) {
+          const w = weightsMap.get(k) ?? 0.00;
+          if (w > maxWeight) maxWeight = w;
+        }
+
+        const wCategory = 0.5 + 1.5 * Math.min(1.0, Math.max(0.0, maxWeight));
+        const proximity = Math.max(0, 1 - meters / radius);
+        const wProximity = 0.5 + 0.5 * proximity;
+        const ratingValue = typeof place.rating === "number" ? Math.min(5, Math.max(0, place.rating)) : 3.5;
+        const wQuality = 0.7 + 0.3 * (ratingValue / 5);
+        const rawScore = wCategory * wProximity * wQuality;
+        const normalizedScore = Math.min(1.0, Math.max(0.0, rawScore / 2.0));
+
+        const photoInfo = await photo(googleKey, place);
+        const photos = (place.photos ?? []).slice(0, 10).map((p, index) => ({
+          name: p.name ?? null,
+          widthPx: p.widthPx ?? null,
+          heightPx: p.heightPx ?? null,
+          url: index === 0 ? photoInfo.photoUrl : null,
+          authorAttributions: (p.authorAttributions ?? []).map((a) => ({
+            displayName: a.displayName ?? null,
+            uri: a.uri ?? null,
+          })),
+        }));
+
+        const tierReason = tier === "high"
+          ? "Matches your top category preferences."
+          : tier === "med"
+            ? "Matches your secondary interests."
+            : "A popular choice to expand your options.";
+
+        return {
+          id: place.id!,
+          name: place.displayName?.text ?? "Unknown Venue",
+          category: place.primaryTypeDisplayName?.text ?? "Place",
+          categoryKey: matchedKeys[0] ?? null,
+          categoryKeys: matchedKeys,
+          address: place.formattedAddress ?? null,
+          distanceMeters: Math.round(meters),
+          rating: place.rating ?? null,
+          ratingCount: place.userRatingCount ?? null,
+          priceLevel: place.priceLevel ?? null,
+          openNow: place.currentOpeningHours?.openNow ?? null,
+          mapsUrl: place.googleMapsUri ?? null,
+          websiteUri: place.websiteUri ?? null,
+          phoneNumber: place.nationalPhoneNumber ?? place.internationalPhoneNumber ?? null,
+          regularOpeningHours: place.regularOpeningHours?.weekdayDescriptions ?? [],
+          amenities: extractAmenities(place),
+          reason: meters < radius * 0.3 ? "A nearby option within your chosen range." : tierReason,
+          score: Number(normalizedScore.toFixed(4)),
+          matchPercent: Math.round(normalizedScore * 100),
+          photos,
+          photoUrl: photoInfo.photoUrl,
+          photoAttribution: photoInfo.photoAttribution,
+        };
+      })
+    );
+  }
+
+  const [highQueue, medQueue, lowQueue] = await Promise.all([
+    enrichPlaces(rawHigh, "high"),
+    enrichPlaces(rawMed, "med"),
+    enrichPlaces(rawLow, "low"),
+  ]);
+
+  const recommendations = [...highQueue, ...medQueue, ...lowQueue];
+  const isCircleExhausted = recommendations.length === 0;
+
+  return reply({
+    queues: {
+      high: highQueue,
+      med: medQueue,
+      low: lowQueue,
+    },
+    recommendations,
+    circleIndex,
+    exhausted: isCircleExhausted,
+    passedCount: passedPlaces?.length ?? 0,
+  });
 });

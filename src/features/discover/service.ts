@@ -29,15 +29,39 @@ export async function getRoundedDeviceLocation(): Promise<DiscoverLocation> {
   return { latitude: round(result.coords.latitude), longitude: round(result.coords.longitude) };
 }
 
-export async function requestRecommendations(mode: DiscoverMode, location: DiscoverLocation, radiusMeters: number) {
+export async function requestRecommendations(
+  mode: DiscoverMode,
+  location: DiscoverLocation,
+  radiusMeters: number,
+  circleIndex: number = 0,
+  excludedPlaceIds: string[] = []
+) {
   const { data, error } = await client().functions.invoke('place-recommendations', { body: {
-    mode, latitude: location.latitude, longitude: location.longitude, radiusMeters,
+    mode,
+    latitude: location.latitude,
+    longitude: location.longitude,
+    radiusMeters,
+    circleIndex,
+    excludedPlaceIds,
   } });
   if (error) throw error;
   if (!data || !Array.isArray(data.recommendations) || typeof data.exhausted !== 'boolean' || typeof data.passedCount !== 'number') {
     throw new Error('The recommendation service returned an invalid response.');
   }
   return data as RecommendationResponse;
+}
+
+export async function loadUserSavedAndPassedPlaceIds(
+  userId: string,
+  mode: DiscoverMode
+): Promise<{ savedIds: Set<string>; passedIds: Set<string> }> {
+  const [savedRes, passedRes] = await Promise.all([
+    client().from('saved_places').select('google_place_id').eq('user_id', userId),
+    client().from('passed_places').select('google_place_id').eq('user_id', userId).eq('mode', mode),
+  ]);
+  const savedIds = new Set<string>((savedRes.data ?? []).map((r: { google_place_id: string }) => r.google_place_id));
+  const passedIds = new Set<string>((passedRes.data ?? []).map((r: { google_place_id: string }) => r.google_place_id));
+  return { savedIds, passedIds };
 }
 
 export async function savePlace(userId: string, placeId: string, mode: DiscoverMode) {

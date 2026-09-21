@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/app-header';
@@ -14,32 +14,63 @@ const EMPTY_SUMMARY: ProfileVisitSummary = { averageRating: null, places: [], vi
 
 export default function ProfileScreen() {
   const { session } = useAuth();
-  const { profile } = useProfile();
+  const { profile, reload } = useProfile();
   const { updated } = useLocalSearchParams<{ updated?: string }>();
   const [summary, setSummary] = useState<ProfileVisitSummary>(EMPTY_SUMMARY);
   const [loadingSummary, setLoadingSummary] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const summaryRequest = useRef(0);
 
-  useFocusEffect(useCallback(() => {
-    let active = true;
+  const reloadSummary = useCallback(async () => {
+    const id = ++summaryRequest.current;
     const userId = session?.user.id;
     if (!userId) {
       setLoadingSummary(false);
-      return () => { active = false; };
+      return;
     }
+
+    try {
+      const next = await loadProfileVisitSummary(userId);
+      if (id === summaryRequest.current) setSummary(next);
+    } catch {
+      if (id === summaryRequest.current) setSummary(EMPTY_SUMMARY);
+    } finally {
+      if (id === summaryRequest.current) setLoadingSummary(false);
+    }
+  }, [session?.user.id]);
+
+  useFocusEffect(useCallback(() => {
     setLoadingSummary(true);
-    void loadProfileVisitSummary(userId)
-      .then((next) => { if (active) setSummary(next); })
-      .catch(() => { if (active) setSummary(EMPTY_SUMMARY); })
-      .finally(() => { if (active) setLoadingSummary(false); });
-    return () => { active = false; };
-  }, [session?.user.id]));
+    void reloadSummary();
+    return () => { summaryRequest.current += 1; };
+  }, [reloadSummary]));
+
+  const handleRefresh = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await Promise.all([reload({ background: true }), reloadSummary()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshing, reload, reloadSummary]);
 
   if (!profile) return null;
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <AppHeader brandLeading description="My Profile" />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={(
+          <RefreshControl
+            colors={['#000000']}
+            onRefresh={() => void handleRefresh()}
+            refreshing={refreshing}
+            tintColor="#000000"
+          />
+        )}
+      >
         {updated === '1' ? <Text accessibilityRole="alert" style={styles.savedMessage}>Your profile is saved.</Text> : null}
 
         <View style={styles.profileDescription}>
