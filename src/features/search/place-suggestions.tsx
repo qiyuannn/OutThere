@@ -67,10 +67,10 @@ export function PlaceSuggestions({ query, center, onSelect }: {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, minHeight: 0 },
-  header: { width: '100%', padding: 10, justifyContent: 'center', overflow: 'hidden' },
-  title: { color: '#000000', fontSize: 16, fontWeight: '600', lineHeight: 20 },
-  list: { padding: 10, paddingBottom: 36 },
+  container: { flex: 1, minHeight: 0, borderRadius: 24, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.96)' },
+  header: { width: '100%', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, justifyContent: 'center', overflow: 'hidden' },
+  title: { color: '#000000', fontSize: 20, fontWeight: '700', lineHeight: 25 },
+  list: { paddingHorizontal: 16, paddingBottom: 120 },
   emptyList: { flexGrow: 1 },
   separator: { height: 10 },
   status: { minHeight: 100, alignItems: 'center', justifyContent: 'center' },

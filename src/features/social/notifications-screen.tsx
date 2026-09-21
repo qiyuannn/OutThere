@@ -5,6 +5,14 @@ import { PersonRow, SocialBack, SocialError, SocialState } from './components';
 import { useSocialList, useSocialMutation } from './hooks';
 import { notificationMessage } from './model';
 import type { SocialNotification } from './types';
+import { SectionHeading } from '@/components/ui-system';
+
+function groupLabel(dateValue: string) {
+  const date = new Date(dateValue); const now = new Date();
+  if (date.toDateString() === now.toDateString()) return 'Today';
+  const days = (now.getTime() - date.getTime()) / 86_400_000;
+  return days < 7 ? 'This week' : 'Earlier';
+}
 
 export default function NotificationsScreen() {
   const list = useSocialList<SocialNotification>('notifications');
@@ -16,7 +24,9 @@ export default function NotificationsScreen() {
   return <Screen title="Notifications" headerDescription="Notifications">
     <SocialBack />
     <SocialError message={mutation.error} />
-    {list.items.map((item) => <Card key={item.id}>
+    {list.items.map((item, index) => <Card key={item.id}>
+      {index === 0 || groupLabel(list.items[index - 1].created_at) !== groupLabel(item.created_at)
+        ? <SectionHeading title={groupLabel(item.created_at)} /> : null}
       <PersonRow person={item.actor} />
       <ThemedText>{item.read ? '' : '● '}{item.actor.name} {notificationMessage(item.kind)}.</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">{new Date(item.created_at).toLocaleString()}</ThemedText>

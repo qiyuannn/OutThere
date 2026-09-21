@@ -111,11 +111,11 @@ function QuickAction({
 
 const styles = StyleSheet.create({
   row: { width: '100%', flexDirection: 'row', alignItems: 'flex-start' },
-  action: { flex: 1, minWidth: 0, gap: 10, padding: 10, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  iconCircle: { width: 46, height: 46, borderWidth: 1, borderColor: '#000000', borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
-  selectedCircle: { backgroundColor: '#F3F4F6' },
-  icon: { width: 24, height: 24 },
-  label: { width: '100%', color: '#000000', fontSize: 10, fontWeight: '600', lineHeight: 12, textAlign: 'center' },
+  action: { flex: 1, minWidth: 0, gap: 4, padding: 6, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  iconCircle: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(243,244,246,0.88)' },
+  selectedCircle: { backgroundColor: '#000000' },
+  icon: { width: 21, height: 21 },
+  label: { width: '100%', color: '#000000', fontSize: 11, fontWeight: '700', lineHeight: 14, textAlign: 'center' },
   value: { color: '#000000', fontSize: 12, fontWeight: '600', lineHeight: 15, textAlign: 'center' },
   disabled: { opacity: 0.3 },
   pressed: { opacity: 0.5 },

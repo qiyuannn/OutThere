@@ -55,11 +55,11 @@ export function PlaceHeader({ place }: { place: PlaceDetails }) {
 }
 
 const styles = StyleSheet.create({
-  container: { width: '100%', minHeight: 60, flexDirection: 'row', alignItems: 'flex-start', gap: 11, overflow: 'hidden' },
-  details: { flex: 1, minWidth: 0, alignItems: 'flex-start', overflow: 'hidden' },
-  name: { color: '#000000', fontSize: 16, fontWeight: '600', lineHeight: 15, letterSpacing: 0.25 },
-  meta: { color: '#000000', fontSize: 10, fontWeight: '300', lineHeight: 15, letterSpacing: 0.25 },
-  shareButton: { width: 60, height: 60, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
+  container: { width: '100%', minHeight: 82, flexDirection: 'row', alignItems: 'flex-start', gap: 14, overflow: 'hidden' },
+  details: { flex: 1, minWidth: 0, alignItems: 'flex-start', gap: 3, overflow: 'hidden' },
+  name: { color: '#000000', fontSize: 28, fontWeight: '800', lineHeight: 34, letterSpacing: -0.55 },
+  meta: { color: '#637068', fontSize: 13, fontWeight: '400', lineHeight: 18 },
+  shareButton: { width: 48, height: 48, borderRadius: 24, flexShrink: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6' },
   shareIcon: { width: 24, height: 24 },
   pressed: { opacity: 0.5 },
 });

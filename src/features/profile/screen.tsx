@@ -14,6 +14,7 @@ import { Avatar } from './components/avatar';
 import { SignOutButton } from './components/sign-out';
 import { VisitedPlacesMap } from './components/visited-places-map';
 import { loadProfileVisitSummary, type ProfileVisitSummary } from './service';
+import { SectionHeading, StatusBanner } from '@/components/ui-system';
 
 const EMPTY_SUMMARY: ProfileVisitSummary = { averageRating: null, places: [], visitedCount: 0 };
 const EMPTY_SOCIAL: SocialSummary = { enabled: false, friends: 0, incoming: 0, outgoing: 0, unread: 0 };
@@ -63,100 +64,101 @@ export default function ProfileScreen() {
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <AppHeader brandLeading description="My Profile" />
       <ScrollView contentContainerStyle={styles.content}>
-        {updated === '1' ? <Text accessibilityRole="alert" style={styles.savedMessage}>Your profile is saved.</Text> : null}
+        {updated === '1' ? <StatusBanner>Your profile is saved.</StatusBanner> : null}
 
         <View style={styles.profileDescription}>
-          <Avatar name={profile.display_name} path={profile.avatar_path} size={69} />
+          <Avatar name={profile.display_name} path={profile.avatar_path} size={84} />
           <View style={styles.identity}>
             <Text style={styles.name}>{profile.display_name}</Text>
             <Text style={styles.username}>@{profile.username}</Text>
-            {socialLoading ? <Text style={styles.socialCounts}>Loading social counts…</Text>
-              : offline ? <Text accessibilityRole="alert" style={styles.socialCounts}>Offline · counts may be outdated</Text>
-                : socialError ? <Pressable accessibilityRole="button" onPress={() => { loadSocial(); }}><Text style={styles.socialError}>Couldn’t load counts · Try again</Text></Pressable>
-                  : <Text style={styles.socialCounts}>{social.friends} {social.friends === 1 ? 'friend' : 'friends'} · {social.incoming} incoming</Text>}
+            {profile.bio ? <Text numberOfLines={3} style={styles.bio}>{profile.bio}</Text> : null}
           </View>
         </View>
 
-        <Pressable accessibilityRole="button" onPress={() => router.push('/profile/edit')}
-          style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}>
-          <Text style={styles.buttonLabel}>Edit Profile</Text>
-        </Pressable>
+        <View style={styles.stats}>
+          <StatButton label="Friends" value={socialLoading ? '—' : String(social.friends)} onPress={() => router.push('/feed/people')} />
+          <View style={styles.statDivider} />
+          <StatButton label="Visited" value={loadingSummary ? '—' : String(summary.visitedCount)} onPress={() => router.push('/profile/activities')} />
+          <View style={styles.statDivider} />
+          <StatButton label="Avg rating" value={loadingSummary || summary.averageRating === null ? '—' : summary.averageRating.toFixed(1)} onPress={() => router.push('/profile/statistics')} />
+        </View>
 
-        <Pressable accessibilityRole="button" onPress={() => router.push('/rankings')}
-          style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}>
-          <Text style={styles.buttonLabel}>My Rankings</Text>
-        </Pressable>
+        {offline ? <StatusBanner>Offline · social counts may be outdated</StatusBanner>
+          : socialError ? <Pressable accessibilityRole="button" onPress={() => { loadSocial(); }}><StatusBanner tone="error">Couldn’t load social counts · Tap to retry</StatusBanner></Pressable>
+            : social.incoming > 0 ? <Pressable accessibilityRole="button" onPress={() => router.push('/feed/people')}><StatusBanner>{social.incoming} pending friend {social.incoming === 1 ? 'request' : 'requests'}</StatusBanner></Pressable> : null}
 
         <View style={styles.actions}>
-          <Pressable accessibilityRole="button" onPress={() => router.push('/feed/people')}
-            style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
-            <Text style={styles.buttonLabel}>Friends{social.incoming ? ` (${social.incoming})` : ''}</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={() => router.push('/feed/privacy')}
-            style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
-            <Text style={styles.buttonLabel}>Privacy & Sharing</Text>
-          </Pressable>
+          <ProfileButton label="Edit profile" onPress={() => router.push('/profile/edit')} />
+          <ProfileButton label="Settings" onPress={() => router.push('/profile/account')} />
         </View>
 
-        <View style={styles.statistics}>
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Places Visited:</Text>
-            <Text style={styles.statValue}>{loadingSummary ? '—' : summary.visitedCount}</Text>
-          </View>
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Average Rating:</Text>
-            <Text style={styles.statValue}>{loadingSummary || summary.averageRating === null ? '—' : summary.averageRating.toFixed(1)}</Text>
-          </View>
-        </View>
-
-        <View style={styles.actions}>
-          <Pressable accessibilityRole="button" onPress={() => router.push('/profile/statistics')}
-            style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
-            <Text style={styles.buttonLabel}>View Statistics</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={() => router.push('/profile/activities')}
-            style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
-            <Text style={styles.buttonLabel}>View Past Activities</Text>
-          </Pressable>
+        <View accessibilityRole="tablist" style={styles.profileTabs}>
+          <ProfileTab label="Ratings" symbol="★" onPress={() => router.push('/rankings')} />
+          <ProfileTab label="Activity" symbol="▦" onPress={() => router.push('/profile/activities')} />
+          <ProfileTab label="Map" symbol="⌖" onPress={() => router.push('/profile/statistics')} />
         </View>
 
         <View style={styles.mapSection}>
-          <Text style={styles.mapHeading}>Map</Text>
+          <SectionHeading eyebrow="Your footprint" title="Places you’ve been" />
           {loadingSummary ? <View style={styles.mapLoading}><ActivityIndicator color="#000000" /></View>
             : <VisitedPlacesMap places={summary.places} />}
         </View>
 
+        <SectionHeading eyebrow="Account" title="More for you" />
+        <View style={styles.menuGrid}>
+          <ProfileButton label="Friends" onPress={() => router.push('/feed/people')} />
+          <ProfileButton label="Privacy & sharing" onPress={() => router.push('/feed/privacy')} />
+        </View>
         <SubscriptionCard />
-        <Pressable accessibilityRole="button" onPress={() => router.push('/profile/account')}
-          style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}>
-          <Text style={styles.buttonLabel}>Account & Privacy</Text>
-        </Pressable>
         <SignOutButton />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+function StatButton({ label, onPress, value }: { label: string; onPress: () => void; value: string }) {
+  return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.statButton, pressed && styles.pressed]}>
+    <Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text>
+  </Pressable>;
+}
+
+function ProfileButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
+    <Text style={styles.buttonLabel}>{label}</Text>
+  </Pressable>;
+}
+
+function ProfileTab({ label, onPress, symbol }: { label: string; onPress: () => void; symbol: string }) {
+  return <Pressable accessibilityRole="tab" onPress={onPress} style={({ pressed }) => [styles.profileTab, pressed && styles.pressed]}>
+    <Text style={styles.tabSymbol}>{symbol}</Text><Text style={styles.tabLabel}>{label}</Text>
+  </Pressable>;
+}
+
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
-  content: { width: '100%', maxWidth: 720, alignSelf: 'center', padding: 10, gap: 10, backgroundColor: '#FFFFFF' },
+  content: { width: '100%', maxWidth: 720, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 20, paddingBottom: 120, gap: 18, backgroundColor: '#FFFFFF' },
   savedMessage: { color: '#000000', fontSize: 12, lineHeight: 15, textAlign: 'center' },
-  profileDescription: { minHeight: 101, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  identity: { flex: 1, minHeight: 81, justifyContent: 'center', paddingVertical: 16 },
-  name: { color: '#000000', fontSize: 20, lineHeight: 24, fontWeight: '700' },
-  username: { color: '#000000', fontSize: 10, lineHeight: 15, fontWeight: '300', letterSpacing: 0.25 },
+  profileDescription: { minHeight: 104, flexDirection: 'row', alignItems: 'center', gap: 16 },
+  identity: { flex: 1, justifyContent: 'center', gap: 3 },
+  name: { color: '#000000', fontSize: 25, lineHeight: 30, fontWeight: '700', letterSpacing: -0.35 },
+  username: { color: '#637068', fontSize: 13, lineHeight: 18, fontWeight: '400' },
+  bio: { color: '#000000', fontSize: 14, lineHeight: 19, marginTop: 3 },
   socialCounts: { color: '#000000', fontSize: 10, lineHeight: 15, fontWeight: '500', letterSpacing: 0.25 },
   socialError: { color: '#9A3412', fontSize: 10, lineHeight: 15, fontWeight: '600', letterSpacing: 0.25 },
-  outlineButton: { minHeight: 37, borderWidth: 1, borderColor: '#000000', padding: 10, alignItems: 'center', justifyContent: 'center' },
-  pressed: { opacity: 0.55 },
-  buttonLabel: { color: '#000000', fontSize: 12, lineHeight: 15, fontWeight: '600', textAlign: 'center' },
-  statistics: { padding: 10, gap: 10 },
-  statRow: { flexDirection: 'row', gap: 10 },
-  statLabel: { flex: 1, color: '#000000', fontSize: 12, lineHeight: 15, fontWeight: '600' },
-  statValue: { flex: 1, color: '#000000', fontSize: 12, lineHeight: 15, fontWeight: '400' },
-  actions: { minHeight: 37, flexDirection: 'row', gap: 10 },
-  actionButton: { flex: 1, minHeight: 37, borderWidth: 1, borderColor: '#000000', paddingHorizontal: 10, paddingVertical: 7, alignItems: 'center', justifyContent: 'center' },
-  mapSection: { padding: 10, gap: 10 },
-  mapHeading: { color: '#000000', fontSize: 16, lineHeight: 19, fontWeight: '600' },
-  mapLoading: { width: '100%', height: 330, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D9D9D9' },
+  pressed: { opacity: 0.68, transform: [{ scale: 0.98 }] },
+  buttonLabel: { color: '#000000', fontSize: 13, lineHeight: 17, fontWeight: '700', textAlign: 'center' },
+  stats: { minHeight: 76, borderRadius: 24, backgroundColor: '#F3F4F6', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 },
+  statButton: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  statValue: { color: '#000000', fontSize: 19, lineHeight: 23, fontWeight: '700' },
+  statLabel: { color: '#637068', fontSize: 12, lineHeight: 16, fontWeight: '500' },
+  statDivider: { width: StyleSheet.hairlineWidth, height: 34, backgroundColor: '#C9CECB' },
+  actions: { minHeight: 44, flexDirection: 'row', gap: 10 },
+  actionButton: { flex: 1, minHeight: 44, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6' },
+  profileTabs: { minHeight: 62, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#D8DDDA', flexDirection: 'row' },
+  profileTab: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  tabSymbol: { color: '#000000', fontSize: 20, lineHeight: 22 },
+  tabLabel: { color: '#637068', fontSize: 11, lineHeight: 14, fontWeight: '600' },
+  mapSection: { gap: 12 },
+  mapLoading: { width: '100%', height: 330, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6', overflow: 'hidden' },
+  menuGrid: { flexDirection: 'row', gap: 10 },
 });

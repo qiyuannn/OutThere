@@ -26,7 +26,7 @@ export default function SocialProfileScreen() {
     <SocialBack />
     <SocialState loading={profile.loading} error={profile.error} offline={profile.offline} empty={false} onRetry={profile.refresh} />
     {profile.data && <Card>
-      <PersonRow person={profile.data.person} open={false} />
+      <PersonRow person={profile.data.person} open={false} prominent />
       {!!profile.data.person.bio && <ThemedText>{profile.data.person.bio}</ThemedText>}
       {relationship === 'none' && <Button disabled={mutation.busy} label="Send friend request" onPress={() => void run('request')} />}
       {relationship === 'incoming' && <><Button disabled={mutation.busy} label="Accept request" onPress={() => void run('accept')} /><Button disabled={mutation.busy} label="Decline request" onPress={() => void run('decline')} /></>}

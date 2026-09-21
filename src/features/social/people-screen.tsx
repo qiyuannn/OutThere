@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Screen } from '@/components/foundation';
 import { ThemedText } from '@/components/themed-text';
 import { PersonRow, SocialBack, SocialError, SocialField, SocialState } from './components';
@@ -24,9 +24,12 @@ export default function PeopleScreen() {
 
   return <Screen title="Friends" headerDescription="Friends">
     <SocialBack />
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-      {(Object.keys(labels) as PeopleMode[]).map((value) => <Button key={value} label={`${mode === value ? '• ' : ''}${labels[value]}`} onPress={() => setMode(value)} />)}
-    </View>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modes}>
+      {(Object.keys(labels) as PeopleMode[]).map((value) => <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === value }} key={value}
+        onPress={() => setMode(value)} style={[styles.mode, mode === value && styles.selectedMode]}>
+        <ThemedText style={[styles.modeLabel, mode === value && styles.selectedModeLabel]}>{labels[value]}</ThemedText>
+      </Pressable>)}
+    </ScrollView>
     {search && <>
       <SocialField accessibilityLabel="Search people" autoCapitalize="none" autoCorrect={false} maxLength={80} placeholder="Name or username" value={query} onChangeText={setQuery} />
       <ThemedText type="small" themeColor="textSecondary">Enter at least two characters. Only opted-in profiles appear.</ThemedText>
@@ -41,3 +44,11 @@ export default function PeopleScreen() {
     <SocialState loading={list.loading} error={list.error} offline={list.offline} empty={list.items.length === 0 && (!search || debounced.length >= 2)} emptyTitle={search ? 'No matching people' : `No ${labels[mode].toLocaleLowerCase()}`} emptyMessage={search ? 'Try another name or username.' : mode === 'friends' ? 'Accepted friends will appear here.' : mode === 'incoming' ? 'New friend requests will appear here.' : mode === 'outgoing' ? 'Requests you send will appear here.' : 'People you block will appear here.'} onRetry={list.refresh} hasMore={list.hasMore} loadingMore={list.loadingMore} onMore={list.loadMore} />
   </Screen>;
 }
+
+const styles = StyleSheet.create({
+  modes: { gap: 8, paddingRight: 16 },
+  mode: { minHeight: 42, borderRadius: 21, paddingHorizontal: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6' },
+  selectedMode: { backgroundColor: '#000000' },
+  modeLabel: { color: '#637068', fontSize: 13, lineHeight: 17, fontWeight: '700' },
+  selectedModeLabel: { color: '#FFFFFF' },
+});

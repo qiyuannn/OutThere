@@ -47,11 +47,11 @@ export function SearchResultItem({ place, onPress }: SearchResultItemProps) {
 }
 
 const styles = StyleSheet.create({
-  row: { width: '100%', minHeight: 60, flexDirection: 'row', alignItems: 'flex-start', gap: 11, overflow: 'hidden' },
-  pressed: { opacity: 0.65 },
-  image: { width: 60, height: 60, flexShrink: 0, backgroundColor: '#DC2424' },
-  placeholder: { width: 60, minHeight: 60, alignSelf: 'stretch', flexShrink: 0, backgroundColor: '#DC2424' },
-  details: { flex: 1, minWidth: 0, alignItems: 'flex-start', overflow: 'hidden' },
-  name: { color: '#000000', fontSize: 16, fontWeight: '600', lineHeight: 15, letterSpacing: 0.25 },
-  meta: { color: '#000000', fontSize: 10, fontWeight: '300', lineHeight: 15, letterSpacing: 0.25 },
+  row: { width: '100%', minHeight: 104, flexDirection: 'row', alignItems: 'center', gap: 14, overflow: 'hidden', borderRadius: 22, padding: 8, backgroundColor: '#FFFFFF', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(0,0,0,0.08)' },
+  pressed: { opacity: 0.72, transform: [{ scale: 0.985 }] },
+  image: { width: 88, height: 88, borderRadius: 17, flexShrink: 0, backgroundColor: '#F3F4F6' },
+  placeholder: { width: 88, height: 88, borderRadius: 17, flexShrink: 0, backgroundColor: '#E9EBED' },
+  details: { flex: 1, minWidth: 0, alignItems: 'flex-start', justifyContent: 'center', gap: 3, overflow: 'hidden' },
+  name: { color: '#000000', fontSize: 17, fontWeight: '700', lineHeight: 22 },
+  meta: { color: '#637068', fontSize: 13, fontWeight: '400', lineHeight: 18 },
 });

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
-import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/app-header';
@@ -12,6 +12,7 @@ import { useSubscription } from '@/providers/subscription-provider';
 import { DEFAULT_FILTERS, parseSearch, type SearchRequest } from './model';
 import { SearchResultItem } from './search-result-item';
 import { usePlaceSearch } from './use-search';
+import { SearchResultsMap } from './results-map';
 
 type ResultsParams = {
   query?: string;
@@ -38,6 +39,7 @@ export function SearchResultsScreen() {
   const search = usePlaceSearch();
   const { isPro } = useSubscription();
   const startedRequestKey = useRef<string | null>(null);
+  const [displayMode, setDisplayMode] = useState<'list' | 'map'>('list');
   const requestKey = `${params.query ?? ''}|${params.latitude ?? ''}|${params.longitude ?? ''}|${params.filters ?? ''}|pro:${isPro}`;
   const request = useMemo(() => {
     const parsed = requestFromParams(params);
@@ -59,12 +61,18 @@ export function SearchResultsScreen() {
         <ThemedText accessibilityRole="header" style={styles.title}>
           Search Results for “{request?.query ?? params.query ?? ''}”
         </ThemedText>
+        <View accessibilityRole="tablist" style={styles.viewSwitcher}>
+          {(['list', 'map'] as const).map((mode) => <Pressable key={mode} accessibilityRole="tab" accessibilityState={{ selected: displayMode === mode }} onPress={() => setDisplayMode(mode)}
+            style={[styles.viewOption, displayMode === mode && styles.selectedView]}><ThemedText style={[styles.viewLabel, displayMode === mode && styles.selectedViewLabel]}>{mode === 'list' ? '☷  List' : '⌖  Map'}</ThemedText></Pressable>)}
+        </View>
 
         {!request ? (
           <View style={styles.message}>
             <ThemedText accessibilityRole="alert">This search could not be opened.</ThemedText>
             <Button label="Back to search" onPress={goBack} />
           </View>
+        ) : displayMode === 'map' ? (
+          <SearchResultsMap center={request.center} places={search.results} onSelect={(place) => router.push({ pathname: '/search/[id]', params: { id: place.id, mode: place.mode } } as unknown as Href)} />
         ) : (
           <FlatList
             accessibilityRole="list"
@@ -116,11 +124,16 @@ export function SearchResultsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, overflow: 'hidden' },
-  content: { flex: 1, width: '100%', maxWidth: 402, alignSelf: 'center', padding: 10, gap: 10, overflow: 'hidden' },
-  title: { width: '100%', color: '#000000', fontSize: 16, fontWeight: '600', lineHeight: 20 },
-  list: { padding: 10, paddingBottom: 36 },
-  separator: { height: 10 },
+  content: { flex: 1, width: '100%', maxWidth: 520, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 18, gap: 16, overflow: 'hidden' },
+  title: { width: '100%', color: '#000000', fontSize: 24, fontWeight: '700', lineHeight: 30, letterSpacing: -0.35 },
+  list: { paddingBottom: 120 },
+  separator: { height: 12 },
   emptyList: { flexGrow: 1 },
-  message: { gap: 14, alignItems: 'flex-start' },
+  message: { minHeight: 180, borderRadius: 24, padding: 22, gap: 14, alignItems: 'flex-start', justifyContent: 'center', backgroundColor: '#F3F4F6' },
   footer: { paddingTop: 20, gap: 14 },
+  viewSwitcher: { alignSelf: 'flex-end', padding: 3, borderRadius: 18, flexDirection: 'row', backgroundColor: '#F3F4F6' },
+  viewOption: { minHeight: 34, borderRadius: 15, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
+  selectedView: { backgroundColor: '#000000' },
+  viewLabel: { color: '#637068', fontSize: 12, lineHeight: 16, fontWeight: '700' },
+  selectedViewLabel: { color: '#FFFFFF' },
 });

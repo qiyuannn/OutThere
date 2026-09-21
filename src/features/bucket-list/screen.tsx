@@ -36,6 +36,7 @@ export default function BucketListScreen() {
   const [existingRankings, setExistingRankings] = useState<RankedPlace[]>([]);
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
   const [placeToRate, setPlaceToRate] = useState<CandidatePlace | null>(null);
+  const [displayMode, setDisplayMode] = useState<'list' | 'grid'>('list');
 
   const loadRatings = useCallback(async () => {
     if (!userId) {
@@ -119,14 +120,24 @@ export default function BucketListScreen() {
           onOpenChange={setDropdownOpen}
           onChange={setRatingStatus}
         />
+        <View style={styles.viewSwitcher} accessibilityRole="tablist">
+          {(['list', 'grid'] as const).map((mode) => <Pressable key={mode} accessibilityRole="tab" accessibilityState={{ selected: displayMode === mode }}
+            onPress={() => setDisplayMode(mode)} style={[styles.viewOption, displayMode === mode && styles.selectedView]}>
+            <ThemedText style={[styles.viewLabel, displayMode === mode && styles.selectedViewLabel]}>{mode === 'list' ? '☷  List' : '▦  Grid'}</ThemedText>
+          </Pressable>)}
+        </View>
 
         <FlatList
+          key={displayMode}
+          numColumns={displayMode === 'grid' ? 2 : 1}
+          columnWrapperStyle={displayMode === 'grid' ? styles.gridRow : undefined}
           accessibilityRole="list"
           data={visiblePlaces}
           keyExtractor={(place) => place.google_place_id}
           renderItem={({ item }) => (
             <SavedPlaceItem
               place={item}
+              grid={displayMode === 'grid'}
               userRating={ratingsMap[item.google_place_id]}
               onPress={openDetails}
               onRate={openRating}
@@ -195,10 +206,16 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 
 const styles = StyleSheet.create({
   screen: { flex: 1, overflow: 'hidden' },
-  content: { flex: 1, width: '100%', maxWidth: 402, alignSelf: 'center', padding: 10, gap: 10, overflow: 'hidden' },
-  list: { padding: 10, paddingBottom: 36 },
+  content: { flex: 1, width: '100%', maxWidth: 520, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 18, gap: 14, overflow: 'hidden' },
+  list: { paddingBottom: 120 },
   emptyList: { flexGrow: 1 },
-  separator: { height: 16 },
+  separator: { height: 12 },
+  gridRow: { gap: 12 },
+  viewSwitcher: { alignSelf: 'flex-end', padding: 3, borderRadius: 18, flexDirection: 'row', backgroundColor: '#F3F4F6' },
+  viewOption: { minHeight: 34, borderRadius: 15, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
+  selectedView: { backgroundColor: '#000000' },
+  viewLabel: { color: '#637068', fontSize: 12, lineHeight: 16, fontWeight: '700' },
+  selectedViewLabel: { color: '#FFFFFF' },
   loadingState: { flex: 1, minHeight: 220, alignItems: 'center', justifyContent: 'center', gap: 14 },
   errorState: { borderWidth: 1, borderRadius: 24, padding: 24, gap: 14, backgroundColor: '#FFFFFF' },
   stateTitle: { fontSize: 24, lineHeight: 30, fontWeight: '700' },

@@ -126,8 +126,13 @@ export function ProfileForm({ onboarding = false, onDone, onCancel }: { onboardi
           contentContainerStyle={styles.onboardingContent}
           keyboardShouldPersistTaps="handled"
         >
+          <View style={styles.onboardingIntro}>
+            <Text style={styles.onboardingEyebrow}>PROFILE · 1 OF 1</Text>
+            <Text accessibilityRole="header" style={styles.onboardingTitle}>Make OutThere yours.</Text>
+            <Text style={styles.onboardingBody}>Add a name, username and optional photo so friends can recognise you.</Text>
+          </View>
           <View style={styles.avatarArea}>
-            <Avatar name={draft.display_name} path={draft.avatar_path} preview={avatar?.uri} size={69} />
+            <Avatar name={draft.display_name} path={draft.avatar_path} preview={avatar?.uri} size={92} />
           </View>
 
           <View style={styles.photoActions}>
@@ -243,10 +248,11 @@ const styles = StyleSheet.create({
   },
   onboardingHeader: {
     width: '100%',
-    gap: 10,
+    gap: 5,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
   },
   onboardingHeaderRow: {
@@ -276,19 +282,25 @@ const styles = StyleSheet.create({
   },
   onboardingDescription: {
     color: '#000000',
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '600',
-    lineHeight: 12,
+    lineHeight: 17,
     textAlign: 'center',
   },
   onboardingContent: {
     width: '100%',
-    maxWidth: 402,
+    maxWidth: 520,
     flexGrow: 1,
     alignSelf: 'center',
-    gap: 10,
-    padding: 10,
+    gap: 18,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 24,
   },
+  onboardingIntro: { gap: 7, marginBottom: 6 },
+  onboardingEyebrow: { color: '#637068', fontSize: 11, lineHeight: 14, fontWeight: '700', letterSpacing: 1.2 },
+  onboardingTitle: { color: '#000000', fontSize: 30, lineHeight: 36, fontWeight: '700', letterSpacing: -0.6 },
+  onboardingBody: { color: '#637068', fontSize: 15, lineHeight: 21 },
   onboardingSpacer: {
     minHeight: 24,
     flexGrow: 1,
@@ -302,8 +314,10 @@ const styles = StyleSheet.create({
     maxWidth: 720,
     flexGrow: 1,
     alignSelf: 'center',
-    gap: 10,
-    padding: 10,
+    gap: 18,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 24,
   },
   avatarArea: {
     minHeight: 89,
@@ -315,11 +329,12 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   editButton: {
-    minHeight: 37,
+    minHeight: 48,
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
     borderColor: '#000000',
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
@@ -327,9 +342,9 @@ const styles = StyleSheet.create({
   },
   editButtonLabel: {
     color: '#000000',
-    fontSize: 12,
-    fontWeight: '600',
-    lineHeight: 15,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 18,
     textAlign: 'center',
   },
   pressed: {
@@ -348,20 +363,21 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   editInput: {
-    height: 42,
-    borderWidth: 1,
+    minHeight: 52,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
     borderColor: '#D1D5DB',
     backgroundColor: '#F3F4F6',
     color: '#000000',
     fontSize: 16,
     lineHeight: 20,
-    paddingHorizontal: 10,
+    paddingHorizontal: 16,
     paddingVertical: 0,
   },
   editBio: {
-    height: 84,
-    paddingTop: 10,
-    paddingBottom: 10,
+    height: 108,
+    paddingTop: 14,
+    paddingBottom: 14,
   },
   editSpacer: {
     minHeight: 24,

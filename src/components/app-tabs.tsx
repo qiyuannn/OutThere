@@ -64,7 +64,7 @@ export default function AppTabs() {
           padding: 0,
         },
         tabBarIconStyle: {
-          width: 46,
+          width: 72,
           height: 46,
           margin: 0,
         },
@@ -77,7 +77,7 @@ export default function AppTabs() {
           options={{
             title,
             tabBarAccessibilityLabel: title,
-            tabBarIcon: ({ focused }) => <BottomNavigationIcon active={focused} name={name} />,
+            tabBarIcon: ({ focused }) => <BottomNavigationIcon active={focused} label={title} name={name} />,
           }}
         />
       ))}

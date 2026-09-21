@@ -15,6 +15,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { getCategoryGroupKey } from '@/features/categories/catalog';
 import { getLivePlaceDetails } from '@/features/search/service';
 import { Button } from '@/components/foundation';
+import { GlassSurface } from '@/components/ui-system';
 import { RatePlaceModal } from '@/features/rankings/components/rate-place-modal';
 import { getUserRankings, getUserRatingForPlace, saveUserPlaceRating } from '@/features/rankings/service';
 import type { CandidatePlace, RankedPlace, RankingMode, SaveRatingInput } from '@/features/rankings/types';
@@ -322,7 +323,7 @@ export function PlaceDetailsScreen({
 
   return (
     <View style={styles.screen}>
-      <AppHeader description="Place Details" showBack onBack={handleBack} />
+      <View style={styles.floatingHeader}><AppHeader description="Place Details" showBack onBack={handleBack} /></View>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -332,19 +333,21 @@ export function PlaceDetailsScreen({
           <View style={styles.summary}>
             <PlaceHeader place={place} />
           </View>
-          <ActionBar
-            place={place}
-            isSaved={isSaved}
-            onToggleSave={handleToggleSave}
-            userRating={userRating}
-            onRate={rankingsReady ? () => setIsRateModalVisible(true) : undefined}
-          />
           {rankingsError && <><ThemedText>Could not load your ratings for comparison.</ThemedText><Button label="Retry ratings" onPress={() => setRankingsAttempt(n => n + 1)} /></>}
           <HoursSection place={place} />
           <LocationSection place={place} />
           <AttributionFooter place={place} />
         </View>
       </ScrollView>
+      <GlassSurface style={styles.stickyActions} interactive>
+        <ActionBar
+          place={place}
+          isSaved={isSaved}
+          onToggleSave={handleToggleSave}
+          userRating={userRating}
+          onRate={rankingsReady ? () => setIsRateModalVisible(true) : undefined}
+        />
+      </GlassSurface>
 
       <RatePlaceModal
         visible={isRateModalVisible}
@@ -365,19 +368,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  floatingHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20 },
   scrollContent: {
     flexGrow: 1,
     width: '100%',
     maxWidth: 402,
     alignSelf: 'center',
-    paddingBottom: 24,
+    paddingBottom: 122,
   },
   body: {
     width: '100%',
-    gap: 10,
-    padding: 10,
+    gap: 18,
+    paddingHorizontal: 18,
+    paddingTop: 16,
   },
-  summary: { width: '100%', padding: 10, overflow: 'hidden' },
+  summary: { width: '100%', overflow: 'hidden' },
+  stickyActions: { position: 'absolute', left: 16, right: 16, bottom: 14, minHeight: 78, borderRadius: 28, paddingHorizontal: 6, justifyContent: 'center' },
   emptyContainer: {
     flex: 1,
     alignItems: 'center',

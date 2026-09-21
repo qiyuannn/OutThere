@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { router, type Href } from 'expo-router';
-import { ActivityIndicator, FlatList, Keyboard, StyleSheet, View } from 'react-native';
+import { FlatList, Keyboard, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/app-header';
@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { enforceSearchAccess } from '@/features/subscriptions/model';
 import { useSubscription } from '@/providers/subscription-provider';
+import { SectionHeading, SkeletonBlock } from '@/components/ui-system';
 import { AreaSheet } from './area-sheet';
 import { FilterSheet } from './filter-sheet';
 import { DEFAULT_FILTERS, type SearchArea, type SearchFilters, type SearchPlace } from './model';
@@ -100,14 +101,18 @@ export function SearchScreen() {
           onOpenFilters={openFilters}
           activeFilterCount={activeFilterCount}
         />
+        <ScrollView horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickFilters}>
+          <QuickFilter active={filters.mode === 'food'} label="Food" onPress={() => setFilters((current) => ({ ...current, mode: current.mode === 'food' ? 'all' : 'food', category: '' }))} />
+          <QuickFilter active={filters.mode === 'activities'} label="Activities" onPress={() => setFilters((current) => ({ ...current, mode: current.mode === 'activities' ? 'all' : 'activities', category: '' }))} />
+          <QuickFilter active={filters.openNow} label="Open now" onPress={() => setFilters((current) => ({ ...current, openNow: !current.openNow }))} />
+          <QuickFilter active={filters.sort === 'distance'} label="Nearest" onPress={() => setFilters((current) => ({ ...current, sort: current.sort === 'distance' ? 'relevance' : 'distance' }))} />
+        </ScrollView>
 
         {autocompleteVisible ? (
           <PlaceSuggestions query={query} center={area ?? undefined} onSelect={selectSuggestion} />
         ) : inputEmpty ? (
           <>
-            <View style={styles.sectionHeader}>
-              <ThemedText style={styles.sectionTitle}>Recent</ThemedText>
-            </View>
+            <SectionHeading eyebrow="Pick up where you left off" title="Recent places" />
             <FlatList
               accessibilityRole="list"
               data={search.recentPlaces}
@@ -124,8 +129,8 @@ export function SearchScreen() {
               )}
               ListEmptyComponent={
                 search.recentPlacesLoading
-                  ? <ActivityIndicator color={theme.primary} accessibilityLabel="Loading recent places" />
-                  : <ThemedText style={styles.emptyCopy}>Places you open from Search will appear here.</ThemedText>
+                  ? <View style={styles.skeletons} accessibilityLabel="Loading recent places"><SkeletonBlock height={82} /><SkeletonBlock height={82} /></View>
+                  : <View style={styles.emptyCard}><ThemedText style={styles.emptyTitle}>Start exploring</ThemedText><ThemedText style={styles.emptyCopy}>Search for a restaurant, activity, dish or neighbourhood. Places you open will appear here.</ThemedText></View>
               }
               showsVerticalScrollIndicator={false}
             />
@@ -152,13 +157,25 @@ export function SearchScreen() {
   );
 }
 
+function QuickFilter({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
+  return <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} onPress={onPress} style={[styles.quickFilter, active && styles.activeQuickFilter]}>
+    <ThemedText style={[styles.quickFilterLabel, active && styles.activeQuickFilterLabel]}>{label}</ThemedText>
+  </Pressable>;
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, overflow: 'hidden' },
-  content: { flex: 1, width: '100%', maxWidth: 402, alignSelf: 'center', padding: 10, gap: 10, overflow: 'hidden' },
-  sectionHeader: { width: '100%', padding: 10, justifyContent: 'center', overflow: 'hidden' },
-  sectionTitle: { color: '#000000', fontSize: 16, fontWeight: '600', lineHeight: 20 },
-  recentList: { padding: 10, paddingBottom: 36 },
-  recentSeparator: { height: 10 },
+  content: { flex: 1, width: '100%', maxWidth: 520, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 18, gap: 18, overflow: 'hidden' },
+  recentList: { paddingBottom: 120 },
+  recentSeparator: { height: 12 },
   emptyList: { flexGrow: 1 },
-  emptyCopy: { color: '#637068', fontSize: 13, lineHeight: 19 },
+  emptyCard: { minHeight: 180, borderRadius: 28, padding: 24, justifyContent: 'center', gap: 8, backgroundColor: '#F3F4F6' },
+  emptyTitle: { color: '#000000', fontSize: 20, lineHeight: 25, fontWeight: '700' },
+  emptyCopy: { color: '#637068', fontSize: 15, lineHeight: 21 },
+  skeletons: { gap: 12 },
+  quickFilters: { gap: 8, paddingRight: 16 },
+  quickFilter: { minHeight: 38, borderRadius: 19, paddingHorizontal: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6' },
+  activeQuickFilter: { backgroundColor: '#000000' },
+  quickFilterLabel: { color: '#637068', fontSize: 13, lineHeight: 17, fontWeight: '700' },
+  activeQuickFilterLabel: { color: '#FFFFFF' },
 });

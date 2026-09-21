@@ -71,5 +71,44 @@ export const Spacing = {
   six: 64,
 } as const;
 
+export const Radius = {
+  small: 12,
+  medium: 18,
+  large: 24,
+  card: 28,
+  pill: 999,
+} as const;
+
+export const Typography = {
+  pageTitle: { fontSize: 30, lineHeight: 36, fontWeight: '700' as const, letterSpacing: -0.7 },
+  sectionTitle: { fontSize: 20, lineHeight: 25, fontWeight: '700' as const, letterSpacing: -0.25 },
+  cardTitle: { fontSize: 17, lineHeight: 22, fontWeight: '700' as const },
+  body: { fontSize: 15, lineHeight: 21, fontWeight: '400' as const },
+  caption: { fontSize: 13, lineHeight: 18, fontWeight: '400' as const },
+} as const;
+
+export const Motion = {
+  quick: 160,
+  standard: 240,
+  sheet: 320,
+} as const;
+
+export const Shadows = {
+  floating: {
+    shadowColor: '#101820',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  card: {
+    shadowColor: '#101820',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+} as const;
+
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;

@@ -17,7 +17,6 @@ export function RankedPlaceCard({ item, rank, onDelete }: RankedPlaceCardProps) 
   const [imageError, setImageError] = useState(false);
 
   const isTopThree = rank <= 3;
-  const rankMedal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null;
 
   const handlePress = () => {
     router.push({
@@ -53,15 +52,7 @@ export function RankedPlaceCard({ item, rank, onDelete }: RankedPlaceCardProps) 
     >
       {/* Rank Indicator */}
       <View style={styles.rankCol}>
-        {rankMedal ? (
-          <ThemedText style={styles.medalIcon}>{rankMedal}</ThemedText>
-        ) : (
-          <View style={[styles.rankBadge, { backgroundColor: theme.backgroundSelected }]}>
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              #{rank}
-            </ThemedText>
-          </View>
-        )}
+        <ThemedText style={[styles.rankNumber, isTopThree && styles.topRank]}>{rank}</ThemedText>
       </View>
 
       {/* Thumbnail */}
@@ -125,28 +116,27 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 18,
-    gap: 12,
-    marginVertical: 4,
+    padding: 10,
+    borderRadius: 22,
+    gap: 13,
+    marginVertical: 5,
   },
   rankCol: {
-    width: 32,
+    width: 38,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  medalIcon: {
-    fontSize: 22,
-  },
+  rankNumber: { color: '#808782', fontSize: 24, lineHeight: 29, fontWeight: '800', letterSpacing: -0.5 },
+  topRank: { color: '#000000', fontSize: 31, lineHeight: 35 },
   rankBadge: {
     paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 8,
   },
   thumbContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 66,
+    height: 66,
+    borderRadius: 17,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',

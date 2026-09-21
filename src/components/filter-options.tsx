@@ -1,6 +1,8 @@
-import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { Platform, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { useTheme } from '@/hooks/use-theme';
 
 export type FilterOption<Value extends string> = {
   label: string;
@@ -21,8 +23,9 @@ export function FilterOptions<Value extends string>({
   onChange,
   style,
 }: FilterOptionsProps<Value>) {
+  const theme = useTheme();
   return (
-    <View accessibilityRole="tablist" style={[styles.container, style]}>
+    <View accessibilityRole="tablist" style={[styles.container, { backgroundColor: theme.backgroundSelected }, style]}>
       {options.map((option) => (
         <Pressable
           key={option.value}
@@ -30,10 +33,10 @@ export function FilterOptions<Value extends string>({
           accessibilityRole="tab"
           accessibilityState={{ selected: option.value === value }}
           hitSlop={6}
-          onPress={() => onChange(option.value)}
-          style={({ pressed }) => [styles.option, pressed && styles.pressed]}
+          onPress={() => { if (Platform.OS !== 'web') void Haptics.selectionAsync(); onChange(option.value); }}
+          style={({ pressed }) => [styles.option, option.value === value && styles.selectedOption, pressed && styles.pressed]}
         >
-          <ThemedText style={styles.label}>{option.label}</ThemedText>
+          <ThemedText style={[styles.label, option.value === value && styles.selectedLabel]}>{option.label}</ThemedText>
         </Pressable>
       ))}
     </View>
@@ -44,28 +47,31 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 10,
+    alignItems: 'center',
+    padding: 4,
+    borderRadius: 24,
     overflow: 'hidden',
   },
   option: {
     flex: 1,
     minWidth: 0,
-    minHeight: 35,
+    minHeight: 44,
     paddingHorizontal: 10,
     paddingVertical: 5,
     alignItems: 'center',
     justifyContent: 'center',
   },
   pressed: {
-    opacity: 0.5,
+    opacity: 0.7,
   },
+  selectedOption: { backgroundColor: '#000000', borderRadius: 20 },
   label: {
     color: '#000000',
-    fontSize: 20,
-    fontWeight: '600',
-    lineHeight: 24,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 18,
     letterSpacing: 0.25,
     textAlign: 'center',
   },
+  selectedLabel: { color: '#FFFFFF' },
 });

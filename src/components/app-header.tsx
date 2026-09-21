@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
+import { GlassSurface } from './ui-system';
 
 const backIcon = require('../../assets/images/navigation/back.svg');
 const bellIcon = require('../../assets/images/navigation/bell.svg');
@@ -29,7 +30,7 @@ export function AppHeader({
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-      <View style={styles.container}>
+      <GlassSurface style={styles.container}>
         <View style={styles.row}>
           <View style={[styles.actionSlot, brandLeading && styles.hiddenSlot]}>
             {showBack ? (
@@ -65,30 +66,33 @@ export function AppHeader({
         </View>
 
         <Text numberOfLines={1} style={styles.description}>{description}</Text>
-      </View>
+      </GlassSurface>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    zIndex: 20,
   },
   container: {
-    gap: 10,
-    padding: 10,
-    backgroundColor: '#FFFFFF',
+    gap: 5,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.08)',
   },
   row: {
-    minHeight: 24,
-    paddingHorizontal: 10,
+    minHeight: 40,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   actionSlot: {
     width: 44,
-    height: 24,
+    height: 44,
     alignItems: 'flex-start',
     justifyContent: 'center',
   },
@@ -99,8 +103,11 @@ const styles = StyleSheet.create({
     display: 'none',
   },
   action: {
-    width: 24,
-    height: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pressed: {
     opacity: 0.55,
@@ -112,7 +119,7 @@ const styles = StyleSheet.create({
   brand: {
     color: '#000000',
     fontFamily: Fonts.mono,
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '400',
     lineHeight: 24,
     textAlign: 'center',
@@ -122,9 +129,9 @@ const styles = StyleSheet.create({
   },
   description: {
     color: '#000000',
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '600',
-    lineHeight: 12,
+    lineHeight: 17,
     textAlign: 'center',
   },
 });
