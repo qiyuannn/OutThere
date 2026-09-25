@@ -181,6 +181,34 @@ export async function getUserProfileStats(
   }
 }
 
+export type UserFollowRelationship = 'following' | 'requested' | 'none';
+
+export async function getFollowRelationship(targetUserId: string): Promise<UserFollowRelationship> {
+  if (!targetUserId) return 'none';
+  const { data, error } = await client().rpc('get_follow_relationship', {
+    p_target_user_id: targetUserId,
+  });
+  if (error) return 'none';
+  return (data as UserFollowRelationship) ?? 'none';
+}
+
+export async function sendFollowRequest(targetUserId: string): Promise<UserFollowRelationship> {
+  if (!targetUserId) return 'none';
+  const { data, error } = await client().rpc('send_follow_request', {
+    p_target_user_id: targetUserId,
+  });
+  if (error) throw error;
+  return (data as UserFollowRelationship) ?? 'requested';
+}
+
+export async function cancelFollowRequest(targetUserId: string): Promise<void> {
+  if (!targetUserId) return;
+  const { error } = await client().rpc('cancel_follow_request', {
+    p_target_user_id: targetUserId,
+  });
+  if (error) throw error;
+}
+
 export async function isFollowingUser(followerId: string, followingId: string): Promise<boolean> {
   if (!followerId || !followingId || followerId === followingId) return false;
   const { data, error } = await client()
@@ -195,20 +223,21 @@ export async function isFollowingUser(followerId: string, followingId: string): 
 
 export async function followUser(followerId: string, followingId: string): Promise<void> {
   if (!followerId || !followingId || followerId === followingId) return;
-  const { error } = await client()
-    .from('user_follows')
-    .insert({ follower_id: followerId, following_id: followingId });
-  if (error && error.code !== '23505') throw error;
+  await sendFollowRequest(followingId);
 }
 
 export async function unfollowUser(followerId: string, followingId: string): Promise<void> {
   if (!followerId || !followingId || followerId === followingId) return;
-  const { error } = await client()
-    .from('user_follows')
-    .delete()
-    .eq('follower_id', followerId)
-    .eq('following_id', followingId);
-  if (error) throw error;
+  const { error } = await client().rpc('unfollow_user', {
+    p_target_user_id: followingId,
+  });
+  if (error) {
+    await client()
+      .from('user_follows')
+      .delete()
+      .eq('follower_id', followerId)
+      .eq('following_id', followingId);
+  }
 }
 
 export async function getFollowCounts(userId: string): Promise<{ followers: number; following: number }> {

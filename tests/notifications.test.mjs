@@ -12,8 +12,23 @@ import {
 
 test('formats notification actions correctly for follow, like, and comment', () => {
   assert.equal(
+    formatNotificationAction({ type: 'follow', followStatus: 'pending', placeName: null }),
+    'requested to follow you'
+  );
+
+  assert.equal(
+    formatNotificationAction({ type: 'follow', followStatus: 'accepted', placeName: null }),
+    'started following you'
+  );
+
+  assert.equal(
     formatNotificationAction({ type: 'follow', placeName: null }),
     'started following you'
+  );
+
+  assert.equal(
+    formatNotificationAction({ type: 'follow_accepted', placeName: null }),
+    'accepted your follow request'
   );
 
   assert.equal(

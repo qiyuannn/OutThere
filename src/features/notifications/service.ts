@@ -28,6 +28,7 @@ type NotificationRow = {
   is_following_actor: boolean;
   google_place_id: string | null;
   invite_status: string | null;
+  follow_status: string | null;
 };
 
 async function getSignedUrls(bucket: 'avatars' | 'post-photos', paths: string[]): Promise<Map<string, string>> {
@@ -76,6 +77,7 @@ export async function getUserNotifications(limit = 50, offset = 0): Promise<AppN
     isFollowingActor: r.is_following_actor,
     googlePlaceId: r.google_place_id ?? null,
     inviteStatus: (r.invite_status as AppNotification['inviteStatus']) ?? null,
+    followStatus: (r.follow_status as AppNotification['followStatus']) ?? null,
   }));
 }
 
@@ -112,6 +114,18 @@ export async function respondToPlaceInvite(
   status: 'accepted' | 'declined'
 ): Promise<void> {
   const { error } = await client().rpc('respond_to_place_invite', {
+    p_notification_id: notificationId,
+    p_status: status,
+  });
+
+  if (error) throw error;
+}
+
+export async function respondToFollowRequest(
+  notificationId: number,
+  status: 'accepted' | 'declined'
+): Promise<void> {
+  const { error } = await client().rpc('respond_to_follow_request', {
     p_notification_id: notificationId,
     p_status: status,
   });

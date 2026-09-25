@@ -22,7 +22,11 @@ import {
   formatNotificationTime,
   partitionNotifications,
 } from './model';
-import { getUserNotifications, respondToPlaceInvite } from './service';
+import {
+  getUserNotifications,
+  respondToFollowRequest,
+  respondToPlaceInvite,
+} from './service';
 import type { AppNotification } from './types';
 
 export default function NotificationsScreen() {
@@ -36,6 +40,7 @@ export default function NotificationsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [followProcessing, setFollowProcessing] = useState<Set<string>>(new Set());
   const [inviteProcessing, setInviteProcessing] = useState<Set<number>>(new Set());
+  const [followRespondProcessing, setFollowRespondProcessing] = useState<Set<number>>(new Set());
 
   const requestCount = useRef(0);
 
@@ -145,8 +150,38 @@ export default function NotificationsScreen() {
     }
   };
 
+  const handleRespondFollow = async (notificationId: number, status: 'accepted' | 'declined') => {
+    if (followRespondProcessing.has(notificationId)) return;
+
+    setFollowRespondProcessing((prev) => new Set(prev).add(notificationId));
+
+    // Optimistic update
+    setNotifications((prev) =>
+      prev.map((item) =>
+        item.id === notificationId ? { ...item, followStatus: status } : item
+      )
+    );
+
+    try {
+      await respondToFollowRequest(notificationId, status);
+    } catch {
+      // Revert on error
+      setNotifications((prev) =>
+        prev.map((item) =>
+          item.id === notificationId ? { ...item, followStatus: 'pending' } : item
+        )
+      );
+    } finally {
+      setFollowRespondProcessing((prev) => {
+        const next = new Set(prev);
+        next.delete(notificationId);
+        return next;
+      });
+    }
+  };
+
   const handlePressNotification = (item: AppNotification) => {
-    if (item.type === 'follow') {
+    if (item.type === 'follow' || item.type === 'follow_accepted') {
       if (item.actorId) {
         router.push({
           pathname: '/search/profile/[id]',
@@ -250,8 +285,10 @@ export default function NotificationsScreen() {
             return (
               <NotificationRow
                 isBusyFollowing={followProcessing.has(item.actorId)}
+                isBusyRespondingFollow={followRespondProcessing.has(item.id)}
                 notification={item}
                 onPress={() => handlePressNotification(item)}
+                onRespondFollow={(status) => void handleRespondFollow(item.id, status)}
                 onToggleFollow={() => handleToggleFollow(item.actorId, item.isFollowingActor)}
               />
             );
@@ -393,12 +430,16 @@ function InviteRow({
 function NotificationRow({
   notification,
   isBusyFollowing,
+  isBusyRespondingFollow = false,
   onPress,
+  onRespondFollow,
   onToggleFollow,
 }: {
   notification: AppNotification;
   isBusyFollowing: boolean;
+  isBusyRespondingFollow?: boolean;
   onPress: () => void;
+  onRespondFollow?: (status: 'accepted' | 'declined') => void;
   onToggleFollow: () => void;
 }) {
   const [avatarFailed, setAvatarFailed] = useState(false);
@@ -421,6 +462,8 @@ function NotificationRow({
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
+        notification.type === 'follow' &&
+          Boolean(notification.followStatus) && { alignItems: 'flex-start' },
         !notification.isRead && styles.unreadRow,
         pressed && styles.pressed,
       ]}
@@ -456,9 +499,55 @@ function NotificationRow({
         ) : null}
 
         <ThemedText style={styles.timeText}>{timeText}</ThemedText>
+
+        {/* Accept / Decline actions or status badges for follow requests */}
+        {notification.type === 'follow' && notification.followStatus === 'pending' ? (
+          <View style={styles.inviteActionsRow}>
+            {isBusyRespondingFollow ? (
+              <ActivityIndicator color="#000000" size="small" />
+            ) : (
+              <>
+                <Pressable
+                  accessibilityLabel="Accept follow request"
+                  accessibilityRole="button"
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onRespondFollow?.('accepted');
+                  }}
+                  style={({ pressed }) => [styles.acceptBtn, pressed && styles.pressed]}
+                >
+                  <ThemedText style={styles.acceptBtnText}>Accept</ThemedText>
+                </Pressable>
+
+                <Pressable
+                  accessibilityLabel="Decline follow request"
+                  accessibilityRole="button"
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onRespondFollow?.('declined');
+                  }}
+                  style={({ pressed }) => [styles.declineBtn, pressed && styles.pressed]}
+                >
+                  <ThemedText style={styles.declineBtnText}>Decline</ThemedText>
+                </Pressable>
+              </>
+            )}
+          </View>
+        ) : notification.type === 'follow' && notification.followStatus === 'accepted' ? (
+          <View style={styles.acceptedBadge}>
+            <ThemedText style={styles.acceptedBadgeText}>Accepted ✓</ThemedText>
+          </View>
+        ) : notification.type === 'follow' && notification.followStatus === 'declined' ? (
+          <View style={styles.declinedBadge}>
+            <ThemedText style={styles.declinedBadgeText}>Declined</ThemedText>
+          </View>
+        ) : null}
       </View>
 
-      {notification.type === 'follow' ? (
+      {notification.type === 'follow_accepted' ||
+      (notification.type === 'follow' &&
+        notification.followStatus !== 'pending' &&
+        notification.followStatus !== 'declined') ? (
         <Pressable
           accessibilityLabel={notification.isFollowingActor ? 'Following' : 'Follow back'}
           accessibilityRole="button"

@@ -11,13 +11,15 @@ import { Avatar } from './components/avatar';
 import { VisitedPlacesMap } from './components/visited-places-map';
 import type { Profile } from './model';
 import {
-  followUser,
+  cancelFollowRequest,
   getFollowCounts,
-  isFollowingUser,
+  getFollowRelationship,
   loadProfile,
   loadProfileVisitSummary,
+  sendFollowRequest,
   unfollowUser,
   type ProfileVisitSummary,
+  type UserFollowRelationship,
 } from './service';
 
 const EMPTY_SUMMARY: ProfileVisitSummary = { averageRating: null, places: [], visitedCount: 0 };
@@ -31,7 +33,7 @@ export function UserProfileScreen() {
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [summary, setSummary] = useState<ProfileVisitSummary>(EMPTY_SUMMARY);
-  const [isFollowing, setIsFollowing] = useState(false);
+  const [followRelationship, setFollowRelationship] = useState<UserFollowRelationship>('none');
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
   const [togglingFollow, setTogglingFollow] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -39,6 +41,7 @@ export function UserProfileScreen() {
   const [error, setError] = useState<string | null>(null);
   const requestCount = useRef(0);
 
+  const isFollowing = followRelationship === 'following';
   const canViewDetails = isOwnProfile || isFollowing;
 
   const loadData = useCallback(async () => {
@@ -50,14 +53,16 @@ export function UserProfileScreen() {
 
     const currentReq = ++requestCount.current;
     try {
-      const [fetchedProfile, fetchedFollowing, fetchedCounts] = await Promise.all([
+      const [fetchedProfile, fetchedRel, fetchedCounts] = await Promise.all([
         loadProfile(targetUserId),
-        currentUserId && !isOwnProfile ? isFollowingUser(currentUserId, targetUserId).catch(() => false) : false,
+        currentUserId && !isOwnProfile
+          ? getFollowRelationship(targetUserId).catch(() => 'none' as const)
+          : ('none' as const),
         getFollowCounts(targetUserId).catch(() => ({ followers: 0, following: 0 })),
       ]);
 
       let fetchedSummary = EMPTY_SUMMARY;
-      if (isOwnProfile || fetchedFollowing) {
+      if (isOwnProfile || fetchedRel === 'following') {
         fetchedSummary = await loadProfileVisitSummary(targetUserId).catch(() => EMPTY_SUMMARY);
       }
 
@@ -67,7 +72,7 @@ export function UserProfileScreen() {
         } else {
           setProfile(fetchedProfile);
           setSummary(fetchedSummary);
-          setIsFollowing(fetchedFollowing);
+          setFollowRelationship(fetchedRel);
           setFollowCounts(fetchedCounts);
           setError(null);
         }
@@ -91,29 +96,38 @@ export function UserProfileScreen() {
 
   const handleToggleFollow = async () => {
     if (!currentUserId || !targetUserId || isOwnProfile || togglingFollow) return;
-    const prevFollowing = isFollowing;
-    const nextFollowing = !prevFollowing;
+    const prevRel = followRelationship;
 
-    setIsFollowing(nextFollowing);
-    setFollowCounts((prev) => ({
-      ...prev,
-      followers: Math.max(0, prev.followers + (nextFollowing ? 1 : -1)),
-    }));
     setTogglingFollow(true);
     try {
-      if (nextFollowing) {
-        await followUser(currentUserId, targetUserId);
-        const nextSummary = await loadProfileVisitSummary(targetUserId).catch(() => EMPTY_SUMMARY);
-        setSummary(nextSummary);
-      } else {
+      if (prevRel === 'following') {
+        // Unfollow
+        setFollowRelationship('none');
+        setFollowCounts((prev) => ({
+          ...prev,
+          followers: Math.max(0, prev.followers - 1),
+        }));
         await unfollowUser(currentUserId, targetUserId);
+      } else if (prevRel === 'requested') {
+        // Cancel follow request
+        setFollowRelationship('none');
+        await cancelFollowRequest(targetUserId);
+      } else {
+        // Send follow request
+        setFollowRelationship('requested');
+        const nextRel = await sendFollowRequest(targetUserId);
+        setFollowRelationship(nextRel);
+        if (nextRel === 'following') {
+          setFollowCounts((prev) => ({
+            ...prev,
+            followers: prev.followers + 1,
+          }));
+          const nextSummary = await loadProfileVisitSummary(targetUserId).catch(() => EMPTY_SUMMARY);
+          setSummary(nextSummary);
+        }
       }
     } catch {
-      setIsFollowing(prevFollowing);
-      setFollowCounts((prev) => ({
-        ...prev,
-        followers: Math.max(0, prev.followers + (prevFollowing ? 1 : -1)),
-      }));
+      setFollowRelationship(prevRel);
     } finally {
       setTogglingFollow(false);
     }
@@ -185,25 +199,46 @@ export function UserProfileScreen() {
           ) : (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={isFollowing ? 'Unfollow' : 'Follow'}
+              accessibilityLabel={
+                followRelationship === 'following'
+                  ? 'Unfollow'
+                  : followRelationship === 'requested'
+                    ? 'Requested'
+                    : 'Follow'
+              }
               disabled={togglingFollow || !currentUserId}
               onPress={handleToggleFollow}
               style={({ pressed }) => [
                 styles.followButton,
-                isFollowing ? styles.unfollowButton : styles.followActionButton,
+                followRelationship === 'following'
+                  ? styles.unfollowButton
+                  : followRelationship === 'requested'
+                    ? styles.requestedButton
+                    : styles.followActionButton,
                 pressed && styles.pressed,
               ]}
             >
               {togglingFollow ? (
-                <ActivityIndicator size="small" color={isFollowing ? '#000000' : '#FFFFFF'} />
+                <ActivityIndicator
+                  size="small"
+                  color={followRelationship === 'none' ? '#FFFFFF' : '#000000'}
+                />
               ) : (
                 <Text
                   style={[
                     styles.buttonLabel,
-                    isFollowing ? styles.unfollowButtonLabel : styles.followActionButtonLabel,
+                    followRelationship === 'following'
+                      ? styles.unfollowButtonLabel
+                      : followRelationship === 'requested'
+                        ? styles.requestedButtonLabel
+                        : styles.followActionButtonLabel,
                   ]}
                 >
-                  {isFollowing ? 'Unfollow' : 'Follow'}
+                  {followRelationship === 'following'
+                    ? 'Unfollow'
+                    : followRelationship === 'requested'
+                      ? 'Requested'
+                      : 'Follow'}
                 </Text>
               )}
             </Pressable>
@@ -386,6 +421,17 @@ const styles = StyleSheet.create({
   },
   unfollowButtonLabel: {
     color: '#000000',
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  requestedButton: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#D1D5DB',
+  },
+  requestedButtonLabel: {
+    color: '#4B5563',
     fontSize: 12,
     lineHeight: 15,
     fontWeight: '600',

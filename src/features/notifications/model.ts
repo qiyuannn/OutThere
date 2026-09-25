@@ -1,11 +1,15 @@
 import type { AppNotification } from './types';
 
 export function formatNotificationAction(
-  notification: Pick<AppNotification, 'type' | 'placeName'>
+  notification: Pick<AppNotification, 'type' | 'placeName'> & { followStatus?: AppNotification['followStatus'] }
 ): string {
   switch (notification.type) {
     case 'follow':
-      return 'started following you';
+      return notification.followStatus === 'pending'
+        ? 'requested to follow you'
+        : 'started following you';
+    case 'follow_accepted':
+      return 'accepted your follow request';
     case 'like':
       return notification.placeName
         ? `liked your review of ${notification.placeName}`

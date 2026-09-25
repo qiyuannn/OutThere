@@ -4,9 +4,10 @@ export type NotificationType =
   | 'comment'
   | 'invite'
   | 'invite_accepted'
-  | 'invite_declined';
+  | 'invite_declined'
+  | 'follow_accepted';
 
-
+export type FollowStatus = 'pending' | 'accepted' | 'declined';
 export type InviteStatus = 'pending' | 'accepted' | 'declined';
 
 export type AppNotification = {
@@ -29,5 +30,6 @@ export type AppNotification = {
   isFollowingActor: boolean;
   googlePlaceId: string | null;
   inviteStatus: InviteStatus | null;
+  followStatus: FollowStatus | null;
 };
 
