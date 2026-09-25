@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
   Alert,
@@ -15,10 +15,18 @@ import { AppHeader } from '@/components/app-header';
 import { ThemedText } from '@/components/themed-text';
 import { FeedItem } from '@/features/posts/feed-item';
 import type { FeedPost } from '@/features/posts/types';
+import { useAuth } from '@/providers/auth-provider';
+import { formatActivitiesTitle } from './model';
 import { usePastActivities } from './use-past-activities';
 
 export default function PastActivitiesScreen() {
-  const activities = usePastActivities();
+  const { userId: paramUserId, userName } = useLocalSearchParams<{ userId?: string; userName?: string }>();
+  const { session } = useAuth();
+  const currentUserId = session?.user.id;
+  const targetUserId = paramUserId || currentUserId;
+  const isOwn = !paramUserId || paramUserId === currentUserId;
+
+  const activities = usePastActivities(targetUserId);
   const [likingIds, setLikingIds] = useState<Set<number>>(() => new Set());
 
   const toggleLike = async (post: FeedPost) => {
@@ -37,9 +45,11 @@ export default function PastActivitiesScreen() {
     }
   };
 
+  const headerTitle = formatActivitiesTitle(isOwn, userName);
+
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.screen}>
-      <AppHeader description="My Past Activities" onBack={() => router.back()} showBack />
+      <AppHeader description={headerTitle} onBack={() => router.back()} showBack />
       {activities.loading ? (
         <View style={styles.centerState}>
           <ActivityIndicator accessibilityLabel="Loading past activities" color="#000000" />
@@ -49,7 +59,7 @@ export default function PastActivitiesScreen() {
           contentContainerStyle={activities.posts.length === 0 ? styles.emptyContent : styles.content}
           data={activities.posts}
           keyExtractor={(post) => String(post.id)}
-          ListEmptyComponent={<EmptyActivities error={activities.error} onRetry={() => void activities.refresh()} />}
+          ListEmptyComponent={<EmptyActivities error={activities.error} isOwn={isOwn} onRetry={() => void activities.refresh()} />}
           ListFooterComponent={activities.loadingMore ? <ActivityIndicator color="#000000" style={styles.footerLoader} /> : null}
           onEndReached={() => void activities.loadMore()}
           onEndReachedThreshold={0.5}
@@ -71,14 +81,14 @@ export default function PastActivitiesScreen() {
   );
 }
 
-function EmptyActivities({ error, onRetry }: { error: string | null; onRetry: () => void }) {
+function EmptyActivities({ error, isOwn, onRetry }: { error: string | null; isOwn: boolean; onRetry: () => void }) {
   return (
     <View style={styles.centerState}>
       <ThemedText accessibilityRole={error ? 'alert' : undefined} style={styles.stateTitle}>
-        {error ? 'Couldn’t load your activities' : 'No past activities yet'}
+        {error ? 'Couldn’t load activities' : 'No past activities yet'}
       </ThemedText>
       <ThemedText style={styles.stateBody}>
-        {error ? 'Check your connection and try again.' : 'Places you post about will appear here.'}
+        {error ? 'Check your connection and try again.' : isOwn ? 'Places you post about will appear here.' : 'Places this user posts about will appear here.'}
       </ThemedText>
       {error ? (
         <Pressable accessibilityRole="button" onPress={onRetry} style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}>

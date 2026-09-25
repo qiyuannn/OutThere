@@ -1,11 +1,12 @@
 export interface PlaceSuggestion { id: string; name: string; address: string }
-export interface SuggestionsState { loading: boolean; items: PlaceSuggestion[]; error: string | null }
+export interface SuggestionsState<T = PlaceSuggestion> { loading: boolean; items: T[]; error: string | null }
 
 /** One controller per mounted search field; invalidates both timers and in-flight responses. */
-export function createSuggestionsController(
-  fetchSuggestions: (query: string, center?: { latitude: number; longitude: number }) => Promise<PlaceSuggestion[]>,
-  publish: (state: SuggestionsState) => void,
+export function createSuggestionsController<T = PlaceSuggestion>(
+  fetchSuggestions: (query: string, center?: { latitude: number; longitude: number }) => Promise<T[]>,
+  publish: (state: SuggestionsState<T>) => void,
   delay = 350,
+  fallbackErrorMessage = 'Suggestions are unavailable. Try typing again or use Search places.',
 ) {
   let version = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -21,7 +22,7 @@ export function createSuggestionsController(
         const items = await fetchSuggestions(input, center);
         if (version === current) publish({ items, loading: false, error: null });
       } catch {
-        if (version === current) publish({ items: [], loading: false, error: 'Suggestions are unavailable. Try typing again or use Search places.' });
+        if (version === current) publish({ items: [], loading: false, error: fallbackErrorMessage });
       }
     }, delay);
   }

@@ -36,3 +36,14 @@ export function profileError(error: unknown): string {
   if (error instanceof Error && error.message.startsWith('Your profile changed')) return error.message;
   return 'We couldn’t save your profile. Check your connection and try again.';
 }
+
+export function formatActivitiesTitle(isOwn: boolean, userName?: string): string {
+  if (isOwn) return 'My Past Activities';
+  return userName ? `${userName}’s Activities` : 'Past Activities';
+}
+
+export function formatStatisticsTitle(isOwn: boolean, userName?: string): string {
+  if (isOwn) return 'Distribution & Statistics';
+  return userName ? `${userName}’s Statistics` : 'Distribution & Statistics';
+}
+

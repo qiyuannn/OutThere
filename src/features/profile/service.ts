@@ -180,3 +180,54 @@ export async function getUserProfileStats(
     return { savedCount: 0, passedCount: 0 };
   }
 }
+
+export async function isFollowingUser(followerId: string, followingId: string): Promise<boolean> {
+  if (!followerId || !followingId || followerId === followingId) return false;
+  const { data, error } = await client()
+    .from('user_follows')
+    .select('created_at')
+    .eq('follower_id', followerId)
+    .eq('following_id', followingId)
+    .maybeSingle();
+  if (error) return false;
+  return !!data;
+}
+
+export async function followUser(followerId: string, followingId: string): Promise<void> {
+  if (!followerId || !followingId || followerId === followingId) return;
+  const { error } = await client()
+    .from('user_follows')
+    .insert({ follower_id: followerId, following_id: followingId });
+  if (error && error.code !== '23505') throw error;
+}
+
+export async function unfollowUser(followerId: string, followingId: string): Promise<void> {
+  if (!followerId || !followingId || followerId === followingId) return;
+  const { error } = await client()
+    .from('user_follows')
+    .delete()
+    .eq('follower_id', followerId)
+    .eq('following_id', followingId);
+  if (error) throw error;
+}
+
+export async function getFollowCounts(userId: string): Promise<{ followers: number; following: number }> {
+  try {
+    const [followersRes, followingRes] = await Promise.all([
+      client()
+        .from('user_follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('following_id', userId),
+      client()
+        .from('user_follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('follower_id', userId),
+    ]);
+    return {
+      followers: followersRes.count ?? 0,
+      following: followingRes.count ?? 0,
+    };
+  } catch {
+    return { followers: 0, following: 0 };
+  }
+}

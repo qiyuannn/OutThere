@@ -1,7 +1,7 @@
 import { decode } from 'base64-arraybuffer';
 
 import { supabase } from '@/lib/supabase';
-import type { CreatePostInput, FeedCursor, FeedPage, FeedPost } from './types';
+import type { CreatePostInput, FeedCursor, FeedPage, FeedPost, PostComment } from './types';
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
@@ -90,6 +90,7 @@ type FeedPostRow = {
   regular_opening_hours?: unknown;
   like_count: number | string;
   liked_by_me: boolean;
+  comment_count?: number | string;
 };
 
 async function getSignedUrls(bucket: 'avatars' | 'post-photos', paths: string[]): Promise<Map<string, string>> {
@@ -104,12 +105,17 @@ async function getSignedUrls(bucket: 'avatars' | 'post-photos', paths: string[])
   return new Map(data.flatMap((item) => item.path && item.signedUrl ? [[item.path, item.signedUrl] as const] : []));
 }
 
-async function getPostPage(onlyCurrentUser: boolean, cursor: FeedCursor | null): Promise<FeedPage> {
+async function getPostPage(
+  onlyCurrentUser: boolean,
+  cursor: FeedCursor | null,
+  targetUserId?: string,
+): Promise<FeedPage> {
   const { data, error } = await client().rpc('get_feed_posts', {
     p_before_created_at: cursor?.createdAt ?? null,
     p_before_id: cursor?.id ?? null,
     p_limit: FEED_PAGE_SIZE,
     p_only_current_user: onlyCurrentUser,
+    p_target_user_id: targetUserId ?? null,
   });
   if (error) throw error;
 
@@ -141,6 +147,7 @@ async function getPostPage(onlyCurrentUser: boolean, cursor: FeedCursor | null):
     }),
     likeCount: Number(row.like_count),
     likedByMe: row.liked_by_me,
+    commentCount: row.comment_count != null ? Number(row.comment_count) : 0,
   }));
 
   const last = rows.at(-1);
@@ -160,10 +167,130 @@ export function getMyPostsPage(cursor: FeedCursor | null = null): Promise<FeedPa
   return getPostPage(true, cursor);
 }
 
+export function getUserPostsPage(targetUserId: string, cursor: FeedCursor | null = null): Promise<FeedPage> {
+  return getPostPage(false, cursor, targetUserId);
+}
+
 export async function setPostLiked(postId: number, userId: string, liked: boolean): Promise<void> {
   const db = client();
   const { error } = liked
     ? await db.from('post_likes').insert({ post_id: postId, user_id: userId })
     : await db.from('post_likes').delete().eq('post_id', postId).eq('user_id', userId);
+  if (error) throw error;
+}
+
+export async function getPostDetail(postId: number): Promise<FeedPost | null> {
+  const { data, error } = await client().rpc('get_post_detail', { p_post_id: postId });
+  if (error) throw error;
+  const rows = (data ?? []) as FeedPostRow[];
+  if (rows.length === 0) return null;
+  const row = rows[0];
+
+  const [avatarUrls, postPhotoUrls] = await Promise.all([
+    getSignedUrls('avatars', row.avatar_path ? [row.avatar_path] : []),
+    getSignedUrls('post-photos', row.photo_paths ?? []),
+  ]);
+
+  return {
+    id: Number(row.id),
+    userId: row.user_id,
+    googlePlaceId: row.google_place_id,
+    rating: Number(row.rating),
+    body: row.body,
+    createdAt: row.created_at,
+    displayName: row.display_name,
+    avatarUrl: row.avatar_path ? avatarUrls.get(row.avatar_path) ?? null : null,
+    placeName: row.place_name,
+    placeCategory: row.place_category,
+    placeAddress: row.place_address,
+    placePriceLevel: row.place_price_level,
+    placeRegularOpeningHours: Array.isArray(row.regular_opening_hours)
+      ? row.regular_opening_hours.filter((value): value is string => typeof value === 'string')
+      : [],
+    photoUrls: (row.photo_paths ?? []).flatMap((path) => {
+      const url = postPhotoUrls.get(path);
+      return url ? [url] : [];
+    }),
+    likeCount: Number(row.like_count),
+    likedByMe: row.liked_by_me,
+    commentCount: row.comment_count != null ? Number(row.comment_count) : 0,
+  };
+}
+
+type PostCommentRow = {
+  id: number | string;
+  post_id: number | string;
+  user_id: string;
+  body: string;
+  created_at: string;
+  display_name: string;
+  username: string | null;
+  avatar_path: string | null;
+};
+
+export async function getPostComments(postId: number): Promise<PostComment[]> {
+  const { data, error } = await client().rpc('get_post_comments', { p_post_id: postId });
+  if (error) throw error;
+  const rows = (data ?? []) as PostCommentRow[];
+  const avatarUrls = await getSignedUrls(
+    'avatars',
+    rows.flatMap((r) => r.avatar_path ? [r.avatar_path] : [])
+  );
+
+  return rows.map((r) => ({
+    id: Number(r.id),
+    postId: Number(r.post_id),
+    userId: r.user_id,
+    body: r.body,
+    createdAt: r.created_at,
+    displayName: r.display_name,
+    username: r.username,
+    avatarUrl: r.avatar_path ? avatarUrls.get(r.avatar_path) ?? null : null,
+  }));
+}
+
+export async function createComment(postId: number, userId: string, body: string): Promise<PostComment> {
+  const cleanBody = body.trim();
+  if (!cleanBody) throw new Error('Comment cannot be empty.');
+  if (cleanBody.length > 1000) throw new Error('Comment must be 1,000 characters or fewer.');
+
+  const db = client();
+  const { data, error } = await db
+    .from('post_comments')
+    .insert({ post_id: postId, user_id: userId, body: cleanBody })
+    .select('id, created_at')
+    .single();
+  if (error) throw error;
+
+  const { data: profile } = await db
+    .from('profiles')
+    .select('display_name, username, avatar_path')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  let avatarUrl: string | null = null;
+  if (profile?.avatar_path) {
+    const avatarMap = await getSignedUrls('avatars', [profile.avatar_path]);
+    avatarUrl = avatarMap.get(profile.avatar_path) ?? null;
+  }
+
+  return {
+    id: Number(data.id),
+    postId,
+    userId,
+    body: cleanBody,
+    createdAt: data.created_at,
+    displayName: profile?.display_name?.trim() || profile?.username?.trim() || 'OutThere user',
+    username: profile?.username ?? null,
+    avatarUrl,
+  };
+}
+
+export async function deleteComment(commentId: number, userId: string): Promise<void> {
+  const { error } = await client()
+    .from('post_comments')
+    .delete()
+    .eq('id', commentId)
+    .eq('user_id', userId);
   if (error) throw error;
 }

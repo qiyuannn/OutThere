@@ -89,8 +89,8 @@ const groups: Record<Mode, Record<string, string[]>> = {
       "observation_deck", "tourist_attraction", "vineyard",
     ],
     social_nightlife_venues: [
-      "banquet_hall", "casino", "community_center", "convention_center",
-      "event_venue", "night_club", "wedding_venue",
+      "casino", "community_center", "convention_center",
+      "event_venue", "night_club",
     ],
   },
   food: {
@@ -185,6 +185,26 @@ const defaults: Record<Mode, string[]> = {
   activities: ["park", "museum", "art_gallery", "tourist_attraction", "aquarium", "hiking_area", "performing_arts_theater", "botanical_garden", "amusement_park", "zoo"],
   food: ["restaurant", "cafe", "coffee_shop", "bakery", "seafood_restaurant", "bar", "pizza_restaurant", "diner", "bistro"],
 };
+
+const HOTEL_LODGING_TYPES = [
+  "bed_and_breakfast",
+  "budget_japanese_inn",
+  "camping_cabin",
+  "cottage",
+  "extended_stay_hotel",
+  "farmstay",
+  "guest_house",
+  "hostel",
+  "hotel",
+  "inn",
+  "japanese_inn",
+  "lodging",
+  "motel",
+  "private_guest_room",
+  "resort_hotel",
+];
+const HOTEL_LODGING_TYPES_SET = new Set(HOTEL_LODGING_TYPES);
+
 const headers = { ...corsHeaders, "Content-Type": "application/json" };
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
 const number = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -309,9 +329,34 @@ function allocateTierPlaceTypes(mode: Mode, weightsMap: Map<string, number>) {
   };
 }
 
-async function searchNearby(apiKey: string, center: Coordinates, radius: number, includedTypes: string[]) {
-  if (includedTypes.length === 0) return { ok: true, places: [] as Place[] };
+async function searchNearby(
+  apiKey: string,
+  center: Coordinates,
+  radius: number,
+  includedTypes: string[],
+  tierName: string = "unknown",
+  excludedPrimaryTypes?: string[]
+) {
+  if (includedTypes.length === 0) {
+    console.log(`[GooglePlaces] Tier ${tierName}: 0 types provided, skipping query`);
+    return { ok: true, places: [] as Place[] };
+  }
   try {
+    console.log(`[GooglePlaces] Tier ${tierName}: querying ${includedTypes.length} types at (${center.latitude.toFixed(4)}, ${center.longitude.toFixed(4)}) r=${radius}m`);
+    const requestBody: Record<string, unknown> = {
+      includedTypes: includedTypes.slice(0, 50),
+      maxResultCount: 20,
+      rankPreference: "POPULARITY",
+      locationRestriction: {
+        circle: {
+          center: { latitude: center.latitude, longitude: center.longitude },
+          radius,
+        },
+      },
+    };
+    if (excludedPrimaryTypes && excludedPrimaryTypes.length > 0) {
+      requestBody.excludedPrimaryTypes = excludedPrimaryTypes.slice(0, 50);
+    }
     const response = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
       method: "POST",
       headers: {
@@ -320,26 +365,19 @@ async function searchNearby(apiKey: string, center: Coordinates, radius: number,
         "X-Goog-FieldMask": fieldMask,
         "X-Goog-Maps-Solution-ID": "gmp_git_agentskills_v1",
       },
-      body: JSON.stringify({
-        includedTypes: includedTypes.slice(0, 50),
-        maxResultCount: 20,
-        rankPreference: "POPULARITY",
-        locationRestriction: {
-          circle: {
-            center: { latitude: center.latitude, longitude: center.longitude },
-            radius,
-          },
-        },
-      }),
+      body: JSON.stringify(requestBody),
     });
     if (!response.ok) {
-      console.error("Google Places searchNearby failed", response.status, await response.text());
+      const errText = await response.text();
+      console.error(`Google Places searchNearby failed [tier=${tierName}, status=${response.status}]:`, errText);
       return { ok: false, places: [] as Place[] };
     }
     const payload = (await response.json()) as { places?: Place[] };
-    return { ok: true, places: payload.places ?? [] };
+    const returnedPlaces = payload.places ?? [];
+    console.log(`[GooglePlaces] Tier ${tierName} returned ${returnedPlaces.length} places`);
+    return { ok: true, places: returnedPlaces };
   } catch (error) {
-    console.error("Google Places searchNearby exception", error);
+    console.error(`Google Places searchNearby exception [tier=${tierName}]`, error);
     return { ok: false, places: [] as Place[] };
   }
 }
@@ -648,11 +686,13 @@ Deno.serve(async (request) => {
   // 2. Allocate 3 Tiers (High, Med, Low) with 50-type cap
   const { highTypes, medTypes, lowTypes } = allocateTierPlaceTypes(mode, weightsMap);
 
+  const excludedPrimaryTypes = mode === "food" ? HOTEL_LODGING_TYPES : undefined;
+
   // 3. Dispatch 3 Concurrent Google Places searchNearby Queries (POPULARITY, max 20)
   const [highRes, medRes, lowRes] = await Promise.all([
-    searchNearby(googleKey, activeCircle.center, activeCircle.radiusMeters, highTypes),
-    searchNearby(googleKey, activeCircle.center, activeCircle.radiusMeters, medTypes),
-    searchNearby(googleKey, activeCircle.center, activeCircle.radiusMeters, lowTypes),
+    searchNearby(googleKey, activeCircle.center, activeCircle.radiusMeters, highTypes, "HIGH", excludedPrimaryTypes),
+    searchNearby(googleKey, activeCircle.center, activeCircle.radiusMeters, medTypes, "MED", excludedPrimaryTypes),
+    searchNearby(googleKey, activeCircle.center, activeCircle.radiusMeters, lowTypes, "LOW", excludedPrimaryTypes),
   ]);
 
   if (!highRes.ok && !medRes.ok && !lowRes.ok) {
@@ -688,6 +728,24 @@ Deno.serve(async (request) => {
         continue;
       }
 
+      // When in food mode, explicitly exclude hotels, motels, and lodging venues
+      if (mode === "food") {
+        const isHotelPrimary = Boolean(place.primaryType && HOTEL_LODGING_TYPES_SET.has(place.primaryType.toLowerCase()));
+        const isHotelDisplayName = Boolean(
+          place.primaryTypeDisplayName?.text &&
+          /\b(hotel|resort|motel|hostel|inn|lodging)\b/i.test(place.primaryTypeDisplayName.text)
+        );
+        const hasLodgingType = Boolean(place.types?.some((t) => HOTEL_LODGING_TYPES_SET.has(t.toLowerCase())));
+        const isHotelName = Boolean(
+          place.displayName?.text &&
+          /\b(hotel|resort|motel|hostel)\b/i.test(place.displayName.text)
+        );
+
+        if (isHotelPrimary || isHotelDisplayName || (hasLodgingType && isHotelName)) {
+          continue;
+        }
+      }
+
       // Strict boundary check: distance from user origin (lat0, lng0) must not exceed radius R
       const metersFromUser = haversineDistanceMeters(origin, {
         latitude: place.location.latitude,
@@ -711,6 +769,22 @@ Deno.serve(async (request) => {
   const rawHigh = filterTierPlaces(highRes.places);
   const rawMed = filterTierPlaces(medRes.places);
   const rawLow = filterTierPlaces(lowRes.places);
+
+  console.log(`[place-recommendations] Circle ${circleIndex} fetch summary:`, {
+    rawFromGoogle: {
+      high: highRes.places.length,
+      med: medRes.places.length,
+      low: lowRes.places.length,
+      total: highRes.places.length + medRes.places.length + lowRes.places.length,
+    },
+    afterDedupAndBounds: {
+      high: rawHigh.length,
+      med: rawMed.length,
+      low: rawLow.length,
+      total: rawHigh.length + rawMed.length + rawLow.length,
+    },
+    excludedCount: excluded.size,
+  });
 
   // 6. Enrich Places with Scores, Details, and Photo Media URLs
   async function enrichPlaces(places: Place[], tier: "high" | "med" | "low") {
@@ -811,5 +885,20 @@ Deno.serve(async (request) => {
     circleIndex,
     exhausted: isCircleExhausted,
     passedCount: passedPlaces?.length ?? 0,
+    debug: {
+      rawCounts: {
+        high: highRes.places.length,
+        med: medRes.places.length,
+        low: lowRes.places.length,
+        total: highRes.places.length + medRes.places.length + lowRes.places.length,
+      },
+      dedupedCounts: {
+        high: rawHigh.length,
+        med: rawMed.length,
+        low: rawLow.length,
+        total: rawHigh.length + rawMed.length + rawLow.length,
+      },
+      excludedCount: excluded.size,
+    },
   });
 });

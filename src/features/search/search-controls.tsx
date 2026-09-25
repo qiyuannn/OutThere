@@ -1,6 +1,8 @@
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
+import type { SearchScope } from './model';
+
 const searchIcon = require('../../../assets/images/search/field-search.svg');
 const filterIcon = require('../../../assets/images/search/filter-menu.svg');
 
@@ -8,33 +10,43 @@ type SearchControlsProps = Pick<TextInputProps,
   'value' | 'onChangeText' | 'onFocus' | 'onSubmitEditing' | 'returnKeyType'> & {
   onOpenFilters: () => void;
   activeFilterCount?: number;
+  searchScope?: SearchScope;
 };
 
-export function SearchControls({ onOpenFilters, activeFilterCount = 0, ...inputProps }: SearchControlsProps) {
+export function SearchControls({
+  onOpenFilters,
+  activeFilterCount = 0,
+  searchScope = 'places',
+  ...inputProps
+}: SearchControlsProps) {
+  const isProfileMode = searchScope === 'profiles';
+
   return (
     <View style={styles.controls}>
       <View style={styles.field}>
         <Image source={searchIcon} contentFit="contain" style={styles.searchIcon} />
         <TextInput
-          accessibilityLabel="Search places, dishes or cuisines"
+          accessibilityLabel={isProfileMode ? 'Search profiles by name or username' : 'Search places, dishes or cuisines'}
           autoCorrect={false}
           maxLength={160}
-          placeholder="Search places, dishes or cuisines"
+          placeholder={isProfileMode ? 'Search profiles by name or username' : 'Search places, dishes or cuisines'}
           placeholderTextColor="#637068"
           style={styles.input}
           {...inputProps}
         />
       </View>
 
-      <Pressable
-        accessibilityLabel={activeFilterCount ? `Search filters, ${activeFilterCount} active` : 'Search filters'}
-        accessibilityRole="button"
-        hitSlop={4}
-        onPress={onOpenFilters}
-        style={({ pressed }) => [styles.filterButton, pressed && styles.pressed]}
-      >
-        <Image source={filterIcon} contentFit="contain" style={styles.filterIcon} />
-      </Pressable>
+      {!isProfileMode ? (
+        <Pressable
+          accessibilityLabel={activeFilterCount ? `Search filters, ${activeFilterCount} active` : 'Search filters'}
+          accessibilityRole="button"
+          hitSlop={4}
+          onPress={onOpenFilters}
+          style={({ pressed }) => [styles.filterButton, pressed && styles.pressed]}
+        >
+          <Image source={filterIcon} contentFit="contain" style={styles.filterIcon} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }

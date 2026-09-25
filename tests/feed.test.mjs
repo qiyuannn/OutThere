@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { formatFeedTimestamp, formatLikeCount, formatPlaceCategory } from '../src/features/posts/feed-model.ts';
+import {
+  formatCommentCount,
+  formatFeedTimestamp,
+  formatLikeCount,
+  formatPlaceCategory,
+  validateCommentBody,
+} from '../src/features/posts/feed-model.ts';
 
 test('formats feed timestamps relative to the current local day', () => {
   const now = new Date(2026, 8, 20, 12, 0);
@@ -16,3 +22,18 @@ test('formats place and like metadata used by feed cards', () => {
   assert.equal(formatLikeCount(1), '1 person liked this');
   assert.equal(formatLikeCount(4), '4 others liked this');
 });
+
+test('formats comment counts and validates comment bodies', () => {
+  assert.equal(formatCommentCount(0), '0 comments');
+  assert.equal(formatCommentCount(1), '1 comment');
+  assert.equal(formatCommentCount(5), '5 comments');
+
+  assert.deepEqual(validateCommentBody(''), { valid: false, error: 'Comment cannot be empty.' });
+  assert.deepEqual(validateCommentBody('   '), { valid: false, error: 'Comment cannot be empty.' });
+  assert.deepEqual(validateCommentBody('Great place!'), { valid: true });
+  assert.deepEqual(validateCommentBody('a'.repeat(1001)), {
+    valid: false,
+    error: 'Comment must be 1,000 characters or less.',
+  });
+});
+

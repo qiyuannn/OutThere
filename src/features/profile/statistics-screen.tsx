@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,13 +8,19 @@ import { CATEGORY_GROUPS_BY_MODE } from '@/features/categories/catalog';
 import { getScoreTier } from '@/features/rankings/comparison';
 import { useAuth } from '@/providers/auth-provider';
 import { RadarChart, type RadarChartItem } from './components/radar-chart';
+import { formatStatisticsTitle } from './model';
 import { loadDistributionStatistics, type DistributionStatistics } from './service';
 import type { ProfileMode } from './types';
 
 const EMPTY_STATISTICS: DistributionStatistics = { averageRating: null, placesRated: 0, weights: {} };
 
 export default function StatisticsScreen() {
+  const { userId: paramUserId, userName } = useLocalSearchParams<{ userId?: string; userName?: string }>();
   const { session } = useAuth();
+  const currentUserId = session?.user.id;
+  const targetUserId = paramUserId || currentUserId;
+  const isOwn = !paramUserId || paramUserId === currentUserId;
+
   const { width } = useWindowDimensions();
   const [mode, setMode] = useState<ProfileMode>('activities');
   const [statistics, setStatistics] = useState<DistributionStatistics>(EMPTY_STATISTICS);
@@ -25,20 +31,20 @@ export default function StatisticsScreen() {
   const chartSize = mode === 'food' ? availableChartSize * 0.84 : availableChartSize;
 
   useFocusEffect(useCallback(() => {
+    void attempt;
     let active = true;
-    const userId = session?.user.id;
-    if (!userId) {
+    if (!targetUserId) {
       setLoading(false);
       return () => { active = false; };
     }
     setLoading(true);
     setError(false);
-    void loadDistributionStatistics(userId, mode)
+    void loadDistributionStatistics(targetUserId, mode)
       .then((next) => { if (active) setStatistics(next); })
       .catch(() => { if (active) { setStatistics(EMPTY_STATISTICS); setError(true); } })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [attempt, mode, session?.user.id]));
+  }, [attempt, mode, targetUserId]));
 
   const groups = CATEGORY_GROUPS_BY_MODE[mode];
   const chartItems: RadarChartItem[] = useMemo(() => groups.map((group) => ({
@@ -57,9 +63,11 @@ export default function StatisticsScreen() {
     return top?.label ?? '—';
   }, [groups, statistics.weights]);
 
+  const headerTitle = formatStatisticsTitle(isOwn, userName);
+
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
-      <AppHeader description="Distribution & Statistics" showBack onBack={() => router.back()} />
+      <AppHeader description={headerTitle} showBack onBack={() => router.back()} />
       <ScrollView contentContainerStyle={styles.content}>
         <View accessibilityRole="tablist" style={styles.filters}>
           {(['activities', 'food'] as const).map((value) => (

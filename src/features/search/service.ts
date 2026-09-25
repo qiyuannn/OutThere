@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { SearchArea, SearchPlace, SearchRequest, SearchResponse } from './model';
+import type { ProfileSearchResult, SearchArea, SearchPlace, SearchRequest, SearchResponse } from './model';
 import type { PlaceSuggestion } from './suggestions-controller';
 
 export async function suggestPlaces(query: string, center?: { latitude: number; longitude: number }): Promise<PlaceSuggestion[]> {
@@ -67,4 +67,30 @@ export async function hydratePlaceRows<T extends { google_place_id: string; disp
       website_uri: p.websiteUri, phone_number: p.phoneNumber, regular_opening_hours: p.regularOpeningHours,
       amenities: p.amenities, photos: p.photos, live_open_now: p.openNow };
   });
+}
+
+export async function searchProfiles(query: string, limit = 20): Promise<ProfileSearchResult[]> {
+  const clean = query.trim();
+  if (clean.length < 2) return [];
+  if (!supabase) throw new Error('Connect to Supabase to search for profiles.');
+
+  const { data: rpcData, error: rpcError } = await supabase.rpc('search_profiles', {
+    search_query: clean,
+    limit_count: limit,
+  });
+
+  if (!rpcError && Array.isArray(rpcData)) {
+    return rpcData as ProfileSearchResult[];
+  }
+
+  const safeQuery = clean.replace(/[%_,()]/g, '');
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('user_id,username,display_name,bio,avatar_path')
+    .eq('onboarding_completed', true)
+    .or(`username.ilike.%${safeQuery}%,display_name.ilike.%${safeQuery}%`)
+    .limit(limit);
+
+  if (error) throw new Error('Could not search profiles. Check your connection and try again.');
+  return (data ?? []) as ProfileSearchResult[];
 }

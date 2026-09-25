@@ -75,7 +75,7 @@ function EmptyFeed({ error, onRetry }: { error: string | null; onRetry: () => vo
         {error ? 'Couldn’t load the feed' : 'No posts yet'}
       </ThemedText>
       <ThemedText style={styles.stateBody}>
-        {error ? 'Check your connection and try again.' : 'Posts from the OutThere community will appear here.'}
+        {error ? 'Check your connection and try again.' : 'Posts from profiles you follow will appear here.'}
       </ThemedText>
       {error ? (
         <Pressable accessibilityRole="button" onPress={onRetry} style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import {
   Pressable,
   ScrollView,
@@ -22,13 +22,25 @@ const shareIcon = require('../../../assets/images/posts/share-fat.svg');
 
 type FeedItemProps = {
   post: FeedPost;
-  liking: boolean;
-  onToggleLike: (post: FeedPost) => void;
+  liking?: boolean;
+  onToggleLike?: (post: FeedPost) => void;
+  onOpenComments?: (post: FeedPost) => void;
   showAuthor?: boolean;
   showOpeningStatus?: boolean;
+  disableCommentLink?: boolean;
+  showActions?: boolean;
 };
 
-export function FeedItem({ post, liking, onToggleLike, showAuthor = true, showOpeningStatus = false }: FeedItemProps) {
+export function FeedItem({
+  post,
+  liking = false,
+  onToggleLike,
+  onOpenComments,
+  showAuthor = true,
+  showOpeningStatus = false,
+  disableCommentLink = false,
+  showActions = true,
+}: FeedItemProps) {
   const category = formatPlaceCategory(post.placePriceLevel, post.placeCategory);
   const openNow = showOpeningStatus ? computeIsOpenNow(post.placeRegularOpeningHours) : null;
   const scoreTier = getScoreTier(post.rating);
@@ -37,20 +49,36 @@ export function FeedItem({ post, liking, onToggleLike, showAuthor = true, showOp
     : { backgroundColor: scoreTier.backgroundColor, borderColor: scoreTier.color };
 
   const openPlace = () => router.push({ pathname: '/search/[id]', params: { id: post.googlePlaceId } });
+  const openAuthorProfile = () => {
+    if (post.userId) router.push({ pathname: '/search/profile/[id]', params: { id: post.userId } });
+  };
   const sharePost = () => Share.share({
     message: `${post.displayName} rated ${post.placeName} ${post.rating.toFixed(1)}/10 on OutThere.${post.body ? `\n\n${post.body}` : ''}`,
   });
+  const pathname = usePathname();
+  const handleOpenComments = () => {
+    if (onOpenComments) {
+      onOpenComments(post);
+    } else if (!disableCommentLink) {
+      const pathnameTarget = pathname.startsWith('/search')
+        ? '/search/comments'
+        : pathname.startsWith('/profile')
+          ? '/profile/comments'
+          : '/rankings/comments';
+      router.push({ pathname: pathnameTarget, params: { postId: String(post.id) } });
+    }
+  };
 
   return (
     <View style={styles.item}>
       {showAuthor ? (
-        <View style={styles.profileRow}>
+        <Pressable accessibilityRole="button" onPress={openAuthorProfile} style={styles.profileRow}>
           <FeedAvatar name={post.displayName} uri={post.avatarUrl} />
           <View style={styles.profileCopy}>
             <ThemedText numberOfLines={1} style={styles.profileName}>{post.displayName}</ThemedText>
             <ThemedText style={styles.meta}>{formatFeedTimestamp(post.createdAt)}</ThemedText>
           </View>
-        </View>
+        </Pressable>
       ) : null}
 
       <View style={styles.placeRow}>
@@ -71,17 +99,24 @@ export function FeedItem({ post, liking, onToggleLike, showAuthor = true, showOp
       {post.photoUrls.length > 0 ? <PhotoGallery urls={post.photoUrls} placeName={post.placeName} /> : null}
 
       <ThemedText style={styles.likeCount}>{formatLikeCount(post.likeCount)}</ThemedText>
-      <View style={styles.actions}>
-        <ActionButton
-          accessibilityLabel={post.likedByMe ? 'Unlike post' : 'Like post'}
-          disabled={liking}
-          icon={likeIcon}
-          onPress={() => onToggleLike(post)}
-          selected={post.likedByMe}
-        />
-        <ActionButton accessibilityLabel="Comments are not available yet" disabled icon={commentIcon} />
-        <ActionButton accessibilityLabel="Share post" icon={shareIcon} onPress={() => void sharePost()} />
-      </View>
+      {showActions ? (
+        <View style={styles.actions}>
+          <ActionButton
+            accessibilityLabel={post.likedByMe ? 'Unlike post' : 'Like post'}
+            disabled={liking}
+            icon={likeIcon}
+            onPress={() => onToggleLike?.(post)}
+            selected={post.likedByMe}
+          />
+          <ActionButton
+            accessibilityLabel="Comments"
+            disabled={disableCommentLink && !onOpenComments}
+            icon={commentIcon}
+            onPress={handleOpenComments}
+          />
+          <ActionButton accessibilityLabel="Share post" icon={shareIcon} onPress={() => void sharePost()} />
+        </View>
+      ) : null}
     </View>
   );
 }

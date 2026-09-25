@@ -205,8 +205,8 @@ export const ACTIVITY_CATEGORY_GROUPS: readonly CategoryGroup[] = [
     icon: '🌃',
     description: 'Nightclubs, casinos, event halls, and social venues',
     placeTypes: [
-      'banquet_hall', 'casino', 'community_center', 'convention_center',
-      'event_venue', 'night_club', 'wedding_venue',
+      'casino', 'community_center', 'convention_center',
+      'event_venue', 'night_club',
     ],
   },
 ];

@@ -5,6 +5,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/use-theme';
 import { SubscriptionProvider } from '@/providers/subscription-provider';
 import { ProfileProvider } from '@/providers/profile-provider';
+import { NotificationsProvider } from '@/providers/notifications-provider';
 import { BackendProvider } from '@/providers/backend-provider';
 import { AuthProvider, useAuth } from '@/providers/auth-provider';
 export { ErrorBoundary } from 'expo-router';
@@ -97,6 +98,6 @@ export default function RootLayout() {
   const colors = useTheme();
   const base = dark ? DarkTheme : DefaultTheme;
   return <SafeAreaProvider><ThemeProvider value={{ ...base, colors: { ...base.colors, primary: colors.primary, background: colors.background, card: colors.backgroundElement, text: colors.text, border: colors.border } }}>
-    <BackendProvider><AuthProvider><SubscriptionProvider><ProfileProvider><StatusBar style={dark ? 'light' : 'dark'} /><Navigation /></ProfileProvider></SubscriptionProvider></AuthProvider></BackendProvider>
+    <BackendProvider><AuthProvider><SubscriptionProvider><ProfileProvider><NotificationsProvider><StatusBar style={dark ? 'light' : 'dark'} /><Navigation /></NotificationsProvider></ProfileProvider></SubscriptionProvider></AuthProvider></BackendProvider>
   </ThemeProvider></SafeAreaProvider>;
 }

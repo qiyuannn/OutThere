@@ -65,6 +65,9 @@ export function useDiscover() {
   const [location, setLocation] = useState<DiscoverLocation | null>(null);
   const [radiusMeters, setRadiusMeters] = useState(preferredRadius);
   const [modesState, setModesState] = useState<Record<DiscoverMode, ModeState>>(initialModesState);
+  const modesStateRef = useRef<Record<DiscoverMode, ModeState>>(modesState);
+  modesStateRef.current = modesState;
+
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,63 +96,63 @@ export function useDiscover() {
       if (requestId !== requestNumber.current) return;
       setLocation(nextLocation);
 
-      // Determine current unvisited circles and exclusions
-      let currentUnvisited = forceReset ? [0, 1, 2, 3, 4, 5, 6] : modesState[targetMode].unvisitedCircles;
-      if (currentUnvisited.length === 0) {
-        // No circles remaining
-        setModesState((prev) => {
-          const m = prev[targetMode];
-          const exhausted = isFeedExhausted(m.visitedCirclesCount, m.queues, m.current);
-          return {
-            ...prev,
-            [targetMode]: { ...m, exhausted, loaded: true },
-          };
-        });
-        return;
-      }
+      let isFirstIteration = true;
+      let hasFoundCard = false;
 
-      const circleChoice = pickNextCircle(currentUnvisited);
-      if (!circleChoice) return;
+      while (!hasFoundCard) {
+        if (requestId !== requestNumber.current) return;
 
-      const circleToFetch = circleChoice.nextCircle;
-      const remainingCircles = circleChoice.remaining;
+        const isReset = forceReset && isFirstIteration;
+        const currentMode = isReset ? createInitialModeState() : modesStateRef.current[targetMode];
+        const currentUnvisited = isReset ? [0, 1, 2, 3, 4, 5, 6] : currentMode.unvisitedCircles;
 
-      // Load saved and passed place IDs if not yet loaded or if force resetting
-      let currentSavedIds = forceReset ? new Set<string>() : modesState[targetMode].savedPlaceIds;
-      let currentPassedIds = forceReset ? new Set<string>() : modesState[targetMode].passedPlaceIds;
-      if (forceReset || (currentSavedIds.size === 0 && currentPassedIds.size === 0)) {
-        const { savedIds, passedIds } = await loadUserSavedAndPassedPlaceIds(userId, targetMode);
-        currentSavedIds = savedIds;
-        currentPassedIds = passedIds;
-      }
+        if (currentUnvisited.length === 0) {
+          const exhausted = isFeedExhausted(currentMode.visitedCirclesCount, currentMode.queues, currentMode.current);
+          const nextState = { ...currentMode, exhausted, loaded: true };
+          modesStateRef.current[targetMode] = nextState;
+          setModesState((prev) => ({ ...prev, [targetMode]: nextState }));
+          break;
+        }
 
-      const seenIds = forceReset ? [] : Array.from(modesState[targetMode].seenPlaceIds);
-      const result = await requestRecommendations(
-        targetMode,
-        nextLocation,
-        targetRadius,
-        circleToFetch,
-        seenIds
-      );
+        const circleChoice = pickNextCircle(currentUnvisited);
+        if (!circleChoice) break;
 
-      if (requestId !== requestNumber.current) return;
+        const circleToFetch = circleChoice.nextCircle;
+        const remainingCircles = circleChoice.remaining;
 
-      setModesState((prev) => {
-        const prevMode = forceReset ? createInitialModeState() : prev[targetMode];
-        const newSeen = new Set(prevMode.seenPlaceIds);
+        let currentSavedIds = isReset ? new Set<string>() : currentMode.savedPlaceIds;
+        let currentPassedIds = isReset ? new Set<string>() : currentMode.passedPlaceIds;
+        if (isReset || (currentSavedIds.size === 0 && currentPassedIds.size === 0)) {
+          const { savedIds, passedIds } = await loadUserSavedAndPassedPlaceIds(userId, targetMode);
+          currentSavedIds = savedIds;
+          currentPassedIds = passedIds;
+        }
+
+        const seenIds = isReset ? [] : Array.from(currentMode.seenPlaceIds);
+        const result = await requestRecommendations(
+          targetMode,
+          nextLocation,
+          targetRadius,
+          circleToFetch,
+          seenIds
+        );
+
+        if (requestId !== requestNumber.current) return;
+
+        const newSeen = new Set(isReset ? [] : currentMode.seenPlaceIds);
         const incomingQueues = result.queues ?? {
           high: result.recommendations.filter((r) => r.queueTier === 'high'),
           med: result.recommendations.filter((r) => r.queueTier === 'med'),
           low: result.recommendations.filter((r) => r.queueTier === 'low' || !r.queueTier),
         };
 
-        // Add to seen set
         for (const item of [...incomingQueues.high, ...incomingQueues.med, ...incomingQueues.low]) {
           newSeen.add(item.id);
         }
 
-        const combinedQueues = enqueueItems(prevMode.queues, incomingQueues);
-        let nextCurrent = prevMode.current;
+        const latestMode = isReset ? createInitialModeState() : modesStateRef.current[targetMode];
+        const combinedQueues = enqueueItems(latestMode.queues, incomingQueues);
+        let nextCurrent = latestMode.current;
 
         // If no active card, draw one
         if (!nextCurrent) {
@@ -160,26 +163,57 @@ export function useDiscover() {
           nextCurrent = draw.item;
         }
 
-        const visitedCount = prevMode.visitedCirclesCount + 1;
+        const visitedCount = isReset ? 1 : latestMode.visitedCirclesCount + 1;
         const exhausted = isFeedExhausted(visitedCount, combinedQueues, nextCurrent);
 
-        return {
-          ...prev,
-          [targetMode]: {
-            ...prevMode,
-            queues: combinedQueues,
-            unvisitedCircles: remainingCircles,
-            visitedCirclesCount: visitedCount,
-            current: nextCurrent,
-            loaded: true,
-            exhausted,
-            passedCount: result.passedCount ?? prevMode.passedCount,
-            savedPlaceIds: currentSavedIds,
-            passedPlaceIds: currentPassedIds,
-            seenPlaceIds: newSeen,
-          },
+        const nextModeState: ModeState = {
+          ...latestMode,
+          queues: combinedQueues,
+          unvisitedCircles: remainingCircles,
+          visitedCirclesCount: visitedCount,
+          current: nextCurrent,
+          loaded: true,
+          exhausted,
+          passedCount: result.passedCount ?? latestMode.passedCount,
+          savedPlaceIds: currentSavedIds,
+          passedPlaceIds: currentPassedIds,
+          seenPlaceIds: newSeen,
         };
-      });
+
+        console.log(`[Discover:${targetMode}] Circle ${circleToFetch} loaded:`, {
+          googleApiRaw: result.debug?.rawCounts ?? 'N/A',
+          afterDedupAndBounds: result.debug?.dedupedCounts ?? 'N/A',
+          incoming: {
+            high: incomingQueues.high.length,
+            med: incomingQueues.med.length,
+            low: incomingQueues.low.length,
+            total: incomingQueues.high.length + incomingQueues.med.length + incomingQueues.low.length,
+          },
+          queues: {
+            high: combinedQueues.high.length,
+            med: combinedQueues.med.length,
+            low: combinedQueues.low.length,
+            total: getQueueTotal(combinedQueues),
+          },
+          currentCard: nextCurrent ? `${nextCurrent.name} [${nextCurrent.queueTier ?? 'tier'}]` : null,
+          unvisitedCircles: remainingCircles,
+          visitedCirclesCount: visitedCount,
+          exhausted,
+        });
+
+        modesStateRef.current[targetMode] = nextModeState;
+        setModesState((prev) => ({
+          ...prev,
+          [targetMode]: nextModeState,
+        }));
+
+        isFirstIteration = false;
+
+        // Stop if a card is active, or queues contain places, or all circles are visited
+        if (nextCurrent || getQueueTotal(combinedQueues) > 0 || remainingCircles.length === 0) {
+          hasFoundCard = true;
+        }
+      }
     } catch (reason) {
       if (requestId === requestNumber.current) {
         setError(reason instanceof Error ? reason.message : 'Could not load nearby places.');
@@ -194,13 +228,15 @@ export function useDiscover() {
         setLoading(false);
       }
     }
-  }, [location, modesState, radiusMeters, userId]);
+  }, [location, radiusMeters, userId]);
 
   // Initial load
   useEffect(() => {
     if (!userId) return;
     setRadiusMeters(preferredRadius);
-    setModesState(initialModesState());
+    const freshModes = initialModesState();
+    modesStateRef.current = freshModes;
+    setModesState(freshModes);
     void fetchNextCircle('activities', preferredRadius, null, true);
     return () => {
       requestNumber.current += 1;
@@ -226,26 +262,8 @@ export function useDiscover() {
     try {
       if (choice === 'pass') {
         await passPlace(userId, placeToResolve.id, mode);
-        setModesState((prev) => {
-          const m = prev[mode];
-          const newPassed = new Set(m.passedPlaceIds);
-          newPassed.add(placeToResolve.id);
-          return {
-            ...prev,
-            [mode]: { ...m, passedPlaceIds: newPassed, passedCount: m.passedCount + 1 },
-          };
-        });
       } else if (choice === 'save' || choice === 'details') {
         await savePlace(userId, placeToResolve.id, mode);
-        setModesState((prev) => {
-          const m = prev[mode];
-          const newSaved = new Set(m.savedPlaceIds);
-          newSaved.add(placeToResolve.id);
-          return {
-            ...prev,
-            [mode]: { ...m, savedPlaceIds: newSaved },
-          };
-        });
       }
 
       if (choice === 'details') {
@@ -255,40 +273,65 @@ export function useDiscover() {
         });
       }
 
-      // Draw next card from current queues
-      let drawnCard: Recommendation | null = null;
-      let shouldFetch = false;
+      // Synchronously draw next card and compute replenishment condition
+      const prevMode = modesStateRef.current[mode];
+      const newPassed = new Set(prevMode.passedPlaceIds);
+      const newSaved = new Set(prevMode.savedPlaceIds);
+      let newPassedCount = prevMode.passedCount;
 
-      setModesState((prev) => {
-        const m = prev[mode];
-        const queuesCopy = {
-          high: [...m.queues.high],
-          med: [...m.queues.med],
-          low: [...m.queues.low],
-        };
+      if (choice === 'pass') {
+        newPassed.add(placeToResolve.id);
+        newPassedCount += 1;
+      } else if (choice === 'save' || choice === 'details') {
+        newSaved.add(placeToResolve.id);
+      }
 
-        const draw = drawNextRecommendation(
-          queuesCopy,
-          (item) => m.savedPlaceIds.has(item.id) || m.passedPlaceIds.has(item.id)
-        );
+      const queuesCopy = {
+        high: [...prevMode.queues.high],
+        med: [...prevMode.queues.med],
+        low: [...prevMode.queues.low],
+      };
 
-        drawnCard = draw.item;
-        shouldFetch = (shouldReplenish(queuesCopy) || !drawnCard) && m.unvisitedCircles.length > 0;
-        const exhausted = isFeedExhausted(m.visitedCirclesCount, queuesCopy, drawnCard);
+      const draw = drawNextRecommendation(
+        queuesCopy,
+        (item) => newSaved.has(item.id) || newPassed.has(item.id)
+      );
 
-        return {
-          ...prev,
-          [mode]: {
-            ...m,
-            queues: queuesCopy,
-            current: drawnCard,
-            exhausted,
-          },
-        };
+      const drawnCard = draw.item;
+      const shouldFetch = (shouldReplenish(queuesCopy) || !drawnCard) && prevMode.unvisitedCircles.length > 0;
+      const exhausted = isFeedExhausted(prevMode.visitedCirclesCount, queuesCopy, drawnCard);
+
+      const nextModeState: ModeState = {
+        ...prevMode,
+        queues: queuesCopy,
+        current: drawnCard,
+        passedPlaceIds: newPassed,
+        savedPlaceIds: newSaved,
+        passedCount: newPassedCount,
+        exhausted,
+      };
+
+      modesStateRef.current[mode] = nextModeState;
+      setModesState((prev) => ({
+        ...prev,
+        [mode]: nextModeState,
+      }));
+
+      console.log(`[Discover:${mode}] Action "${choice}" on "${placeToResolve.name}" -> next draw:`, {
+        drawnCard: drawnCard ? `${drawnCard.name} [${drawnCard.queueTier ?? 'tier'}]` : 'NONE',
+        queuesRemaining: {
+          high: queuesCopy.high.length,
+          med: queuesCopy.med.length,
+          low: queuesCopy.low.length,
+          total: getQueueTotal(queuesCopy),
+        },
+        shouldReplenish: shouldFetch,
+        unvisitedCirclesRemaining: prevMode.unvisitedCircles.length,
       });
 
-      // Replenish from next circle if queues low or empty
+      // Proactively replenish from next circle if queues low or empty
       if (shouldFetch) {
+        console.log(`[Discover:${mode}] Replenishing! Remaining unvisited circles:`, prevMode.unvisitedCircles);
         void fetchNextCircle(mode, radiusMeters, location);
       }
     } catch (reason) {
@@ -305,9 +348,11 @@ export function useDiscover() {
     setError(null);
     try {
       await clearPassedPlaces(userId, mode);
+      const freshMode = createInitialModeState();
+      modesStateRef.current[mode] = freshMode;
       setModesState((prev) => ({
         ...prev,
-        [mode]: createInitialModeState(),
+        [mode]: freshMode,
       }));
       await fetchNextCircle(mode, radiusMeters, location, true);
     } catch (reason) {
@@ -320,16 +365,18 @@ export function useDiscover() {
   // Search again: resets visited circles and restarts from Circle 0
   const searchAgain = useCallback(async () => {
     if (!userId || acting) return;
+    const resetState = {
+      ...modesStateRef.current[mode],
+      queues: createEmptyQueueSet<Recommendation>(),
+      unvisitedCircles: [0, 1, 2, 3, 4, 5, 6],
+      visitedCirclesCount: 0,
+      current: null,
+      exhausted: false,
+    };
+    modesStateRef.current[mode] = resetState;
     setModesState((prev) => ({
       ...prev,
-      [mode]: {
-        ...prev[mode],
-        queues: createEmptyQueueSet(),
-        unvisitedCircles: [0, 1, 2, 3, 4, 5, 6],
-        visitedCirclesCount: 0,
-        current: null,
-        exhausted: false,
-      },
+      [mode]: resetState,
     }));
     await fetchNextCircle(mode, radiusMeters, location, true);
   }, [acting, fetchNextCircle, location, mode, radiusMeters, userId]);
@@ -341,7 +388,9 @@ export function useDiscover() {
     setError(null);
     try {
       setRadiusMeters(nextRadius);
-      setModesState(initialModesState());
+      const freshModes = initialModesState();
+      modesStateRef.current = freshModes;
+      setModesState(freshModes);
       await fetchNextCircle(mode, nextRadius, location, true);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Could not update the search range.');

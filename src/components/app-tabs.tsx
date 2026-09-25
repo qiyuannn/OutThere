@@ -13,6 +13,7 @@ const tabs: { name: MainTabName; title: string }[] = [
 
 export default function AppTabs() {
   const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 14);
 
   return (
     <Tabs
@@ -23,9 +24,9 @@ export default function AppTabs() {
         tabBarInactiveTintColor: '#000000',
         tabBarHideOnKeyboard: true,
         tabBarStyle: {
-          height: 44 + insets.bottom,
-          paddingTop: 0,
-          paddingBottom: insets.bottom,
+          height: 56 + bottomInset,
+          paddingTop: 18,
+          paddingBottom: Math.max(bottomInset - 10, 4),
           paddingHorizontal: 11,
           backgroundColor: '#FFFFFF',
           borderTopColor: 'rgba(0, 0, 0, 0.1)',
@@ -33,7 +34,7 @@ export default function AppTabs() {
           elevation: 0,
         },
         tabBarItemStyle: {
-          height: 44,
+          height: 48,
           maxWidth: 76,
           padding: 0,
         },
@@ -44,6 +45,7 @@ export default function AppTabs() {
         },
       }}
     >
+
       {tabs.map(({ name, title }) => (
         <Tabs.Screen
           key={name}
@@ -57,6 +59,7 @@ export default function AppTabs() {
       ))}
       <Tabs.Screen name="explore/index" options={{ href: null }} />
       <Tabs.Screen name="friends" options={{ href: null }} />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
     </Tabs>
   );
 }

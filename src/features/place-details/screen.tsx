@@ -23,6 +23,7 @@ import { ActionBar } from './components/action-bar';
 import { AttributionFooter } from './components/attribution-footer';
 import { HoursSection } from './components/hours-section';
 import { LocationSection } from './components/location-section';
+import { MutualSavesSection } from './components/mutual-saves-section';
 import { PhotoCarousel } from './components/photo-carousel';
 import { PlaceHeader } from './components/place-header';
 import type { PlaceDetails, PlaceDetailsScreenProps } from './types';
@@ -363,6 +364,7 @@ export function PlaceDetailsScreen({
           <View style={styles.summary}>
             <PlaceHeader place={place} />
           </View>
+          <MutualSavesSection placeId={placeId} placeName={place?.name} />
           <ActionBar
             place={place}
             isSaved={isSaved}

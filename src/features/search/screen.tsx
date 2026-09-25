@@ -1,23 +1,34 @@
 import { useState } from 'react';
 import { router, type Href } from 'expo-router';
-import { ActivityIndicator, FlatList, Keyboard, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Keyboard, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/app-header';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '@/providers/auth-provider';
 import { AreaSheet } from './area-sheet';
 import { FilterSheet } from './filter-sheet';
-import { DEFAULT_FILTERS, type SearchArea, type SearchFilters, type SearchPlace } from './model';
+import {
+  DEFAULT_FILTERS,
+  type ProfileSearchResult,
+  type SearchArea,
+  type SearchFilters,
+  type SearchPlace,
+  type SearchScope,
+} from './model';
 import { PlaceSuggestions } from './place-suggestions';
+import { ProfileSuggestions } from './profile-suggestions';
 import { SearchControls } from './search-controls';
 import { SearchPlaceItem } from './search-place-item';
 import { usePlaceSearch } from './use-search';
 
 export function SearchScreen() {
   const theme = useTheme();
+  const { session } = useAuth();
   const search = usePlaceSearch();
   const [query, setQuery] = useState('');
+  const [searchScope, setSearchScope] = useState<SearchScope>('places');
   const [area, setArea] = useState<SearchArea | null>(null);
   const [filters, setFilters] = useState<SearchFilters>({ ...DEFAULT_FILTERS });
   const [sheet, setSheet] = useState<'area' | 'filters' | null>(null);
@@ -25,6 +36,10 @@ export function SearchScreen() {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   function submit(q = query, nextFilters = filters, nextArea = area) {
+    if (searchScope === 'profiles') {
+      Keyboard.dismiss();
+      return;
+    }
     if (q.trim().length < 2) return;
     setShowSuggestions(false);
     Keyboard.dismiss();
@@ -72,6 +87,19 @@ export function SearchScreen() {
     router.push({ pathname: '/search/[id]', params: { id: place.id } } as unknown as Href);
   };
 
+  const selectProfile = (item: ProfileSearchResult) => {
+    setShowSuggestions(false);
+    Keyboard.dismiss();
+    if (session?.user?.id && item.user_id === session.user.id) {
+      router.push('/profile' as Href);
+    } else {
+      router.push({
+        pathname: '/search/profile/[id]',
+        params: { id: item.user_id },
+      } as unknown as Href);
+    }
+  };
+
   const openPlace = (place: Pick<SearchPlace, 'id'>) => {
     setShowSuggestions(false);
     Keyboard.dismiss();
@@ -96,10 +124,56 @@ export function SearchScreen() {
           onSubmitEditing={() => submit()}
           onOpenFilters={openFilters}
           activeFilterCount={activeFilterCount}
+          searchScope={searchScope}
         />
 
-        {autocompleteVisible ? (
-          <PlaceSuggestions query={query} center={area ?? undefined} onSelect={selectSuggestion} />
+        {searchScope === 'profiles' ? (
+          inputEmpty ? (
+            <View style={styles.emptyProfilesPrompt}>
+              <ThemedText style={styles.emptyProfilesTitle}>Search Profiles</ThemedText>
+              <ThemedText style={styles.emptyProfilesCopy}>
+                Search for friends and other members by name or @username.
+              </ThemedText>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setSearchScope('places')}
+                style={({ pressed }) => [styles.switchBackOutline, pressed && styles.pressed]}
+              >
+                <ThemedText style={styles.switchBackText}>Switch to Places Search</ThemedText>
+              </Pressable>
+            </View>
+          ) : (
+            <ProfileSuggestions
+              query={query}
+              onSelect={selectProfile}
+              onSwitchToPlaces={() => setSearchScope('places')}
+            />
+          )
+        ) : autocompleteVisible ? (
+          <View style={styles.suggestionsContainer}>
+            <Pressable
+              accessibilityLabel={`Search for profile ${query.trim()}`}
+              accessibilityRole="button"
+              onPress={() => {
+                setSearchScope('profiles');
+                setShowSuggestions(true);
+              }}
+              style={({ pressed }) => [styles.profileSearchBanner, pressed && styles.pressedBanner]}
+            >
+              <View style={styles.profileSearchIconSlot}>
+                <ThemedText style={styles.profileSearchIcon}>👤</ThemedText>
+              </View>
+              <View style={styles.profileSearchTextSlot}>
+                <ThemedText style={styles.profileSearchTitle}>Search for profile</ThemedText>
+                <ThemedText numberOfLines={1} style={styles.profileSearchSubtitle}>
+                  Search profiles matching “{query.trim()}”
+                </ThemedText>
+              </View>
+              <ThemedText style={styles.profileSearchArrow}>›</ThemedText>
+            </Pressable>
+
+            <PlaceSuggestions query={query} center={area ?? undefined} onSelect={selectSuggestion} />
+          </View>
         ) : inputEmpty ? (
           <>
             <View style={styles.sectionHeader}>
@@ -158,4 +232,93 @@ const styles = StyleSheet.create({
   recentSeparator: { height: 10 },
   emptyList: { flexGrow: 1 },
   emptyCopy: { color: '#637068', fontSize: 13, lineHeight: 19 },
+  suggestionsContainer: { flex: 1, minHeight: 0 },
+  profileSearchBanner: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 14,
+    backgroundColor: '#F3F6F1',
+    borderWidth: 1,
+    borderColor: '#DFE5D9',
+    gap: 10,
+  },
+  pressedBanner: {
+    opacity: 0.7,
+  },
+  profileSearchIconSlot: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#DFE5D9',
+  },
+  profileSearchIcon: {
+    fontSize: 15,
+  },
+  profileSearchTextSlot: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+  },
+  profileSearchTitle: {
+    color: '#14221D',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  profileSearchSubtitle: {
+    color: '#637068',
+    fontSize: 12,
+    fontWeight: '400',
+    lineHeight: 15,
+  },
+  profileSearchArrow: {
+    color: '#637068',
+    fontSize: 18,
+    fontWeight: '400',
+    paddingRight: 4,
+  },
+  emptyProfilesPrompt: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    gap: 12,
+  },
+  emptyProfilesTitle: {
+    color: '#14221D',
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  emptyProfilesCopy: {
+    color: '#637068',
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  switchBackOutline: {
+    marginTop: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#DFE5D9',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  switchBackText: {
+    color: '#14221D',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  pressed: {
+    opacity: 0.6,
+  },
 });

@@ -54,4 +54,9 @@ export interface RecommendationResponse {
   circleIndex?: number;
   exhausted: boolean;
   passedCount: number;
+  debug?: {
+    rawCounts?: { high: number; med: number; low: number; total: number };
+    dedupedCounts?: { high: number; med: number; low: number; total: number };
+    excludedCount?: number;
+  };
 }

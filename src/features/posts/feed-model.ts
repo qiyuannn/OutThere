@@ -35,3 +35,21 @@ export function formatLikeCount(count: number): string {
   if (count === 1) return '1 person liked this';
   return `${count} others liked this`;
 }
+
+export function formatCommentCount(count: number): string {
+  if (count <= 0) return '0 comments';
+  if (count === 1) return '1 comment';
+  return `${count} comments`;
+}
+
+export function validateCommentBody(text: string): { valid: boolean; error?: string } {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) {
+    return { valid: false, error: 'Comment cannot be empty.' };
+  }
+  if (trimmed.length > 1000) {
+    return { valid: false, error: 'Comment must be 1,000 characters or less.' };
+  }
+  return { valid: true };
+}
+

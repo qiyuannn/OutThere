@@ -33,9 +33,22 @@ export type FeedPost = {
   photoUrls: string[];
   likeCount: number;
   likedByMe: boolean;
+  commentCount?: number;
+};
+
+export type PostComment = {
+  id: number;
+  postId: number;
+  userId: string;
+  body: string;
+  createdAt: string;
+  displayName: string;
+  username: string | null;
+  avatarUrl: string | null;
 };
 
 export type FeedPage = {
   posts: FeedPost[];
   nextCursor: FeedCursor | null;
 };
+

@@ -5,6 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
 
+import { useNotifications } from '@/providers/notifications-provider';
+
 const backIcon = require('../../assets/images/navigation/back.svg');
 const bellIcon = require('../../assets/images/navigation/bell.svg');
 
@@ -23,8 +25,12 @@ export function AppHeader({
   onNotifications,
   showBack = false,
 }: AppHeaderProps) {
+  const { unreadCount } = useNotifications();
   const handleBack = onBack ?? (() => {
     if (router.canGoBack()) router.back();
+  });
+  const handleNotifications = onNotifications ?? (() => {
+    router.push('/notifications');
   });
 
   return (
@@ -48,19 +54,16 @@ export function AppHeader({
           <Text accessibilityRole="header" style={[styles.brand, brandLeading && styles.leadingBrand]}>OutThere</Text>
 
           <View style={[styles.actionSlot, styles.trailingSlot]}>
-            {onNotifications ? (
-              <Pressable
-                accessibilityLabel="Notifications"
-                accessibilityRole="button"
-                hitSlop={10}
-                onPress={onNotifications}
-                style={({ pressed }) => [styles.action, pressed && styles.pressed]}
-              >
-                <Image source={bellIcon} style={styles.icon} contentFit="contain" />
-              </Pressable>
-            ) : (
-              <Image accessibilityElementsHidden source={bellIcon} style={styles.icon} contentFit="contain" />
-            )}
+            <Pressable
+              accessibilityLabel={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'}
+              accessibilityRole="button"
+              hitSlop={10}
+              onPress={handleNotifications}
+              style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+            >
+              <Image source={bellIcon} style={styles.icon} contentFit="contain" />
+              {unreadCount > 0 ? <View style={styles.unreadBadge} /> : null}
+            </Pressable>
           </View>
         </View>
 
@@ -126,5 +129,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     lineHeight: 12,
     textAlign: 'center',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: 1,
+    right: 1,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
 });

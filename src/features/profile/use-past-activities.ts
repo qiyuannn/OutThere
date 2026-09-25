@@ -1,12 +1,15 @@
 import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
-import { getMyPostsPage, setPostLiked } from '@/features/posts/service';
+import { getUserPostsPage, getMyPostsPage, setPostLiked } from '@/features/posts/service';
 import type { FeedCursor, FeedPost } from '@/features/posts/types';
 import { useAuth } from '@/providers/auth-provider';
 
-export function usePastActivities() {
+export function usePastActivities(targetUserId?: string) {
   const { session } = useAuth();
+  const currentUserId = session?.user.id;
+  const isOwn = !targetUserId || targetUserId === currentUserId;
+
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [cursor, setCursor] = useState<FeedCursor | null>(null);
   const [loading, setLoading] = useState(true);
@@ -16,20 +19,27 @@ export function usePastActivities() {
   const request = useRef(0);
   const hasLoaded = useRef(false);
 
+  const fetchPage = useCallback((nextCursor: FeedCursor | null = null) => {
+    if (targetUserId && targetUserId !== currentUserId) {
+      return getUserPostsPage(targetUserId, nextCursor);
+    }
+    return getMyPostsPage(nextCursor);
+  }, [targetUserId, currentUserId]);
+
   const refresh = useCallback(async () => {
     const id = ++request.current;
     if (hasLoaded.current) setRefreshing(true);
     else setLoading(true);
     setError(null);
     try {
-      const page = await getMyPostsPage();
+      const page = await fetchPage();
       if (id !== request.current) return;
       setPosts(page.posts);
       setCursor(page.nextCursor);
       hasLoaded.current = true;
     } catch (reason) {
       if (id === request.current) {
-        setError(reason instanceof Error ? reason.message : 'Could not load your past activities.');
+        setError(reason instanceof Error ? reason.message : isOwn ? 'Could not load your past activities.' : 'Could not load past activities.');
       }
     } finally {
       if (id === request.current) {
@@ -37,7 +47,7 @@ export function usePastActivities() {
         setRefreshing(false);
       }
     }
-  }, []);
+  }, [fetchPage, isOwn]);
 
   useFocusEffect(useCallback(() => {
     void refresh();
@@ -48,7 +58,7 @@ export function usePastActivities() {
     if (!cursor || loadingMore || refreshing) return;
     setLoadingMore(true);
     try {
-      const page = await getMyPostsPage(cursor);
+      const page = await fetchPage(cursor);
       setPosts((current) => {
         const knownIds = new Set(current.map((post) => post.id));
         return [...current, ...page.posts.filter((post) => !knownIds.has(post.id))];
@@ -59,7 +69,7 @@ export function usePastActivities() {
     } finally {
       setLoadingMore(false);
     }
-  }, [cursor, loadingMore, refreshing]);
+  }, [cursor, loadingMore, refreshing, fetchPage]);
 
   const toggleLike = useCallback(async (post: FeedPost) => {
     const userId = session?.user.id;

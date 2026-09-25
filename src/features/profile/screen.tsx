@@ -1,14 +1,15 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/app-header';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { useProfile } from '@/providers/profile-provider';
 import { Avatar } from './components/avatar';
 import { VisitedPlacesMap } from './components/visited-places-map';
-import { loadProfileVisitSummary, type ProfileVisitSummary } from './service';
+import { getFollowCounts, loadProfileVisitSummary, type ProfileVisitSummary } from './service';
 
 const EMPTY_SUMMARY: ProfileVisitSummary = { averageRating: null, places: [], visitedCount: 0 };
 
@@ -17,9 +18,34 @@ export default function ProfileScreen() {
   const { profile, reload } = useProfile();
   const { updated } = useLocalSearchParams<{ updated?: string }>();
   const [summary, setSummary] = useState<ProfileVisitSummary>(EMPTY_SUMMARY);
+  const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const summaryRequest = useRef(0);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    if (!supabase || loggingOut) return;
+    setLoggingOut(true);
+    try {
+      const result = await supabase.auth.signOut({ scope: 'local' });
+      if (result.error) throw result.error;
+    } catch {
+      // Allow retry if sign out failed
+    } finally {
+      if (isMounted.current) {
+        setLoggingOut(false);
+      }
+    }
+  }, [loggingOut]);
 
   const reloadSummary = useCallback(async () => {
     const id = ++summaryRequest.current;
@@ -30,8 +56,14 @@ export default function ProfileScreen() {
     }
 
     try {
-      const next = await loadProfileVisitSummary(userId);
-      if (id === summaryRequest.current) setSummary(next);
+      const [next, counts] = await Promise.all([
+        loadProfileVisitSummary(userId),
+        getFollowCounts(userId).catch(() => ({ followers: 0, following: 0 })),
+      ]);
+      if (id === summaryRequest.current) {
+        setSummary(next);
+        setFollowCounts(counts);
+      }
     } catch {
       if (id === summaryRequest.current) setSummary(EMPTY_SUMMARY);
     } finally {
@@ -77,7 +109,9 @@ export default function ProfileScreen() {
           <Avatar name={profile.display_name} path={profile.avatar_path} size={69} />
           <View style={styles.identity}>
             <Text style={styles.name}>{profile.display_name}</Text>
-            <Text style={styles.following}>12 Followers · 24 Following</Text>
+            <Text style={styles.following}>
+              {followCounts.followers} Followers · {followCounts.following} Following
+            </Text>
           </View>
         </View>
 
@@ -113,6 +147,24 @@ export default function ProfileScreen() {
           {loadingSummary ? <View style={styles.mapLoading}><ActivityIndicator color="#000000" /></View>
             : <VisitedPlacesMap places={summary.places} />}
         </View>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: loggingOut }}
+          disabled={loggingOut}
+          onPress={() => void handleLogout()}
+          style={({ pressed }) => [
+            styles.logoutButton,
+            pressed && styles.pressed,
+            loggingOut && styles.disabled,
+          ]}
+        >
+          {loggingOut ? (
+            <ActivityIndicator color="#DC2626" size="small" />
+          ) : (
+            <Text style={styles.logoutButtonLabel}>Log Out</Text>
+          )}
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -127,8 +179,11 @@ const styles = StyleSheet.create({
   name: { color: '#000000', fontSize: 20, lineHeight: 24, fontWeight: '700' },
   following: { color: '#000000', fontSize: 10, lineHeight: 15, fontWeight: '300', letterSpacing: 0.25 },
   outlineButton: { minHeight: 37, borderWidth: 1, borderColor: '#000000', padding: 10, alignItems: 'center', justifyContent: 'center' },
+  logoutButton: { minHeight: 37, borderWidth: 1, borderColor: '#DC2626', padding: 10, alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.55 },
+  disabled: { opacity: 0.45 },
   buttonLabel: { color: '#000000', fontSize: 12, lineHeight: 15, fontWeight: '600', textAlign: 'center' },
+  logoutButtonLabel: { color: '#DC2626', fontSize: 12, lineHeight: 15, fontWeight: '600', textAlign: 'center' },
   statistics: { padding: 10, gap: 10 },
   statRow: { flexDirection: 'row', gap: 10 },
   statLabel: { flex: 1, color: '#000000', fontSize: 12, lineHeight: 15, fontWeight: '600' },
