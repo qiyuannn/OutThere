@@ -7,6 +7,7 @@ import { AppHeader } from '@/components/app-header';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { useProfile } from '@/providers/profile-provider';
+import { useSubscription } from '@/providers/subscription-provider';
 import { Avatar } from './components/avatar';
 import { VisitedPlacesMap } from './components/visited-places-map';
 import { getFollowCounts, loadProfileVisitSummary, type ProfileVisitSummary } from './service';
@@ -16,6 +17,7 @@ const EMPTY_SUMMARY: ProfileVisitSummary = { averageRating: null, places: [], vi
 export default function ProfileScreen() {
   const { session } = useAuth();
   const { profile, reload } = useProfile();
+  const { isPro, ready: membershipReady, unavailable: membershipUnavailable } = useSubscription();
   const { updated } = useLocalSearchParams<{ updated?: string }>();
   const [summary, setSummary] = useState<ProfileVisitSummary>(EMPTY_SUMMARY);
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
@@ -149,6 +151,25 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
 
+        <Pressable
+          accessibilityHint="View plans, restore purchases, or manage your subscription"
+          accessibilityRole="button"
+          onPress={() => router.push('/profile/subscription')}
+          style={({ pressed }) => [styles.membershipButton, pressed && styles.pressed]}
+        >
+          <View style={styles.membershipCopy}>
+            <Text style={styles.membershipTitle}>OutThere Pro</Text>
+            <Text style={styles.membershipDescription}>
+              {membershipUnavailable ?? (isPro
+                ? 'Pro is active. Manage your membership and purchases.'
+                : membershipReady
+                  ? 'View plans, the paywall, and restore purchases.'
+                  : 'Checking your membership status…')}
+            </Text>
+          </View>
+          <Text accessibilityElementsHidden importantForAccessibility="no" style={styles.membershipArrow}>›</Text>
+        </Pressable>
+
         <View style={styles.mapSection}>
           <Text style={styles.mapHeading}>Map</Text>
           {loadingSummary ? <View style={styles.mapLoading}><ActivityIndicator color="#000000" /></View>
@@ -207,6 +228,11 @@ const styles = StyleSheet.create({
   statValue: { flex: 1, color: '#000000', fontSize: 12, lineHeight: 15, fontWeight: '400' },
   actions: { minHeight: 37, flexDirection: 'row', gap: 10 },
   actionButton: { flex: 1, minHeight: 37, borderWidth: 1, borderColor: '#000000', paddingHorizontal: 10, paddingVertical: 7, alignItems: 'center', justifyContent: 'center' },
+  membershipButton: { minHeight: 64, borderWidth: 1, borderColor: '#000000', padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  membershipCopy: { flex: 1, gap: 3 },
+  membershipTitle: { color: '#000000', fontSize: 14, lineHeight: 18, fontWeight: '700' },
+  membershipDescription: { color: '#4B5563', fontSize: 11, lineHeight: 16, fontWeight: '400' },
+  membershipArrow: { color: '#000000', fontSize: 24, lineHeight: 28, fontWeight: '300' },
   mapSection: { padding: 10, gap: 10 },
   mapHeading: { color: '#000000', fontSize: 16, lineHeight: 19, fontWeight: '600' },
   mapLoading: { width: '100%', height: 330, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D9D9D9' },

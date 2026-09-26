@@ -1,7 +1,7 @@
 # RevenueCat in OutThere
 
 The integration lives in `src/features/subscriptions`. It uses the installed
-`react-native-purchases` and `react-native-purchases-ui` 10.9.1 SDKs, Supabase user
+`react-native-purchases` and `react-native-purchases-ui` 10.10.2 SDKs, Supabase user
 UUIDs, and the `outthere_pro` entitlement. Open **Profile → View membership**.
 
 ## 1. Install with npm and rebuild the native app
