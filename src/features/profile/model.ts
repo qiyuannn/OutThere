@@ -3,6 +3,7 @@ export interface ProfileDraft {
   display_name: string;
   bio: string;
   avatar_path: string | null;
+  is_private: boolean;
 }
 export interface Profile extends Omit<ProfileDraft, 'username'> {
   user_id: string;
@@ -13,14 +14,26 @@ export interface Profile extends Omit<ProfileDraft, 'username'> {
   updated_at: string;
 }
 export interface AvatarSelection { uri: string; base64: string }
-export const emptyDraft = (): ProfileDraft => ({ username: '', display_name: '', bio: '', avatar_path: null });
+export const emptyDraft = (): ProfileDraft => ({
+  username: '',
+  display_name: '',
+  bio: '',
+  avatar_path: null,
+  is_private: false,
+});
 export function toDraft(profile: Profile | null): ProfileDraft {
   if (!profile) return emptyDraft();
-  const { username, display_name, bio, avatar_path } = profile;
-  return { username: username ?? '', display_name, bio, avatar_path };
+  const { username, display_name, bio, avatar_path, is_private } = profile;
+  return { username: username ?? '', display_name, bio, avatar_path, is_private: Boolean(is_private) };
 }
 export function normalizeProfile(draft: ProfileDraft): ProfileDraft {
-  return { ...draft, username: draft.username.trim().toLowerCase(), display_name: draft.display_name.trim(), bio: draft.bio.trim() };
+  return {
+    ...draft,
+    username: draft.username.trim().toLowerCase(),
+    display_name: draft.display_name.trim(),
+    bio: draft.bio.trim(),
+    is_private: Boolean(draft.is_private),
+  };
 }
 export function validateProfile(draft: ProfileDraft): string | null {
   const value = normalizeProfile(draft);

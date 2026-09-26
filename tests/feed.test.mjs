@@ -6,6 +6,8 @@ import {
   formatFeedTimestamp,
   formatLikeCount,
   formatPlaceCategory,
+  getFeedEmptyState,
+  labelForFeedScope,
   validateCommentBody,
 } from '../src/features/posts/feed-model.ts';
 
@@ -34,6 +36,31 @@ test('formats comment counts and validates comment bodies', () => {
   assert.deepEqual(validateCommentBody('a'.repeat(1001)), {
     valid: false,
     error: 'Comment must be 1,000 characters or less.',
+  });
+});
+
+test('provides correct feed scope labels and empty states for explore and following', () => {
+  assert.equal(labelForFeedScope('explore'), 'Explore');
+  assert.equal(labelForFeedScope('following'), 'Following');
+
+  assert.deepEqual(getFeedEmptyState('explore', null), {
+    title: 'No posts yet',
+    body: 'Public posts from the community will appear here.',
+  });
+
+  assert.deepEqual(getFeedEmptyState('following', null), {
+    title: 'No posts yet',
+    body: 'Posts from profiles you follow will appear here.',
+  });
+
+  assert.deepEqual(getFeedEmptyState('explore', 'Network timeout'), {
+    title: 'Couldn’t load the feed',
+    body: 'Check your connection and try again.',
+  });
+
+  assert.deepEqual(getFeedEmptyState('following', 'Network timeout'), {
+    title: 'Couldn’t load the feed',
+    body: 'Check your connection and try again.',
   });
 });
 

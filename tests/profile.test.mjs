@@ -28,11 +28,15 @@ test('rejects invalid profile identity fields', () => {
   }
 });
 test('restores saved editable values without including server metadata', () => {
-  const profile = { ...complete(), user_id: 'user-1', version: 5, onboarding_completed: false };
+  const profile = { ...complete(), user_id: 'user-1', version: 5, onboarding_completed: false, is_private: false };
   const draft = toDraft(profile);
   assert.equal(draft.username, profile.username);
+  assert.equal(draft.is_private, false);
   assert.equal('version' in draft, false); assert.equal('onboarding_completed' in draft, false);
   assert.deepEqual(toDraft(null), emptyDraft());
+
+  const privateProfile = { ...profile, is_private: true };
+  assert.equal(toDraft(privateProfile).is_private, true);
 });
 test('reports username conflicts and stale edits without leaking backend errors', () => {
   assert.match(profileError({ code: '23505' }), /already taken/);

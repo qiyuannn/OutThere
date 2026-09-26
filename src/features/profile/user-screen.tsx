@@ -42,7 +42,8 @@ export function UserProfileScreen() {
   const requestCount = useRef(0);
 
   const isFollowing = followRelationship === 'following';
-  const canViewDetails = isOwnProfile || isFollowing;
+  const isProfilePublic = !profile?.is_private;
+  const canViewDetails = isOwnProfile || isFollowing || isProfilePublic;
 
   const loadData = useCallback(async () => {
     if (!targetUserId) {
@@ -62,7 +63,8 @@ export function UserProfileScreen() {
       ]);
 
       let fetchedSummary = EMPTY_SUMMARY;
-      if (isOwnProfile || fetchedRel === 'following') {
+      const isPublic = !fetchedProfile?.is_private;
+      if (isOwnProfile || fetchedRel === 'following' || isPublic) {
         fetchedSummary = await loadProfileVisitSummary(targetUserId).catch(() => EMPTY_SUMMARY);
       }
 
@@ -114,10 +116,17 @@ export function UserProfileScreen() {
         await cancelFollowRequest(targetUserId);
       } else {
         // Send follow request
-        setFollowRelationship('requested');
+        const isTargetPublic = !profile?.is_private;
+        setFollowRelationship(isTargetPublic ? 'following' : 'requested');
+        if (isTargetPublic) {
+          setFollowCounts((prev) => ({
+            ...prev,
+            followers: prev.followers + 1,
+          }));
+        }
         const nextRel = await sendFollowRequest(targetUserId);
         setFollowRelationship(nextRel);
-        if (nextRel === 'following') {
+        if (nextRel === 'following' && !isTargetPublic) {
           setFollowCounts((prev) => ({
             ...prev,
             followers: prev.followers + 1,

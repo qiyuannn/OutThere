@@ -1,7 +1,7 @@
 import { decode } from 'base64-arraybuffer';
 
 import { supabase } from '@/lib/supabase';
-import type { CreatePostInput, FeedCursor, FeedPage, FeedPost, PostComment } from './types';
+import type { CreatePostInput, FeedCursor, FeedPage, FeedPost, FeedScope, PostComment } from './types';
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
@@ -109,6 +109,7 @@ async function getPostPage(
   onlyCurrentUser: boolean,
   cursor: FeedCursor | null,
   targetUserId?: string,
+  feedScope?: FeedScope,
 ): Promise<FeedPage> {
   const { data, error } = await client().rpc('get_feed_posts', {
     p_before_created_at: cursor?.createdAt ?? null,
@@ -116,6 +117,7 @@ async function getPostPage(
     p_limit: FEED_PAGE_SIZE,
     p_only_current_user: onlyCurrentUser,
     p_target_user_id: targetUserId ?? null,
+    p_feed_scope: feedScope ?? 'explore',
   });
   if (error) throw error;
 
@@ -159,8 +161,8 @@ async function getPostPage(
   };
 }
 
-export function getFeedPage(cursor: FeedCursor | null = null): Promise<FeedPage> {
-  return getPostPage(false, cursor);
+export function getFeedPage(cursor: FeedCursor | null = null, scope: FeedScope = 'explore'): Promise<FeedPage> {
+  return getPostPage(false, cursor, undefined, scope);
 }
 
 export function getMyPostsPage(cursor: FeedCursor | null = null): Promise<FeedPage> {

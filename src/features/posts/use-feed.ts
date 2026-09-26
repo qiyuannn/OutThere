@@ -3,9 +3,9 @@ import { useFocusEffect } from 'expo-router';
 
 import { useAuth } from '@/providers/auth-provider';
 import { getFeedPage, setPostLiked } from './service';
-import type { FeedCursor, FeedPost } from './types';
+import type { FeedCursor, FeedPost, FeedScope } from './types';
 
-export function useFeed() {
+export function useFeed(scope: FeedScope = 'explore') {
   const { session } = useAuth();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [cursor, setCursor] = useState<FeedCursor | null>(null);
@@ -15,13 +15,20 @@ export function useFeed() {
   const [error, setError] = useState<string | null>(null);
   const request = useRef(0);
   const hasLoaded = useRef(false);
+  const currentScope = useRef<FeedScope>(scope);
 
   const refresh = useCallback(async () => {
     const id = ++request.current;
+    if (scope !== currentScope.current) {
+      currentScope.current = scope;
+      hasLoaded.current = false;
+      setPosts([]);
+      setCursor(null);
+    }
     hasLoaded.current ? setRefreshing(true) : setLoading(true);
     setError(null);
     try {
-      const page = await getFeedPage();
+      const page = await getFeedPage(null, scope);
       if (id !== request.current) return;
       setPosts(page.posts);
       setCursor(page.nextCursor);
@@ -34,7 +41,7 @@ export function useFeed() {
         setRefreshing(false);
       }
     }
-  }, []);
+  }, [scope]);
 
   useFocusEffect(useCallback(() => {
     void refresh();
@@ -45,7 +52,7 @@ export function useFeed() {
     if (!cursor || loadingMore || refreshing) return;
     setLoadingMore(true);
     try {
-      const page = await getFeedPage(cursor);
+      const page = await getFeedPage(cursor, scope);
       setPosts((current) => {
         const knownIds = new Set(current.map((post) => post.id));
         return [...current, ...page.posts.filter((post) => !knownIds.has(post.id))];
@@ -56,7 +63,7 @@ export function useFeed() {
     } finally {
       setLoadingMore(false);
     }
-  }, [cursor, loadingMore, refreshing]);
+  }, [cursor, loadingMore, refreshing, scope]);
 
   const toggleLike = useCallback(async (post: FeedPost) => {
     const userId = session?.user.id;

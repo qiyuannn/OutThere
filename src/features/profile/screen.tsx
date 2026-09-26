@@ -108,7 +108,14 @@ export default function ProfileScreen() {
         <View style={styles.profileDescription}>
           <Avatar name={profile.display_name} path={profile.avatar_path} size={69} />
           <View style={styles.identity}>
-            <Text style={styles.name}>{profile.display_name}</Text>
+            <View style={styles.nameRow}>
+              <Text style={styles.name}>{profile.display_name}</Text>
+              {profile.is_private ? (
+                <View style={styles.privateBadge}>
+                  <Text style={styles.privateBadgeText}>🔒 Private</Text>
+                </View>
+              ) : null}
+            </View>
             <Text style={styles.following}>
               {followCounts.followers} Followers · {followCounts.following} Following
             </Text>
@@ -176,6 +183,16 @@ const styles = StyleSheet.create({
   savedMessage: { color: '#000000', fontSize: 12, lineHeight: 15, textAlign: 'center' },
   profileDescription: { minHeight: 101, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
   identity: { flex: 1, minHeight: 81, justifyContent: 'center', paddingVertical: 16 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  privateBadge: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  privateBadgeText: { color: '#4B5563', fontSize: 11, fontWeight: '600' },
   name: { color: '#000000', fontSize: 20, lineHeight: 24, fontWeight: '700' },
   following: { color: '#000000', fontSize: 10, lineHeight: 15, fontWeight: '300', letterSpacing: 0.25 },
   outlineButton: { minHeight: 37, borderWidth: 1, borderColor: '#000000', padding: 10, alignItems: 'center', justifyContent: 'center' },

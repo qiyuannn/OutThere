@@ -12,12 +12,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/app-header';
 import { ThemedText } from '@/components/themed-text';
+import { FeedScopeDropdown } from './components/feed-scope-dropdown';
 import { FeedItem } from './feed-item';
-import type { FeedPost } from './types';
+import { getFeedEmptyState } from './feed-model';
+import type { FeedPost, FeedScope } from './types';
 import { useFeed } from './use-feed';
 
 export default function FeedScreen() {
-  const feed = useFeed();
+  const [scope, setScope] = useState<FeedScope>('explore');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const feed = useFeed(scope);
   const [likingIds, setLikingIds] = useState<Set<number>>(() => new Set());
 
   const toggleLike = async (post: FeedPost) => {
@@ -39,6 +43,14 @@ export default function FeedScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.screen}>
       <AppHeader description="Feed" />
+      <View style={styles.dropdownContainer}>
+        <FeedScopeDropdown
+          onChange={(newScope) => setScope(newScope)}
+          onOpenChange={setDropdownOpen}
+          open={dropdownOpen}
+          value={scope}
+        />
+      </View>
       {feed.loading ? (
         <View style={styles.centerState}>
           <ActivityIndicator accessibilityLabel="Loading feed" color="#000000" />
@@ -48,10 +60,11 @@ export default function FeedScreen() {
           contentContainerStyle={feed.posts.length === 0 ? styles.emptyContent : styles.content}
           data={feed.posts}
           keyExtractor={(post) => String(post.id)}
-          ListEmptyComponent={<EmptyFeed error={feed.error} onRetry={() => void feed.refresh()} />}
+          ListEmptyComponent={<EmptyFeed error={feed.error} onRetry={() => void feed.refresh()} scope={scope} />}
           ListFooterComponent={feed.loadingMore ? <ActivityIndicator color="#000000" style={styles.footerLoader} /> : null}
           onEndReached={() => void feed.loadMore()}
           onEndReachedThreshold={0.5}
+          onScrollBeginDrag={() => setDropdownOpen(false)}
           refreshControl={<RefreshControl refreshing={feed.refreshing} onRefresh={() => void feed.refresh()} tintColor="#000000" />}
           renderItem={({ item }) => (
             <FeedItem
@@ -68,14 +81,15 @@ export default function FeedScreen() {
   );
 }
 
-function EmptyFeed({ error, onRetry }: { error: string | null; onRetry: () => void }) {
+function EmptyFeed({ error, onRetry, scope }: { error: string | null; onRetry: () => void; scope: FeedScope }) {
+  const emptyState = getFeedEmptyState(scope, error);
   return (
     <View style={styles.centerState}>
       <ThemedText accessibilityRole={error ? 'alert' : undefined} style={styles.stateTitle}>
-        {error ? 'Couldn’t load the feed' : 'No posts yet'}
+        {emptyState.title}
       </ThemedText>
       <ThemedText style={styles.stateBody}>
-        {error ? 'Check your connection and try again.' : 'Posts from profiles you follow will appear here.'}
+        {emptyState.body}
       </ThemedText>
       {error ? (
         <Pressable accessibilityRole="button" onPress={onRetry} style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}>
@@ -88,6 +102,7 @@ function EmptyFeed({ error, onRetry }: { error: string | null; onRetry: () => vo
 
 const styles = StyleSheet.create({
   screen: { flex: 1, overflow: 'hidden', backgroundColor: '#FFFFFF' },
+  dropdownContainer: { width: '100%', maxWidth: 402, alignSelf: 'center', zIndex: 10 },
   list: { width: '100%', maxWidth: 402, alignSelf: 'center' },
   content: { padding: 10, paddingBottom: 24 },
   emptyContent: { flexGrow: 1, padding: 20 },

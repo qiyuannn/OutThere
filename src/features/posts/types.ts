@@ -47,6 +47,8 @@ export type PostComment = {
   avatarUrl: string | null;
 };
 
+export type FeedScope = 'explore' | 'following';
+
 export type FeedPage = {
   posts: FeedPost[];
   nextCursor: FeedCursor | null;

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
@@ -109,6 +109,30 @@ export function ProfileForm({ onboarding = false, onDone, onCancel }: { onboardi
           value={draft.bio}
         />
 
+        <View style={styles.privacySection}>
+          <View style={styles.privacyRow}>
+            <View style={styles.privacyInfo}>
+              <Text style={styles.editLabel}>Profile Privacy</Text>
+              <Text style={styles.privacyStatus}>
+                {draft.is_private ? 'Private Account' : 'Public Account'}
+              </Text>
+            </View>
+            <Switch
+              accessibilityLabel="Toggle profile privacy"
+              disabled={busy}
+              onValueChange={value => update('is_private', value)}
+              thumbColor="#FFFFFF"
+              trackColor={{ false: '#D1D5DB', true: '#000000' }}
+              value={draft.is_private}
+            />
+          </View>
+          <Text style={styles.privacyDescription}>
+            {draft.is_private
+              ? 'Only approved followers can view your visited places, past activities, and statistics. Follow requests require your approval.'
+              : 'Anyone can view your visited places, past activities, and statistics. Follow requests are automatically accepted.'}
+          </Text>
+        </View>
+
         <View style={styles.editSpacer} />
         {!!error && <Text accessibilityRole="alert" style={styles.editError}>{error}</Text>}
         {conflict && <EditButton disabled={busy} label="Reload latest profile" onPress={() => { void reload(); }} />}
@@ -164,6 +188,30 @@ export function ProfileForm({ onboarding = false, onDone, onCancel }: { onboardi
             onChangeText={value => update('bio', value)}
             value={draft.bio}
           />
+
+          <View style={styles.privacySection}>
+            <View style={styles.privacyRow}>
+              <View style={styles.privacyInfo}>
+                <Text style={styles.editLabel}>Profile Privacy</Text>
+                <Text style={styles.privacyStatus}>
+                  {draft.is_private ? 'Private Account' : 'Public Account'}
+                </Text>
+              </View>
+              <Switch
+                accessibilityLabel="Toggle profile privacy"
+                disabled={busy}
+                onValueChange={value => update('is_private', value)}
+                thumbColor="#FFFFFF"
+                trackColor={{ false: '#D1D5DB', true: '#000000' }}
+                value={draft.is_private}
+              />
+            </View>
+            <Text style={styles.privacyDescription}>
+              {draft.is_private
+                ? 'Only approved followers can view your visited places, past activities, and statistics. Follow requests require approval.'
+                : 'Anyone can view your visited places, past activities, and statistics. Follow requests are automatically accepted.'}
+            </Text>
+          </View>
 
           <View style={styles.onboardingSpacer} />
           {!!error && <Text accessibilityRole="alert" style={styles.editError}>{error}</Text>}
@@ -371,5 +419,33 @@ const styles = StyleSheet.create({
     color: '#B42318',
     fontSize: 12,
     lineHeight: 17,
+  },
+  privacySection: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: 12,
+    gap: 8,
+    marginTop: 4,
+  },
+  privacyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  privacyInfo: {
+    flex: 1,
+    paddingRight: 10,
+    gap: 2,
+  },
+  privacyStatus: {
+    color: '#374151',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  privacyDescription: {
+    color: '#6B7280',
+    fontSize: 11,
+    lineHeight: 15,
   },
 });

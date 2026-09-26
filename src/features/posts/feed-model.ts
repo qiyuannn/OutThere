@@ -53,3 +53,26 @@ export function validateCommentBody(text: string): { valid: boolean; error?: str
   return { valid: true };
 }
 
+export function labelForFeedScope(scope: 'explore' | 'following'): string {
+  return scope === 'explore' ? 'Explore' : 'Following';
+}
+
+export function getFeedEmptyState(scope: 'explore' | 'following', error: string | null): { title: string; body: string } {
+  if (error) {
+    return {
+      title: 'Couldn’t load the feed',
+      body: 'Check your connection and try again.',
+    };
+  }
+  if (scope === 'following') {
+    return {
+      title: 'No posts yet',
+      body: 'Posts from profiles you follow will appear here.',
+    };
+  }
+  return {
+    title: 'No posts yet',
+    body: 'Public posts from the community will appear here.',
+  };
+}
+

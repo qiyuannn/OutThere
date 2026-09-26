@@ -2,7 +2,7 @@ import { decode } from 'base64-arraybuffer';
 import { supabase } from '@/lib/supabase';
 import { normalizeProfile, type AvatarSelection, type Profile, type ProfileDraft } from './model';
 function client() { if (!supabase) throw new Error('Supabase is not configured.'); return supabase; }
-const fields = 'user_id,username,display_name,bio,avatar_path,onboarding_completed,version,created_at,updated_at';
+const fields = 'user_id,username,display_name,bio,avatar_path,onboarding_completed,is_private,version,created_at,updated_at';
 
 export type VisitedPlace = { googlePlaceId: string; latitude: number; longitude: number; name: string; rating: number };
 export type ProfileVisitSummary = { averageRating: number | null; places: VisitedPlace[]; visitedCount: number };
