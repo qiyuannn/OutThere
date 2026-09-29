@@ -53,7 +53,14 @@
           "microphonePermission": false
         }
       ],
-      "./plugins/with-revenuecat"
+      "./plugins/with-revenuecat",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458783700"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

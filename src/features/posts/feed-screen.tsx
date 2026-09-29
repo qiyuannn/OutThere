@@ -17,11 +17,14 @@ import { FeedItem } from './feed-item';
 import { getFeedEmptyState } from './feed-model';
 import type { FeedPost, FeedScope } from './types';
 import { useFeed } from './use-feed';
+import { useSubscription } from '@/providers/subscription-provider';
+import { FeedAdBanner, shouldShowFeedAd } from '@/features/ads';
 
 export default function FeedScreen() {
   const [scope, setScope] = useState<FeedScope>('explore');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const feed = useFeed(scope);
+  const { isPro } = useSubscription();
   const [likingIds, setLikingIds] = useState<Set<number>>(() => new Set());
 
   const toggleLike = async (post: FeedPost) => {
@@ -66,12 +69,17 @@ export default function FeedScreen() {
           onEndReachedThreshold={0.5}
           onScrollBeginDrag={() => setDropdownOpen(false)}
           refreshControl={<RefreshControl refreshing={feed.refreshing} onRefresh={() => void feed.refresh()} tintColor="#000000" />}
-          renderItem={({ item }) => (
-            <FeedItem
-              liking={likingIds.has(item.id)}
-              onToggleLike={(post) => void toggleLike(post)}
-              post={item}
-            />
+          renderItem={({ item, index }) => (
+            <View>
+              <FeedItem
+                liking={likingIds.has(item.id)}
+                onToggleLike={(post) => void toggleLike(post)}
+                post={item}
+              />
+              {shouldShowFeedAd({ index, isPro, scope }) ? (
+                <FeedAdBanner />
+              ) : null}
+            </View>
           )}
           showsVerticalScrollIndicator={false}
           style={styles.list}
