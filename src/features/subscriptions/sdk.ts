@@ -4,5 +4,5 @@ const unsupported = async (): Promise<never> => { throw new Error('Use the nativ
 export const billingAdapter: BillingAdapter = {
   unavailable: 'Subscriptions are available in the iOS and Android apps.', testStore: false,
   identify: unsupported, customerInfo: unsupported, offerings: unsupported, purchase: unsupported,
-  restore: unsupported, paywall: unsupported, customerCenter: unsupported, listen: () => () => {},
+  restore: unsupported, paywall: unsupported, customerCenter: unsupported, manageSubscription: unsupported, listen: () => () => {},
 };

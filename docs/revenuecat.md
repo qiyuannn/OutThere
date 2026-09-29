@@ -51,33 +51,34 @@ keys in Expo public variables.
 
 ## 3. Products, entitlement, and offering
 
-The public RevenueCat API was checked: the current offering is already `default`,
-with these package mappings:
+The app offers one monthly OutThere Pro subscription. It selects the first standard
+`MONTHLY` package from the current offering; annual, lifetime, and duplicate monthly
+packages are not shown or purchasable through the app. Existing entitlements remain valid.
 
 | Product identifier | Product type | Standard RevenueCat package |
 | --- | --- | --- |
-| `lifetime` | Lifetime/non-consumable, one-time purchase | `$rc_lifetime` |
-| `yearly` | Auto-renewing subscription, one year | `$rc_annual` |
 | `monthly` | Auto-renewing subscription, one month | `$rc_monthly` |
 
 In the RevenueCat dashboard:
 
-1. Under Product Catalog → Entitlements, create or open **`outthere_pro`**.
-2. Attach all three products to that entitlement. The public offerings endpoint
-   does not verify entitlement attachments; confirm them in the dashboard.
-3. Under Offerings, open **`default`**, verify the mappings above, and keep it
-   current. The app reads `getOfferings().current`, so targeting and experiments
-   can supply a different current offering without a code change.
-4. For production, create/import the actual App Store and Google Play products,
-   attach them to `outthere_pro`, and map the corresponding products for each
-   store to the same package slots. Apple monthly/yearly plans should share a
-   subscription group. Lifetime must not be a consumable.
-5. Set prices and availability in the respective store/Test Store. The app uses
-   `product.priceString`; it never invents prices, currency, discounts, or trials.
+1. Attach the monthly product to **`outthere_pro`**. Keep legacy product entitlement
+   attachments so existing members retain their access.
+2. Keep only the monthly package in the current offering and any targeted offerings
+   or paywalls. Remove annual/lifetime packages from sale without deleting customer history.
+3. Map the App Store and Google Play monthly products to that package.
+4. Set the intended USD 2.99 monthly price in the store/Test Store. The app displays
+   the localized `product.priceString`; it does not hardcode the Figma sample price.
+5. Configure Customer Center cancellation and support actions. The membership screen's
+   Cancel Subscription button opens the store’s subscription settings; access is refreshed after dismissal
+   and when returning to the app. A cancelled but unexpired membership shows its access
+   end date and a Manage Subscription button.
 
-This code does not invent paid feature benefits or lock existing features. Define
-what Pro includes before launch, then use the entitlement hook below at those
-feature boundaries. Do not sell a production membership without specifying and
+These dashboard/store changes must be applied separately; editing the app does not
+modify the remote product catalog or store prices.
+
+The membership design advertises Ad-Free and Unlimited Discovery swipes. This UI
+change does not add feature restrictions; use the entitlement hook below at those
+feature boundaries before launch. Do not sell a production membership without specifying and
 implementing its benefits.
 
 ## 4. SDK initialization and customer identity
@@ -150,8 +151,7 @@ export default function MembershipExample() {
 ```
 
 The actual complete screen is `src/features/subscriptions/screen.tsx`. It also
-shows renewal/expiration, billing issues, a support ID, and recurring versus
-one-time payment information. Active Pro members manage their membership rather
+shows renewal/expiration and billing issues. Active Pro members manage their membership rather
 than being offered a second purchase. Subscription upgrades/downgrades and
 crossgrades are not implemented as new purchases in this screen.
 
@@ -164,7 +164,7 @@ const isPro = pro?.isActive === true;
 ```
 
 The controller checks returned `CustomerInfo` after `purchasePackage`, restore,
-and paywall presentation. A successful transaction or paywall result alone does
+and the legacy paywall entry point. A successful transaction alone does
 not imply Pro access. `activeSubscriptions` alone is insufficient because
 lifetime/non-consumable access is also supported.
 
@@ -178,37 +178,17 @@ Network/store/configuration errors show recoverable messages. Duplicate purchase
 taps are ignored while a request is open. Restoring with no entitlement shows a
 clear “no active purchase” result. Restore only runs on an explicit user action.
 
-## 6. RevenueCat Paywall
+## 6. Monthly purchase entry point
 
-The native adapter uses:
+The membership screen purchases the single monthly package directly. The legacy
+`billing.presentPaywall()` method delegates to the same guarded monthly purchase
+flow so it cannot expose an older multi-plan dashboard paywall. App screens should
+use `billing.purchase(plan.pkg)` to keep identity, concurrency, cancellation, and
+error handling centralized. Store confirmation still verifies `outthere_pro`.
 
-```tsx
-import RevenueCatUI from 'react-native-purchases-ui';
-import Purchases from 'react-native-purchases';
-
-export async function showProPaywall() {
-  const { current } = await Purchases.getOfferings();
-  if (!current?.availablePackages.length) throw new Error('No current offering');
-  const result = await RevenueCatUI.presentPaywallIfNeeded({
-    offering: current,
-    requiredEntitlementIdentifier: 'outthere_pro',
-    displayCloseButton: true,
-  });
-  const customerInfo = await Purchases.getCustomerInfo();
-  return { result, isPro: customerInfo.entitlements.active.outthere_pro?.isActive === true };
-}
-```
-
-This standalone snippet illustrates SDK calls; app screens should call
-`billing.presentPaywall()` to keep identity, concurrency, cancellation, and error
-handling centralized. `PURCHASED`/`RESTORED` trigger entitlement verification;
-`CANCELLED`/`NOT_PRESENTED` do not grant access; `ERROR` produces a retry message.
-
-In the dashboard, design and publish a paywall attached to `default`. Include
-accurate Pro benefits, the relevant plans, renewal disclosures, restore support,
-and your actual privacy policy and terms links. Add a close action in the paywall
-editor: `displayCloseButton` applies to older template paywalls and is ignored by
-V2 paywalls. Dashboard paywall publication has not been performed by this change.
+Keep any externally configured paywalls monthly-only, with accurate benefits,
+renewal disclosures, restore support, and actual privacy policy and terms links.
+Dashboard paywall publication has not been performed by this change.
 
 ## 7. Customer Center
 
@@ -283,3 +263,16 @@ for production, especially Customer Center management actions.
 - [Displaying paywalls](https://www.revenuecat.com/docs/tools/paywalls/displaying-paywalls)
 - [React Native Customer Center](https://www.revenuecat.com/docs/tools/customer-center/customer-center-react-native)
 - [Test Store](https://www.revenuecat.com/docs/test-and-launch/sandbox/test-store)
+
+## Membership support and legal links
+
+Set `EXPO_PUBLIC_SUPPORT_URL` to your support page or a `mailto:` address,
+`EXPO_PUBLIC_TERMS_URL` to your published Terms of Use, and
+`EXPO_PUBLIC_PRIVACY_URL` to your published Privacy Policy. Restart Expo after
+changing these variables and include them in production builds. No destinations
+are assumed; unset links show an unavailable message rather than opening a
+placeholder site. Opening failures are shown inline and can be retried.
+
+All active members have Manage Subscription; renewing members also retain
+Cancel Subscription. Manage opens Customer Center; Cancel opens the purchase’s management URL (or the native App Store sheet). In Test Store mode, Cancel explains that a store sandbox purchase is needed to test cancellation. Contact Support and the legal
+links appear in both membership states and remain usable during billing errors.

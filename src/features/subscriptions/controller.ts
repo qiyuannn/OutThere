@@ -1,5 +1,5 @@
 import type { CustomerInfo, PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
-import { BillingError, billingError, hasPro, type BillingAdapter } from './model.ts';
+import { BillingError, availablePlans, billingError, hasPro, type BillingAdapter } from './model.ts';
 export interface BillingState {
   userId: string | null;
   customerInfo: CustomerInfo | null;
@@ -24,7 +24,14 @@ export class BillingController {
   constructor(adapter: BillingAdapter) { this.adapter = adapter; }
   subscribe = (callback: () => void) => { this.observers.add(callback); return () => { this.observers.delete(callback); }; };
   snapshot = () => this.state;
-  private update(patch: Partial<BillingState>) { this.state = { ...this.state, ...patch }; this.observers.forEach(fn => fn()); }
+  private update(patch: Partial<BillingState>) {
+    // Display only the latest operation's feedback, whether success or failure.
+    if (patch.error) patch = { ...patch, message: null };
+    else if (patch.message) patch = { ...patch, error: null };
+    this.state = { ...this.state, ...patch };
+    this.observers.forEach(fn => fn());
+  }
+  reportError(error: string | null) { this.update({ error, message: null }); }
   setUser(userId: string | null) {
     this.revision += 1;
     this.stopListening?.(); this.stopListening = undefined;
@@ -72,7 +79,7 @@ export class BillingController {
   async purchase(pkg: PurchasesPackage) {
     if (!this.state.ready || hasPro(this.state.customerInfo)) return;
     await this.run(async current => {
-      if (!this.state.offering?.availablePackages.includes(pkg)) throw new BillingError('Plans changed. Refresh them before purchasing.');
+      if (!availablePlans(this.state.offering).some(plan => plan.pkg === pkg)) throw new BillingError('Plans changed. Refresh them before purchasing.');
       const info = await this.adapter.purchase(pkg);
       if (current()) this.acceptPurchase(info, false);
     });
@@ -84,18 +91,26 @@ export class BillingController {
     await this.run(async current => { const info = await this.adapter.restore(); if (current()) this.acceptPurchase(info, true); });
   }
   async presentPaywall() {
-    if (!this.state.ready) return;
+    // All purchase entry points use the single monthly package, including older callers.
+    const plan = availablePlans(this.state.offering)[0];
+    if (!plan) {
+      if (this.state.ready && !this.state.busy) this.update({ error: 'The monthly plan is temporarily unavailable. Please try again later.' });
+      return;
+    }
+    await this.purchase(plan.pkg);
+  }
+  async cancelSubscription() {
+    if (!this.state.ready || !hasPro(this.state.customerInfo)) return;
     await this.run(async current => {
-      const offering = this.state.offering;
-      if (!offering?.availablePackages.length) throw new BillingError('No plans are available right now. Please try again later.');
-      const result = await this.adapter.paywall(offering);
+      if (this.adapter.testStore) {
+        this.update({ message: 'This is a Test Store subscription, so it cannot be cancelled through Apple or Google. Test subscriptions expire automatically after their test renewals. Use an App Store or Google Play sandbox purchase to test cancellation.' });
+        return;
+      }
+      const info = this.state.customerInfo!;
+      await this.adapter.manageSubscription(info);
       if (!current()) return;
-      if (result === 'ERROR') throw new BillingError('The paywall couldn’t open or complete the purchase. Please try again.');
-      // A presentation result is not proof of entitlement. Always read CustomerInfo.
-      const info = await this.adapter.customerInfo();
-      if (!current()) return;
-      if (result === 'PURCHASED' || result === 'RESTORED') this.acceptPurchase(info, result === 'RESTORED');
-      else this.update({ customerInfo: info });
+      const customerInfo = await this.adapter.customerInfo();
+      if (current()) this.update({ customerInfo, ready: true });
     });
   }
   async customerCenter() {

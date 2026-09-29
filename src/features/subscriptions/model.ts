@@ -1,8 +1,6 @@
 import type { CustomerInfo, PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
 export const PRO_ENTITLEMENT = 'outthere_pro';
 export const PLANS = [
-  { id: 'lifetime', type: 'LIFETIME', label: 'Lifetime', period: 'one-time payment' },
-  { id: 'yearly', type: 'ANNUAL', label: 'Yearly', period: 'per year' },
   { id: 'monthly', type: 'MONTHLY', label: 'Monthly', period: 'per month' },
 ] as const;
 export function hasPro(info: CustomerInfo | null) {
@@ -10,7 +8,7 @@ export function hasPro(info: CustomerInfo | null) {
 }
 export function availablePlans(offering: PurchasesOffering | null) {
   return PLANS.flatMap(plan => {
-    const pkg = offering?.availablePackages.find(item => item.packageType === plan.type || item.identifier === plan.id);
+    const pkg = offering?.availablePackages.find(item => item.packageType === plan.type);
     return pkg ? [{ ...plan, pkg }] : [];
   });
 }
@@ -24,6 +22,7 @@ export interface BillingAdapter {
   restore(): Promise<CustomerInfo>;
   paywall(offering: PurchasesOffering): Promise<string>;
   customerCenter(): Promise<void>;
+  manageSubscription(info: CustomerInfo): Promise<void>;
   listen(callback: () => void): () => void;
 }
 export class BillingError extends Error {}

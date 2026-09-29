@@ -1,7 +1,8 @@
+import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 import RevenueCatUI from 'react-native-purchases-ui';
-import { PRO_ENTITLEMENT, type BillingAdapter } from './model';
+import { BillingError, PRO_ENTITLEMENT, type BillingAdapter } from './model';
 import { selectBillingKey } from './config';
 const config = selectBillingKey(Platform.OS, __DEV__, process.env.EXPO_PUBLIC_REVENUECAT_MODE,
   process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY, process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY, process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY);
@@ -22,6 +23,19 @@ export const billingAdapter: BillingAdapter = {
   restore: () => Purchases.restorePurchases(),
   paywall: offering => RevenueCatUI.presentPaywallIfNeeded({ offering, requiredEntitlementIdentifier: PRO_ENTITLEMENT, displayCloseButton: true }),
   customerCenter: () => RevenueCatUI.presentCustomerCenter(),
+  async manageSubscription(info) {
+    const entitlement = info.entitlements.active[PRO_ENTITLEMENT];
+    if (info.managementURL) {
+      try { await Linking.openURL(info.managementURL); }
+      catch { throw new BillingError('Couldn’t open your subscription settings. Please try again, or open subscriptions in the store where you purchased OutThere Pro.'); }
+      return;
+    }
+    if (Platform.OS === 'ios' && entitlement?.store === 'APP_STORE') {
+      await Purchases.showManageSubscriptions();
+      return;
+    }
+    throw new BillingError('Subscription settings aren’t available for this purchase. Open subscriptions in the store where you purchased OutThere Pro.');
+  },
   listen(callback) {
     Purchases.addCustomerInfoUpdateListener(callback);
     return () => Purchases.removeCustomerInfoUpdateListener(callback);

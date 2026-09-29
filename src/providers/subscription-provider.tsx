@@ -16,8 +16,12 @@ function useSubscriptionState() {
     isPro: matched && hasPro(state.customerInfo), busy: !matched || state.busy,
     error: matched ? state.error : null, message: matched ? state.message : null,
     unavailable: billingAdapter.unavailable, testStore: billingAdapter.testStore,
+    reportError: (error: string | null) => {
+      if (controller.snapshot().userId === userId) controller.reportError(error);
+    },
     refresh: () => controller.refresh(), purchase: controller.purchase.bind(controller),
     restore: () => controller.restore(), presentPaywall: () => controller.presentPaywall(),
+    cancelSubscription: () => controller.cancelSubscription(),
     customerCenter: () => controller.customerCenter() };
 }
 const Context = createContext<ReturnType<typeof useSubscriptionState> | null>(null);
