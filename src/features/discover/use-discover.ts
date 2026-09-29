@@ -2,14 +2,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router } from 'expo-router';
 
 import { useAuth } from '@/providers/auth-provider';
+import { useSubscription } from '@/providers/subscription-provider';
 import { DEFAULT_RADIUS_METERS } from './constants';
+import {
+  computeAllowanceState,
+  executeSwipe,
+  fetchSwipeAllowance,
+  formatResetTime,
+  formatTimeRemaining,
+  loadCachedAllowance,
+  type SwipeAllowanceState,
+} from './allowance';
 import {
   clearPassedPlaces,
   getRoundedDeviceLocation,
   loadUserSavedAndPassedPlaceIds,
-  passPlace,
   requestRecommendations,
-  savePlace,
 } from './service';
 import {
   createEmptyQueueSet,
@@ -59,7 +67,46 @@ const initialModesState = (): Record<DiscoverMode, ModeState> => ({
 export function useDiscover() {
   const { session } = useAuth();
   const userId = session?.user.id;
+  const { isPro } = useSubscription();
   const preferredRadius = DEFAULT_RADIUS_METERS;
+
+  const [allowance, setAllowance] = useState<SwipeAllowanceState>(() =>
+    computeAllowanceState({ isPro })
+  );
+
+  // Sync allowance when user or Pro status changes
+  useEffect(() => {
+    if (!userId) return;
+    let mounted = true;
+
+    // Immediately load cached allowance to prevent UI flicker
+    void loadCachedAllowance(userId, isPro).then((cached) => {
+      if (mounted && cached) setAllowance(cached);
+    });
+
+    // Check remote allowance
+    void fetchSwipeAllowance(userId, isPro).then((fresh) => {
+      if (mounted) setAllowance(fresh);
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, [userId, isPro]);
+
+  // Automatically reset allowance when 24h reset period arrives
+  useEffect(() => {
+    if (isPro || !allowance.resetsAt) return;
+    const diffMs = allowance.resetsAt.getTime() - Date.now();
+    if (diffMs <= 0) {
+      setAllowance(computeAllowanceState({ isPro: false }));
+      return;
+    }
+    const timer = setTimeout(() => {
+      setAllowance(computeAllowanceState({ isPro: false }));
+    }, diffMs);
+    return () => clearTimeout(timer);
+  }, [allowance.resetsAt, isPro]);
 
   const [mode, setMode] = useState<DiscoverMode>('activities');
   const [location, setLocation] = useState<DiscoverLocation | null>(null);
@@ -254,16 +301,19 @@ export function useDiscover() {
   // User swiping choice handler
   const choose = useCallback(async (choice: DiscoverChoice) => {
     if (!userId || !current || acting) return;
+    if (!isPro && allowance.isLimitReached) return;
     setActing(true);
     setError(null);
 
     const placeToResolve = current;
 
     try {
-      if (choice === 'pass') {
-        await passPlace(userId, placeToResolve.id, mode);
-      } else if (choice === 'save' || choice === 'details') {
-        await savePlace(userId, placeToResolve.id, mode);
+      const result = await executeSwipe(userId, placeToResolve.id, mode, choice, isPro);
+      setAllowance(result.allowance);
+
+      if (!result.accepted) {
+        setError(`You have reached your ${result.allowance.limit} daily swipes. Upgrade to Pro for unlimited discovery.`);
+        return;
       }
 
       if (choice === 'details') {
@@ -339,7 +389,7 @@ export function useDiscover() {
     } finally {
       setActing(false);
     }
-  }, [acting, current, fetchNextCircle, location, mode, radiusMeters, userId]);
+  }, [acting, allowance.isLimitReached, current, fetchNextCircle, isPro, location, mode, radiusMeters, userId]);
 
   // Review passed places: deletes from Supabase DB, clears local passed IDs, and restarts 7 circles
   const reviewPassed = useCallback(async () => {
@@ -421,16 +471,31 @@ export function useDiscover() {
     searchAgain,
     updateRadius,
     retry: () => fetchNextCircle(mode, radiusMeters, location),
+    isPro,
+    swipesRemaining: isPro ? null : allowance.remaining,
+    swipesLimit: allowance.limit,
+    swipesResetsAt: allowance.resetsAt,
+    isSwipeLimitReached: !isPro && allowance.isLimitReached,
+    isUnlimitedSwipes: isPro || allowance.unlimited,
+    formattedTimeRemaining: formatTimeRemaining(allowance.resetsAt),
+    formattedResetTime: formatResetTime(allowance.resetsAt),
+    refreshAllowance: () => userId ? fetchSwipeAllowance(userId, isPro).then(setAllowance) : Promise.resolve(),
   }), [
     acting,
     activeModeState.exhausted,
     activeModeState.passedCount,
     activeModeState.queues,
     activeModeState.visitedCirclesCount,
+    allowance.isLimitReached,
+    allowance.limit,
+    allowance.remaining,
+    allowance.resetsAt,
+    allowance.unlimited,
     choose,
     current,
     error,
     fetchNextCircle,
+    isPro,
     loading,
     location,
     mode,
@@ -438,5 +503,6 @@ export function useDiscover() {
     reviewPassed,
     searchAgain,
     updateRadius,
+    userId,
   ]);
 }

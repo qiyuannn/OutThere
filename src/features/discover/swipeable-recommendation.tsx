@@ -130,6 +130,7 @@ export function SwipeableRecommendation({ place, disabled, onChoice }: Props) {
   });
 
   const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
+    if (disabled) return;
     if (event.nativeEvent.actionName === 'pass') completeChoice('pass');
     if (event.nativeEvent.actionName === 'save') completeChoice('save');
     if (event.nativeEvent.actionName === 'details') completeChoice('details');

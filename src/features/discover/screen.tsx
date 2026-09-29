@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 
 import { AppHeader } from '@/components/app-header';
 import { FilterOptions } from '@/components/filter-options';
@@ -39,15 +40,43 @@ export default function DiscoverScreen() {
         >
           <ThemedText type="smallBold" themeColor="primary">📍 {Math.round(discover.radiusMeters / 1000)} km</ThemedText>
         </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={discover.isUnlimitedSwipes ? 'Unlimited discovery swipes' : `${discover.swipesRemaining ?? discover.swipesLimit} daily swipes remaining`}
+          accessibilityHint="Opens membership details"
+          onPress={() => router.push('/profile/subscription')}
+          style={({ pressed }) => [
+            styles.rangeButton,
+            {
+              backgroundColor: theme.backgroundSelected,
+              borderColor: discover.isSwipeLimitReached ? theme.accent : theme.border,
+              opacity: pressed ? 0.75 : 1,
+            },
+          ]}
+        >
+          <ThemedText
+            type="smallBold"
+            themeColor={discover.isSwipeLimitReached ? 'accent' : 'primary'}
+          >
+            {discover.isUnlimitedSwipes ? '⚡ Pro' : `⚡ ${discover.swipesRemaining ?? discover.swipesLimit}/${discover.swipesLimit}`}
+          </ThemedText>
+        </Pressable>
       </View>
 
       <View style={styles.recommendationArea}>
         {discover.error ? <StateCard icon="↗" title="We lost the trail." description={discover.error}>
           <PrimaryButton label="Try again" onPress={discover.retry} />
+        </StateCard> : discover.isSwipeLimitReached ? <StateCard
+          icon="⚡"
+          title="Daily swipe limit reached"
+          description={`You’ve reached your limit of ${discover.swipesLimit} swipes for today. Swipes will reset in ${discover.formattedTimeRemaining || '24 hours'}. Upgrade to OutThere Pro for unlimited discovery.`}
+          accent
+        >
+          <PrimaryButton label="Get OutThere Pro" onPress={() => router.push('/profile/subscription')} />
         </StateCard> : discover.loading && !discover.current ? <StateCard title="Finding a good match…" description="Looking around your current location." loading />
           : discover.current ?
           <SwipeableRecommendation key={`${discover.mode}:${discover.current.id}`} place={discover.current}
-            disabled={discover.acting} onChoice={discover.choose} />
+            disabled={discover.acting || discover.isSwipeLimitReached} onChoice={discover.choose} />
           : <StateCard icon="↻" title="You’ve seen everything we found in this range."
             description={discover.passedCount > 0 ? 'Review your passed places, or increase the range to explore somewhere new.' : 'Increase the range or try searching again for a fresh set.'} accent>
             {discover.exhausted && discover.passedCount > 0 ? <PrimaryButton label="Review passed places" onPress={discover.reviewPassed} disabled={discover.acting} /> : null}
