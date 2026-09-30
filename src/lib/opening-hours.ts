@@ -35,18 +35,11 @@ function parseTimeMinutes(timeStr: string, refAmPm?: 'am' | 'pm', refEndHour?: n
   }
 
   // If no AM/PM specified, infer from context if possible
-  if (!period && refAmPm) {
-    if (refAmPm === 'am') {
-      period = 'am';
-    } else if (refAmPm === 'pm') {
-      if (hour === 12) {
-        period = 'pm';
-      } else if (refEndHour !== undefined && hour > refEndHour) {
-        period = 'am'; // e.g. 11:30 to 2:30 PM -> 11:30 AM
-      } else {
-        period = 'pm'; // e.g. 5:30 to 10:00 PM -> 5:30 PM
-      }
-    }
+  if (!period && refAmPm === 'am') {
+    period = 'am';
+  } else if (!period && refAmPm === 'pm') {
+    const isMorningSpan = hour !== 12 && refEndHour !== undefined && hour > refEndHour;
+    period = isMorningSpan ? 'am' : 'pm';
   }
 
   if (period === 'am') {
@@ -56,6 +49,24 @@ function parseTimeMinutes(timeStr: string, refAmPm?: 'am' | 'pm', refEndHour?: n
   }
 
   return hour * 60 + minute;
+}
+
+/**
+ * Checks whether an interval is active at the given minute on the current day.
+ */
+function isIntervalActiveNow(interval: TimeInterval, currentMinutes: number): boolean {
+  if (interval.is24Hours) return true;
+  if (interval.start <= interval.end) {
+    return currentMinutes >= interval.start && currentMinutes < interval.end;
+  }
+  return currentMinutes >= interval.start;
+}
+
+/**
+ * Checks whether an interval from yesterday crossing midnight spills into the current day.
+ */
+function isMidnightSpilloverActive(interval: TimeInterval, currentMinutes: number): boolean {
+  return interval.start > interval.end && currentMinutes < interval.end;
 }
 
 /**
@@ -133,21 +144,8 @@ export function computeIsOpenNow(
   const todayText = getDaySchedule(weekdayDescriptions, dayIndex);
   if (todayText) {
     const intervals = parseDaySchedule(todayText);
-    for (const { start, end, is24Hours } of intervals) {
-      if (is24Hours) return true;
-
-      if (start <= end) {
-        // Normal interval on the same day (e.g. 09:00 to 17:00)
-        if (currentMinutes >= start && currentMinutes < end) {
-          return true;
-        }
-      } else {
-        // Interval crosses midnight (e.g. 18:00 to 02:00)
-        // Active from start until midnight
-        if (currentMinutes >= start) {
-          return true;
-        }
-      }
+    if (intervals.some((interval) => isIntervalActiveNow(interval, currentMinutes))) {
+      return true;
     }
   }
 
@@ -156,13 +154,8 @@ export function computeIsOpenNow(
   const yesterdayText = getDaySchedule(weekdayDescriptions, prevDayIndex);
   if (yesterdayText) {
     const yesterdayIntervals = parseDaySchedule(yesterdayText);
-    for (const { start, end } of yesterdayIntervals) {
-      if (start > end) {
-        // Crosses midnight, active during early morning today before 'end'
-        if (currentMinutes < end) {
-          return true;
-        }
-      }
+    if (yesterdayIntervals.some((interval) => isMidnightSpilloverActive(interval, currentMinutes))) {
+      return true;
     }
   }
 

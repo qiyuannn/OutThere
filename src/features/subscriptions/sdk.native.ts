@@ -4,8 +4,16 @@ import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 import RevenueCatUI from 'react-native-purchases-ui';
 import { BillingError, PRO_ENTITLEMENT, type BillingAdapter } from './model';
 import { selectBillingKey } from './config';
-const config = selectBillingKey(Platform.OS, __DEV__, process.env.EXPO_PUBLIC_REVENUECAT_MODE,
-  process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY, process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY, process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY);
+import { Config } from '../../constants/config.ts';
+
+const config = selectBillingKey(
+  Platform.OS,
+  __DEV__,
+  Config.revenueCat.mode,
+  Config.revenueCat.testApiKey,
+  Config.revenueCat.iosApiKey,
+  Config.revenueCat.androidApiKey
+);
 export const billingAdapter: BillingAdapter = {
   unavailable: config.error,
   testStore: config.testStore,

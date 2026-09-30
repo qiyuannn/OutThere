@@ -1,3 +1,10 @@
+import type {
+  CandidatePlace,
+  RankedPlace,
+  RankingMode,
+  SaveRatingInput,
+} from '@/features/rankings/types';
+
 export interface PhotoAttribution {
   displayName: string | null;
   uri: string | null;
@@ -46,4 +53,32 @@ export interface PlaceDetailsScreenProps {
   onBack?: () => void;
   isSaved?: boolean;
   onToggleSave?: (saved: boolean) => void | Promise<void>;
+}
+
+export interface UsePlaceDetailsOptions {
+  place?: PlaceDetails;
+  isSaved?: boolean;
+  onToggleSave?: (saved: boolean) => void | Promise<void>;
+}
+
+export interface UsePlaceDetailsReturn {
+  place: PlaceDetails | null;
+  placeId: string | undefined;
+  loading: boolean;
+  isSaved: boolean;
+  userRating: number | null;
+  hasPosted: boolean;
+  postStatusReady: boolean;
+  detectedMode: RankingMode;
+  existingRankings: RankedPlace[];
+  rankingsReady: boolean;
+  rankingsError: boolean;
+  isRateModalVisible: boolean;
+  candidateForModal: CandidatePlace | null;
+  setIsRateModalVisible: (visible: boolean) => void;
+  handleToggleSave: (nextSaved: boolean) => Promise<void>;
+  handleSaveRating: (input: SaveRatingInput) => Promise<void>;
+  retryRankings: () => void;
+  openRateModal: () => void;
+  closeRateModal: () => void;
 }

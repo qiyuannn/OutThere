@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Image, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
+import { ImageLimits, Timeouts } from '@/constants';
 import { useTheme } from '@/hooks/use-theme';
 import { avatarUrl } from '../service';
-export function Avatar({ path, preview, name, size = 88 }: { path: string | null; preview?: string; name: string; size?: number }) {
+export function Avatar({ path, preview, name, size = ImageLimits.defaultAvatarUiSize }: { path: string | null; preview?: string; name: string; size?: number }) {
   const theme = useTheme();
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -11,7 +12,8 @@ export function Avatar({ path, preview, name, size = 88 }: { path: string | null
     let active = true; setUrl(null); setFailed(false);
     const refresh = () => { void avatarUrl(path).then(value => { if (active) { setUrl(value); setFailed(false); } }).catch(() => {}); };
     refresh();
-    const timer = setInterval(refresh, 50 * 60 * 1000);
+    const timer = setInterval(refresh, Timeouts.avatarRefreshIntervalMs);
+
     return () => { active = false; clearInterval(timer); };
   }, [path]);
   useEffect(() => setFailed(false), [preview]);

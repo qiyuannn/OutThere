@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { router, useLocalSearchParams, type Href } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -7,6 +7,7 @@ import { AppHeader } from '@/components/app-header';
 import { Button } from '@/components/foundation';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
+import { routes } from '@/lib/routes';
 import { DEFAULT_FILTERS, parseSearch, type SearchRequest } from './model';
 import { SearchResultItem } from './search-result-item';
 import { usePlaceSearch } from './use-search';
@@ -44,7 +45,7 @@ export function SearchResultsScreen() {
     void search.run(request);
   }, [request, requestKey]);
 
-  const goBack = () => router.canGoBack() ? router.back() : router.replace('/search' as Href);
+  const goBack = () => router.canGoBack() ? router.back() : router.replace(routes.search);
 
   return (
     <SafeAreaView edges={['left', 'right']} style={[styles.screen, { backgroundColor: theme.backgroundElement }]}>
@@ -69,7 +70,7 @@ export function SearchResultsScreen() {
             renderItem={({ item }) => (
               <SearchResultItem
                 place={item}
-                onPress={(place) => router.push({ pathname: '/search/[id]', params: { id: place.id, mode: place.mode } } as unknown as Href)}
+                onPress={(place) => router.push(routes.placeDetails(place.id, place.mode))}
               />
             )}
             ListEmptyComponent={

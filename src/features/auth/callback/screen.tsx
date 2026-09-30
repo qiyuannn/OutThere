@@ -6,12 +6,48 @@ import * as WebBrowser from 'expo-web-browser';
 import * as ExpoLinking from 'expo-linking';
 import { exchangeAuthCode } from '@/lib/auth-callback';
 import { authErrorMessage, extractAuthParams } from '@/lib/auth-validation';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 
 function firstParam(val: string | string[] | undefined): string | undefined {
   if (Array.isArray(val)) return val[0];
   return typeof val === 'string' && val.length > 0 ? val : undefined;
+}
+
+interface CallbackAuthParams {
+  code?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  error?: string;
+  errorCode?: string;
+}
+
+function mergeAuthParams(target: CallbackAuthParams, source: CallbackAuthParams): void {
+  if (!target.error && source.error) target.error = source.error;
+  if (!target.errorCode && source.errorCode) target.errorCode = source.errorCode;
+  if (!target.code && source.code) target.code = source.code;
+  if (!target.accessToken && source.accessToken) target.accessToken = source.accessToken;
+  if (!target.refreshToken && source.refreshToken) target.refreshToken = source.refreshToken;
+}
+
+async function resolveNativeLinkingParams(target: CallbackAuthParams): Promise<void> {
+  if (Platform.OS === 'web') return;
+
+  try {
+    const linkingUrl = ExpoLinking.getLinkingURL ? ExpoLinking.getLinkingURL() : null;
+    if (linkingUrl) {
+      mergeAuthParams(target, extractAuthParams(linkingUrl));
+    }
+
+    const hasAuth = target.code || target.accessToken || target.error || target.errorCode;
+    if (hasAuth) return;
+
+    const initialUrl = await Linking.getInitialURL();
+    if (initialUrl) {
+      mergeAuthParams(target, extractAuthParams(initialUrl));
+    }
+  } catch {
+    // Ignore linking lookup failures
+  }
 }
 
 export default function AuthCallback() {
@@ -23,7 +59,7 @@ export default function AuthCallback() {
     access_token?: string | string[];
     refresh_token?: string | string[];
   }>();
-  const { session } = useAuth();
+  const { session, getAuthSession, setAuthSession, isConfigured } = useAuth();
   const [complete, setComplete] = useState(false);
   const [failed, setFailed] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -51,51 +87,24 @@ export default function AuthCallback() {
     let active = true;
 
     async function processCallback() {
-      let code = firstParam(params.code);
-      let accessToken = firstParam(params.access_token);
-      let refreshToken = firstParam(params.refresh_token);
-      let errorCode = firstParam(params.error_code) ?? firstParam(params.error);
-      let error = firstParam(params.error_description) ?? firstParam(params.error) ?? firstParam(params.error_code);
+      const authParams: CallbackAuthParams = {
+        code: firstParam(params.code),
+        accessToken: firstParam(params.access_token),
+        refreshToken: firstParam(params.refresh_token),
+        errorCode: firstParam(params.error_code) ?? firstParam(params.error),
+        error: firstParam(params.error_description) ?? firstParam(params.error) ?? firstParam(params.error_code),
+      };
 
       // Web fallback: inspect window.location.href (including hash fragment)
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        const fromUrl = extractAuthParams(window.location.href);
-        if (!error && fromUrl.error) error = fromUrl.error;
-        if (!errorCode && fromUrl.errorCode) errorCode = fromUrl.errorCode;
-        if (!code && fromUrl.code) code = fromUrl.code;
-        if (!accessToken && fromUrl.accessToken) accessToken = fromUrl.accessToken;
-        if (!refreshToken && fromUrl.refreshToken) refreshToken = fromUrl.refreshToken;
+        mergeAuthParams(authParams, extractAuthParams(window.location.href));
       }
 
-      // Native fallback: inspect native linking URL (including hash fragment)
-      if (Platform.OS !== 'web') {
-        try {
-          const linkingUrl = ExpoLinking.getLinkingURL ? ExpoLinking.getLinkingURL() : null;
-          if (linkingUrl) {
-            const fromLinking = extractAuthParams(linkingUrl);
-            if (!error && fromLinking.error) error = fromLinking.error;
-            if (!errorCode && fromLinking.errorCode) errorCode = fromLinking.errorCode;
-            if (!code && fromLinking.code) code = fromLinking.code;
-            if (!accessToken && fromLinking.accessToken) accessToken = fromLinking.accessToken;
-            if (!refreshToken && fromLinking.refreshToken) refreshToken = fromLinking.refreshToken;
-          }
-          if (!code && !accessToken && !error && !errorCode) {
-            const initialUrl = await Linking.getInitialURL();
-            if (initialUrl) {
-              const fromInitial = extractAuthParams(initialUrl);
-              if (!error && fromInitial.error) error = fromInitial.error;
-              if (!errorCode && fromInitial.errorCode) errorCode = fromInitial.errorCode;
-              if (!code && fromInitial.code) code = fromInitial.code;
-              if (!accessToken && fromInitial.accessToken) accessToken = fromInitial.accessToken;
-              if (!refreshToken && fromInitial.refreshToken) refreshToken = fromInitial.refreshToken;
-            }
-          }
-        } catch {
-          // Ignore linking lookup failures
-        }
-      }
+      await resolveNativeLinkingParams(authParams);
 
       if (!active) return;
+
+      const { code, accessToken, refreshToken, error, errorCode } = authParams;
 
       // Handle explicit error parameter from OAuth provider
       if (error || errorCode) {
@@ -106,39 +115,36 @@ export default function AuthCallback() {
 
       // Handle OAuth PKCE authorization code
       if (code) {
-        try {
-          const result = await exchangeAuthCode(code);
-          if (!active) return;
-          if (result?.error || !result?.data?.session) {
-            const { data: sessData } = (await supabase?.auth.getSession()) ?? {};
-            if (!active) return;
-            if (sessData?.session) {
-              setComplete(true);
-            } else {
-              setFailed(true);
-              setErrorMessage(authErrorMessage(result?.error));
-            }
-          } else {
-            setComplete(true);
-          }
-        } catch (err) {
-          if (!active) return;
-          const { data: sessData } = (await supabase?.auth.getSession()) ?? {};
+        const verifyOrFallback = async (originalErr?: unknown) => {
+          const { data: sessData } = await getAuthSession();
           if (!active) return;
           if (sessData?.session) {
             setComplete(true);
           } else {
             setFailed(true);
-            setErrorMessage(authErrorMessage(err));
+            setErrorMessage(authErrorMessage(originalErr));
           }
+        };
+
+        try {
+          const result = await exchangeAuthCode(code);
+          if (!active) return;
+          if (result?.data?.session) {
+            setComplete(true);
+            return;
+          }
+          await verifyOrFallback(result?.error);
+        } catch (err) {
+          if (!active) return;
+          await verifyOrFallback(err);
         }
         return;
       }
 
       // Handle implicit token exchange
-      if (accessToken && refreshToken && supabase) {
+      if (accessToken && refreshToken && isConfigured) {
         try {
-          const { data, error: sessionError } = await supabase.auth.setSession({
+          const { data, error: sessionError } = await setAuthSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
@@ -161,14 +167,14 @@ export default function AuthCallback() {
       if (session) {
         setComplete(true);
       } else {
-        const { data: sessData } = (await supabase?.auth.getSession()) ?? {};
+        const { data: sessData } = await getAuthSession();
         if (!active) return;
         if (sessData?.session) {
           setComplete(true);
         } else {
           setFailed(true);
           setErrorMessage(
-            !supabase
+            !isConfigured
               ? 'Sign-in is not available yet. Please try again later.'
               : 'We couldn’t complete your sign in. The authorization may have expired or been cancelled. Please try signing in again.'
           );
@@ -190,6 +196,9 @@ export default function AuthCallback() {
     params.access_token,
     params.refresh_token,
     session,
+    getAuthSession,
+    isConfigured,
+    setAuthSession,
   ]);
 
   if (!failed && (complete || session)) return <Redirect href="/" />;

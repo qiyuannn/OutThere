@@ -1,5 +1,8 @@
 import { decode } from 'base64-arraybuffer';
-import { supabase } from '@/lib/supabase';
+import { supabase, unwrapSingleRelation } from '@/lib/supabase';
+import { resolveSignedUrl } from '@/lib/storage';
+import { ImageLimits, PaginationLimits } from '@/constants/limits';
+import { StorageBuckets } from '@/constants/storage';
 import { normalizeProfile, type AvatarSelection, type Profile, type ProfileDraft } from './model';
 function client() { if (!supabase) throw new Error('Supabase is not configured.'); return supabase; }
 const fields = 'user_id,username,display_name,bio,avatar_path,onboarding_completed,is_private,version,created_at,updated_at';
@@ -15,14 +18,11 @@ export async function loadProfile(userId: string): Promise<Profile | null> {
   return data as Profile | null;
 }
 export async function avatarUrl(path: string | null): Promise<string | null> {
-  if (!path) return null;
-  const { data, error } = await client().storage.from('avatars').createSignedUrl(path, 3600);
-  if (error) return null;
-  return data.signedUrl;
+  return resolveSignedUrl(path, StorageBuckets.avatars);
 }
 
 export async function loadProfileVisitSummary(userId: string): Promise<ProfileVisitSummary> {
-  const pageSize = 500;
+  const pageSize = PaginationLimits.profileVisitsPageSize;
   const rows: VisitRow[] = [];
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await client().from('user_place_ratings')
@@ -39,7 +39,7 @@ export async function loadProfileVisitSummary(userId: string): Promise<ProfileVi
   const places = rows.flatMap((row): VisitedPlace[] => {
     const rating = typeof row.rating === 'number' ? row.rating : Number.parseFloat(row.rating);
     if (Number.isFinite(rating)) { ratingTotal += rating; ratingCount += 1; }
-    const place = Array.isArray(row.places) ? row.places[0] : row.places;
+    const place = unwrapSingleRelation(row.places);
     if (!place || typeof place.latitude !== 'number' || typeof place.longitude !== 'number') return [];
     return [{ googlePlaceId: row.google_place_id, latitude: place.latitude, longitude: place.longitude,
       name: place.display_name?.trim() || 'Visited place', rating: Number.isFinite(rating) ? rating : 0 }];
@@ -53,11 +53,12 @@ export async function saveProfile(userId: string, current: Profile | null, draft
   try {
     if (avatar) {
       const bytes = decode(avatar.base64);
-      if (!bytes.byteLength || bytes.byteLength > 2097152) throw new Error('Avatar must be under 2 MB.');
+      if (!bytes.byteLength || bytes.byteLength > ImageLimits.maxAvatarSizeBytes) throw new Error('Avatar must be under 2 MB.');
       uploaded = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-      const { error } = await db.storage.from('avatars').upload(uploaded, bytes, { contentType: 'image/jpeg', upsert: false });
+      const { error } = await db.storage.from(StorageBuckets.avatars).upload(uploaded, bytes, { contentType: 'image/jpeg', upsert: false });
       if (error) throw error;
     }
+
     const normalized = normalizeProfile(draft);
     const row = { ...normalized, username: normalized.username || null, avatar_path: uploaded ?? normalized.avatar_path,
       user_id: userId, onboarding_completed: completed || !!current?.onboarding_completed };
@@ -70,12 +71,13 @@ export async function saveProfile(userId: string, current: Profile | null, draft
     committed = true;
     if (current?.avatar_path && current.avatar_path !== data.avatar_path) {
       // A cleanup failure must not turn a successful profile save into an error.
-      void db.storage.from('avatars').remove([current.avatar_path]).catch(() => {});
+      void db.storage.from(StorageBuckets.avatars).remove([current.avatar_path]).catch(() => {});
     }
     return data as Profile;
   } finally {
-    if (uploaded && !committed) await db.storage.from('avatars').remove([uploaded]).catch(() => {});
+    if (uploaded && !committed) await db.storage.from(StorageBuckets.avatars).remove([uploaded]).catch(() => {});
   }
+
 }
 
 

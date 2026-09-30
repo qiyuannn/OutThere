@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createClient } from 'npm:@supabase/supabase-js@2.116.0';
 import { createDiscoveryHandler, revenueCatProUntil } from './handler.ts';
 import { DiscoveryError, parseSwipeResponse } from '../_shared/discovery-contract.ts';

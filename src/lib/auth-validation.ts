@@ -1,3 +1,6 @@
+import type { AuthError, Session } from '@supabase/supabase-js';
+import { AppError } from './errors.ts';
+
 export function validateCredentials(email: string, password?: string, confirmation?: string): string | null {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return 'Enter a valid email address.';
   if (password !== undefined && !password) return 'Enter your password.';
@@ -55,10 +58,11 @@ export function extractAuthParams(urlStr: string): ExtractedAuthParams {
 }
 
 export function authErrorMessage(error: unknown): string {
-  const code = typeof error === 'object' && error !== null && 'code' in error ? String((error as any).code) : '';
-  const message = typeof error === 'object' && error !== null && 'message' in error ? String((error as any).message) : '';
-  const err = typeof error === 'object' && error !== null && 'error' in error ? String((error as any).error) : '';
-  const errorDescription = typeof error === 'object' && error !== null && 'error_description' in error ? String((error as any).error_description) : '';
+  const errObj = typeof error === 'object' && error !== null ? (error as Record<string, unknown>) : null;
+  const code = errObj && 'code' in errObj && errObj.code != null ? String(errObj.code) : '';
+  const message = errObj && 'message' in errObj && errObj.message != null ? String(errObj.message) : '';
+  const err = errObj && 'error' in errObj && errObj.error != null ? String(errObj.error) : '';
+  const errorDescription = errObj && 'error_description' in errObj && errObj.error_description != null ? String(errObj.error_description) : '';
   const lowerMsg = message.toLowerCase();
   const lowerCode = code.toLowerCase();
   const lowerErr = err.toLowerCase();
@@ -105,18 +109,28 @@ export function authErrorMessage(error: unknown): string {
   return 'We couldn’t complete that request. Check your connection and try again.';
 }
 
+export interface AuthSessionData {
+  session: Session | null;
+  user?: Session['user'] | null;
+}
+
+export interface AuthSessionResult {
+  data: AuthSessionData | null;
+  error: AuthError | Error | null;
+}
+
 export interface AuthCallbackClient {
   auth: {
-    exchangeCodeForSession: (code: string) => Promise<{ data: any; error: any }>;
-    setSession: (tokens: { access_token: string; refresh_token: string }) => Promise<{ data: any; error: any }>;
-    getSession: () => Promise<{ data: { session: any } | null; error: any }>;
+    exchangeCodeForSession: (code: string) => Promise<AuthSessionResult>;
+    setSession: (tokens: { access_token: string; refresh_token: string }) => Promise<AuthSessionResult>;
+    getSession: () => Promise<{ data: { session: Session | null } | null; error: AuthError | Error | null }>;
   };
 }
 
 export function createAuthCallbackManager(getClient: () => AuthCallbackClient | null) {
   let lastCode: string | undefined;
-  let pendingExchange: Promise<any> | undefined;
-  let lastResult: any = undefined;
+  let pendingExchange: Promise<AuthSessionResult> | undefined;
+  let lastResult: AuthSessionResult | undefined = undefined;
 
   function _resetExchangeState() {
     lastCode = undefined;
@@ -134,7 +148,7 @@ export function createAuthCallbackManager(getClient: () => AuthCallbackClient | 
     lastCode = code;
     lastResult = undefined;
     pendingExchange = client.auth.exchangeCodeForSession(code)
-      .then((result: any) => {
+      .then((result: AuthSessionResult) => {
         if (result?.data?.session) {
           lastResult = result;
         } else {
@@ -143,7 +157,7 @@ export function createAuthCallbackManager(getClient: () => AuthCallbackClient | 
         }
         return result;
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         lastCode = undefined;
         lastResult = undefined;
         throw err;
@@ -159,9 +173,9 @@ export function createAuthCallbackManager(getClient: () => AuthCallbackClient | 
     if (!client) throw new Error('Authentication is not configured.');
     const { code, accessToken, refreshToken, error, errorCode } = extractAuthParams(urlStr);
     if (error || errorCode) {
-      const err = new Error(error ?? errorCode);
-      (err as any).code = errorCode ?? error;
-      throw err;
+      throw new AppError(error ?? errorCode ?? 'Authentication failed', {
+        code: errorCode ?? error,
+      });
     }
     if (code) {
       const result = await exchangeAuthCode(code, client);

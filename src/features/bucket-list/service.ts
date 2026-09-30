@@ -1,5 +1,5 @@
 import { computeIsOpenNow } from '@/lib/opening-hours';
-import { supabase } from '@/lib/supabase';
+import { supabase, unwrapSingleRelation } from '@/lib/supabase';
 import type { CachedPlace, SavedPlace } from './types';
 import { hydratePlaceRows } from '@/features/search/service';
 
@@ -22,7 +22,10 @@ export async function getSavedPlaces(userId: string): Promise<SavedPlace[]> {
   if (error) throw error;
 
   const rows = (data ?? []) as SavedPlaceRow[];
-  const hydrated = await hydratePlaceRows(rows.map(row => (Array.isArray(row.places) ? row.places[0] : row.places) ?? { google_place_id: row.google_place_id, display_name: null }));
+  const hydrated = await hydratePlaceRows(
+    rows.map((row) => unwrapSingleRelation(row.places) ?? { google_place_id: row.google_place_id, display_name: null })
+  );
+
   const byId = new Map(hydrated.map(p => [p.google_place_id, p as CachedPlace & { live_open_now?: boolean | null }]));
 
   return rows.map(({ places, ...savedPlace }) => {

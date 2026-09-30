@@ -1,9 +1,12 @@
 import { decode } from 'base64-arraybuffer';
 
 import { supabase } from '@/lib/supabase';
+import { resolveSignedUrls, resolveSignedUrl } from '@/lib/storage';
+import { StorageBuckets } from '@/constants/storage';
+import { ImageLimits, InputLimits, PaginationLimits } from '@/constants/limits';
 import type { CreatePostInput, FeedCursor, FeedPage, FeedPost, FeedScope, PostComment } from './types';
 
-const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+const MAX_PHOTO_BYTES = ImageLimits.maxPostPhotoSizeBytes;
 
 function client() {
   if (!supabase) throw new Error('Supabase is not configured.');
@@ -22,8 +25,8 @@ export async function createPost(userId: string, input: CreatePostInput): Promis
   const db = client();
   const body = input.body.trim();
   if (!body && input.photos.length === 0) throw new Error('Add a note or photo before posting.');
-  if (body.length > 2000) throw new Error('Your post must be 2,000 characters or fewer.');
-  if (input.photos.length > 5) throw new Error('Choose up to five photos.');
+  if (body.length > InputLimits.maxPostBodyLength) throw new Error('Your post must be 2,000 characters or fewer.');
+  if (input.photos.length > ImageLimits.maxPostPhotos) throw new Error('Choose up to five photos.');
 
   const uploadedPaths: string[] = [];
   let committed = false;
@@ -32,7 +35,7 @@ export async function createPost(userId: string, input: CreatePostInput): Promis
       const bytes = decode(photo.base64);
       if (!bytes.byteLength || bytes.byteLength > MAX_PHOTO_BYTES) throw new Error('Each photo must be under 5 MB.');
       const path = `${userId}/${Date.now()}-${index}-${Math.random().toString(36).slice(2)}.${extensionFor(photo.mimeType)}`;
-      const { error } = await db.storage.from('post-photos').upload(path, bytes, {
+      const { error } = await db.storage.from(StorageBuckets.postPhotos).upload(path, bytes, {
         contentType: photo.mimeType,
         upsert: false,
       });
@@ -52,7 +55,7 @@ export async function createPost(userId: string, input: CreatePostInput): Promis
     return String(data.id);
   } finally {
     if (!committed && uploadedPaths.length) {
-      await db.storage.from('post-photos').remove(uploadedPaths).catch(() => undefined);
+      await db.storage.from(StorageBuckets.postPhotos).remove(uploadedPaths).catch(() => undefined);
     }
   }
 }
@@ -70,8 +73,7 @@ export async function hasUserPostedAboutPlace(userId: string, googlePlaceId: str
   return data !== null;
 }
 
-const FEED_PAGE_SIZE = 20;
-const SIGNED_URL_LIFETIME_SECONDS = 60 * 60;
+const FEED_PAGE_SIZE = PaginationLimits.feedPageSize;
 
 type FeedPostRow = {
   id: number | string;
@@ -93,18 +95,6 @@ type FeedPostRow = {
   comment_count?: number | string;
 };
 
-async function getSignedUrls(bucket: 'avatars' | 'post-photos', paths: string[]): Promise<Map<string, string>> {
-  const uniquePaths = [...new Set(paths.filter(Boolean))];
-  if (uniquePaths.length === 0) return new Map();
-
-  const { data, error } = await client().storage
-    .from(bucket)
-    .createSignedUrls(uniquePaths, SIGNED_URL_LIFETIME_SECONDS);
-
-  if (error || !data) return new Map();
-  return new Map(data.flatMap((item) => item.path && item.signedUrl ? [[item.path, item.signedUrl] as const] : []));
-}
-
 async function getPostPage(
   onlyCurrentUser: boolean,
   cursor: FeedCursor | null,
@@ -123,9 +113,10 @@ async function getPostPage(
 
   const rows = (data ?? []) as FeedPostRow[];
   const [avatarUrls, postPhotoUrls] = await Promise.all([
-    getSignedUrls('avatars', rows.flatMap((row) => row.avatar_path ? [row.avatar_path] : [])),
-    getSignedUrls('post-photos', rows.flatMap((row) => row.photo_paths ?? [])),
+    resolveSignedUrls(rows.map((row) => row.avatar_path), StorageBuckets.avatars),
+    resolveSignedUrls(rows.flatMap((row) => row.photo_paths ?? []), StorageBuckets.postPhotos),
   ]);
+
 
   const posts: FeedPost[] = rows.map((row) => ({
     id: Number(row.id),
@@ -135,7 +126,7 @@ async function getPostPage(
     body: row.body,
     createdAt: row.created_at,
     displayName: row.display_name,
-    avatarUrl: row.avatar_path ? avatarUrls.get(row.avatar_path) ?? null : null,
+    avatarUrl: row.avatar_path ? avatarUrls[row.avatar_path] ?? null : null,
     placeName: row.place_name,
     placeCategory: row.place_category,
     placeAddress: row.place_address,
@@ -144,7 +135,7 @@ async function getPostPage(
       ? row.regular_opening_hours.filter((value): value is string => typeof value === 'string')
       : [],
     photoUrls: (row.photo_paths ?? []).flatMap((path) => {
-      const url = postPhotoUrls.get(path);
+      const url = postPhotoUrls[path];
       return url ? [url] : [];
     }),
     likeCount: Number(row.like_count),
@@ -189,8 +180,8 @@ export async function getPostDetail(postId: number): Promise<FeedPost | null> {
   const row = rows[0];
 
   const [avatarUrls, postPhotoUrls] = await Promise.all([
-    getSignedUrls('avatars', row.avatar_path ? [row.avatar_path] : []),
-    getSignedUrls('post-photos', row.photo_paths ?? []),
+    resolveSignedUrls(row.avatar_path ? [row.avatar_path] : [], StorageBuckets.avatars),
+    resolveSignedUrls(row.photo_paths ?? [], StorageBuckets.postPhotos),
   ]);
 
   return {
@@ -201,7 +192,7 @@ export async function getPostDetail(postId: number): Promise<FeedPost | null> {
     body: row.body,
     createdAt: row.created_at,
     displayName: row.display_name,
-    avatarUrl: row.avatar_path ? avatarUrls.get(row.avatar_path) ?? null : null,
+    avatarUrl: row.avatar_path ? avatarUrls[row.avatar_path] ?? null : null,
     placeName: row.place_name,
     placeCategory: row.place_category,
     placeAddress: row.place_address,
@@ -210,7 +201,7 @@ export async function getPostDetail(postId: number): Promise<FeedPost | null> {
       ? row.regular_opening_hours.filter((value): value is string => typeof value === 'string')
       : [],
     photoUrls: (row.photo_paths ?? []).flatMap((path) => {
-      const url = postPhotoUrls.get(path);
+      const url = postPhotoUrls[path];
       return url ? [url] : [];
     }),
     likeCount: Number(row.like_count),
@@ -234,9 +225,9 @@ export async function getPostComments(postId: number): Promise<PostComment[]> {
   const { data, error } = await client().rpc('get_post_comments', { p_post_id: postId });
   if (error) throw error;
   const rows = (data ?? []) as PostCommentRow[];
-  const avatarUrls = await getSignedUrls(
-    'avatars',
-    rows.flatMap((r) => r.avatar_path ? [r.avatar_path] : [])
+  const avatarUrls = await resolveSignedUrls(
+    rows.map((r) => r.avatar_path),
+    StorageBuckets.avatars
   );
 
   return rows.map((r) => ({
@@ -247,14 +238,14 @@ export async function getPostComments(postId: number): Promise<PostComment[]> {
     createdAt: r.created_at,
     displayName: r.display_name,
     username: r.username,
-    avatarUrl: r.avatar_path ? avatarUrls.get(r.avatar_path) ?? null : null,
+    avatarUrl: r.avatar_path ? avatarUrls[r.avatar_path] ?? null : null,
   }));
 }
 
 export async function createComment(postId: number, userId: string, body: string): Promise<PostComment> {
   const cleanBody = body.trim();
   if (!cleanBody) throw new Error('Comment cannot be empty.');
-  if (cleanBody.length > 1000) throw new Error('Comment must be 1,000 characters or fewer.');
+  if (cleanBody.length > InputLimits.maxCommentLength) throw new Error('Comment must be 1,000 characters or fewer.');
 
   const db = client();
   const { data, error } = await db
@@ -270,11 +261,9 @@ export async function createComment(postId: number, userId: string, body: string
     .eq('user_id', userId)
     .maybeSingle();
 
-  let avatarUrl: string | null = null;
-  if (profile?.avatar_path) {
-    const avatarMap = await getSignedUrls('avatars', [profile.avatar_path]);
-    avatarUrl = avatarMap.get(profile.avatar_path) ?? null;
-  }
+  const avatarUrl = profile?.avatar_path
+    ? await resolveSignedUrl(profile.avatar_path, StorageBuckets.avatars)
+    : null;
 
   return {
     id: Number(data.id),
@@ -287,6 +276,7 @@ export async function createComment(postId: number, userId: string, body: string
     avatarUrl,
   };
 }
+
 
 export async function deleteComment(commentId: number, userId: string): Promise<void> {
   const { error } = await client()

@@ -1,3 +1,5 @@
+import { Config } from '../../constants/config.ts';
+
 export const DEFAULT_AD_INTERVAL = 5;
 
 // Official Google AdMob test App IDs for development
@@ -10,10 +12,10 @@ export const TEST_BANNER_ID_ANDROID = 'ca-app-pub-3940256099942544/6300978111';
 
 export function getBannerAdUnitId(platform: string = 'android'): string {
   if (platform === 'ios') {
-    const custom = process.env.EXPO_PUBLIC_ADMOB_BANNER_ID_IOS?.trim();
+    const custom = Config.ads.customBannerIdIos;
     return custom && custom.length > 0 ? custom : TEST_BANNER_ID_IOS;
   }
-  const custom = process.env.EXPO_PUBLIC_ADMOB_BANNER_ID_ANDROID?.trim();
+  const custom = Config.ads.customBannerIdAndroid;
   return custom && custom.length > 0 ? custom : TEST_BANNER_ID_ANDROID;
 }
 

@@ -9,26 +9,30 @@ interface AttributionFooterProps {
 }
 
 export function AttributionFooter({ place }: AttributionFooterProps) {
-  const attributions: Array<{ displayName: string; uri: string | null }> = [];
+  const attributions: { displayName: string; uri: string | null }[] = [];
+  const seenNames = new Set<string>();
 
   if (place.photoAttribution?.displayName) {
     attributions.push({
       displayName: place.photoAttribution.displayName,
       uri: place.photoAttribution.uri,
     });
+    seenNames.add(place.photoAttribution.displayName);
   }
 
-  if (place.photos) {
-    for (const photo of place.photos) {
-      if (photo.authorAttributions) {
-        for (const attr of photo.authorAttributions) {
-          if (attr.displayName && !attributions.some((a) => a.displayName === attr.displayName)) {
-            attributions.push({ displayName: attr.displayName, uri: attr.uri });
-          }
-        }
-      }
-    }
-  }
+  const additionalAttributions = (place.photos ?? [])
+    .flatMap((photo) => photo.authorAttributions ?? [])
+    .filter((attr): attr is { displayName: string; uri: string | null } => {
+      if (!attr?.displayName || seenNames.has(attr.displayName)) return false;
+      seenNames.add(attr.displayName);
+      return true;
+    })
+    .map((attr) => ({
+      displayName: attr.displayName,
+      uri: attr.uri ?? null,
+    }));
+
+  attributions.push(...additionalAttributions);
 
   return (
     <View style={styles.container}>

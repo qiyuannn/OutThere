@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { supabase } from '@/lib/supabase';
 import { authErrorMessage } from '@/lib/auth-validation';
+import { useAuth } from '@/providers/auth-provider';
 
 export function SignOutButton() {
+  const { signOut: authSignOut, isConfigured } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   async function signOut() {
-    if (!supabase || busy) return;
+    if (!isConfigured || busy) return;
     setBusy(true);
     setError('');
     try {
-      const result = await supabase.auth.signOut({ scope: 'local' });
+      const result = await authSignOut({ scope: 'local' });
       if (result.error) throw result.error;
     } catch (reason) {
       setError(authErrorMessage(reason));

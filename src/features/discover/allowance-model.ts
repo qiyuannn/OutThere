@@ -1,5 +1,11 @@
-export const DAILY_SWIPE_LIMIT = 10;
-export const SWIPE_WINDOW_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+import { PaginationLimits } from '../../constants/limits.ts';
+import { CacheTtl } from '../../constants/timing.ts';
+import { formatResetTime, formatTimeRemaining } from '../../lib/format.ts';
+
+export { formatResetTime, formatTimeRemaining };
+
+export const DAILY_SWIPE_LIMIT = PaginationLimits.dailySwipeLimit;
+export const SWIPE_WINDOW_DURATION_MS = CacheTtl.swipeWindowDurationMs;
 
 export interface SwipeAllowanceState {
   unlimited: boolean;
@@ -71,23 +77,3 @@ export function computeAllowanceState(params: {
   };
 }
 
-export function formatTimeRemaining(resetsAt: Date | null, now = Date.now()): string {
-  if (!resetsAt) return '';
-  const diffMs = resetsAt.getTime() - now;
-  if (diffMs <= 0) return 'now';
-  if (diffMs < 60 * 1000) return '< 1m';
-
-  const totalMinutes = Math.ceil(diffMs / (60 * 1000));
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
-  if (hours > 0) return `${hours}h`;
-  if (minutes > 0) return `${minutes}m`;
-  return '< 1m';
-}
-
-export function formatResetTime(resetsAt: Date | null): string {
-  if (!resetsAt) return '';
-  return resetsAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}

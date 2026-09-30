@@ -2,10 +2,11 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, processLock } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
+import { Config } from '../constants/config.ts';
 
 // Only publishable credentials belong in the mobile bundle. Never use a service-role key.
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const key = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const url = Config.supabase.url;
+const key = Config.supabase.publishableKey;
 const validUrl = (() => {
   try { return !!url && ['https:', 'http:'].includes(new URL(url).protocol); } catch { return false; }
 })();
@@ -22,3 +23,8 @@ export const supabase = isBackendConfigured ? createClient(url!, key!, {
     lock: processLock,
   },
 }) : null;
+
+export { unwrapSingleRelation } from './supabase-relation.ts';
+
+
+

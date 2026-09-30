@@ -1,9 +1,10 @@
 import { CATEGORY_GROUPS_BY_MODE, getCategoryKeysForPlace } from '@/features/categories/catalog';
-import { inferVibeFromRating, recalibrateTierScores, Vibe } from './comparison';
-import { supabase } from '@/lib/supabase';
+import { supabase, unwrapSingleRelation } from '@/lib/supabase';
+import { PaginationLimits } from '@/constants/limits';
 import type { CandidatePlace, RankedPlace, RankingMode, SaveRatingInput } from './types';
 import { hydratePlaceRows } from '@/features/search/service';
 import { calculateCategoryWeights } from './category-weights';
+
 
 function client() {
   if (!supabase) throw new Error('Supabase is not configured.');
@@ -48,8 +49,11 @@ export async function getUserRankings(
   const groups = CATEGORY_GROUPS_BY_MODE[mode];
 
   const ratingRows = (data ?? []) as RatingRow[];
-  const hydrated = await hydratePlaceRows(ratingRows.map(row => (Array.isArray(row.places) ? row.places[0] : row.places) ?? { google_place_id: row.google_place_id, display_name: '' }));
+  const hydrated = await hydratePlaceRows(
+    ratingRows.map((row) => unwrapSingleRelation(row.places) ?? { google_place_id: row.google_place_id, display_name: '' })
+  );
   const byId = new Map(hydrated.map(p => [p.google_place_id, p as PlaceRow]));
+
 
   return ratingRows.map((row) => {
     const place = byId.get(row.google_place_id);
@@ -133,80 +137,6 @@ export async function saveUserPlaceRating(
   await syncCategoryWeightsFromRatings(userId, input.mode);
 }
 
-export async function deleteUserPlaceRating(
-  userId: string,
-  placeId: string,
-  mode: RankingMode,
-): Promise<void> {
-  const { error } = await client()
-    .from('user_place_ratings')
-    .delete()
-    .eq('user_id', userId)
-    .eq('google_place_id', placeId);
-
-  if (error) throw error;
-
-  // Recalibrate remaining places after deletion to relieve compression
-  try {
-    const { data: remaining } = await client()
-      .from('user_place_ratings')
-      .select('google_place_id, rating, vibe')
-      .eq('user_id', userId)
-      .eq('mode', mode)
-      .order('rating', { ascending: false });
-
-    if (remaining && remaining.length > 0) {
-      const tierGroups: Record<Vibe, Array<{ google_place_id: string; rating: number; vibe: Vibe }>> = {
-        loved: [],
-        liked: [],
-        fine: [],
-        disliked: [],
-      };
-
-      for (const row of remaining) {
-        const numRating = typeof row.rating === 'number' ? row.rating : parseFloat(row.rating);
-        const v: Vibe = row.vibe ?? inferVibeFromRating(numRating);
-        tierGroups[v].push({
-          google_place_id: row.google_place_id,
-          rating: numRating,
-          vibe: v,
-        });
-      }
-
-      const updates: Array<{ user_id: string; google_place_id: string; mode: RankingMode; rating: number; vibe: Vibe; updated_at: string }> = [];
-      const allVibes: Vibe[] = ['loved', 'liked', 'fine', 'disliked'];
-
-      for (const v of allVibes) {
-        const group = tierGroups[v];
-        if (group.length === 0) continue;
-        const newTierScores = recalibrateTierScores(group.length, v);
-        for (let i = 0; i < group.length; i++) {
-          if (Math.abs(group[i].rating - newTierScores[i]) >= 0.05) {
-            updates.push({
-              user_id: userId,
-              google_place_id: group[i].google_place_id,
-              mode,
-              rating: newTierScores[i],
-              vibe: v,
-              updated_at: new Date().toISOString(),
-            });
-          }
-        }
-      }
-
-      if (updates.length > 0) {
-        await client()
-          .from('user_place_ratings')
-          .upsert(updates, { onConflict: 'user_id,google_place_id' });
-      }
-    }
-  } catch {
-    // Non-critical if post-delete recalibration fails; deletion still succeeded
-  }
-
-  await syncCategoryWeightsFromRatings(userId, mode);
-}
-
 export async function getUserRatingForPlace(
   userId: string,
   placeId: string,
@@ -257,7 +187,9 @@ export async function syncCategoryWeightsFromRatings(
 
   if (ratingsError) throw ratingsError;
 
-  const ratingPlaces = await hydratePlaceRows((ratingsData ?? []).map(row => (Array.isArray(row.places) ? row.places[0] : row.places) ?? { google_place_id: row.google_place_id, display_name: null }));
+  const ratingPlaces = await hydratePlaceRows(
+    (ratingsData ?? []).map((row) => unwrapSingleRelation(row.places) ?? { google_place_id: row.google_place_id, display_name: null })
+  );
   const ratingPlacesById = new Map(ratingPlaces.map(p => [p.google_place_id, p]));
 
   const weights = calculateCategoryWeights(mode, (ratingsData ?? []).map((row) => {
@@ -299,7 +231,9 @@ export async function getCandidatePlaces(
   const candidates: CandidatePlace[] = [];
   const seenIds = new Set<string>();
 
-  const savedPlaces = await hydratePlaceRows((savedData ?? []).map(row => ((Array.isArray(row.places) ? row.places[0] : row.places) as PlaceRow | null) ?? { google_place_id: row.google_place_id, display_name: '' }));
+  const savedPlaces = await hydratePlaceRows(
+    (savedData ?? []).map((row) => unwrapSingleRelation(row.places) ?? { google_place_id: row.google_place_id, display_name: '' })
+  );
   const savedById = new Map(savedPlaces.map(p => [p.google_place_id, p as PlaceRow]));
 
   for (const row of savedData ?? []) {
@@ -324,7 +258,8 @@ export async function getCandidatePlaces(
   const { data: otherPlaces } = await client()
     .from('places')
     .select('*')
-    .limit(40);
+    .limit(PaginationLimits.candidatePlacesLimit);
+
 
   for (const place of (otherPlaces ?? []) as PlaceRow[]) {
     if (!place.display_name) continue;

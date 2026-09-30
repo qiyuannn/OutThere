@@ -4,7 +4,6 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/app-header';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { useProfile } from '@/providers/profile-provider';
 import { useSubscription } from '@/providers/subscription-provider';
@@ -15,7 +14,7 @@ import { getFollowCounts, loadProfileVisitSummary, type ProfileVisitSummary } fr
 const EMPTY_SUMMARY: ProfileVisitSummary = { averageRating: null, places: [], visitedCount: 0 };
 
 export default function ProfileScreen() {
-  const { session } = useAuth();
+  const { session, signOut, isConfigured } = useAuth();
   const { profile, reload } = useProfile();
   const { isPro, ready: membershipReady, unavailable: membershipUnavailable } = useSubscription();
   const { updated } = useLocalSearchParams<{ updated?: string }>();
@@ -35,10 +34,10 @@ export default function ProfileScreen() {
   }, []);
 
   const handleLogout = useCallback(async () => {
-    if (!supabase || loggingOut) return;
+    if (!isConfigured || loggingOut) return;
     setLoggingOut(true);
     try {
-      const result = await supabase.auth.signOut({ scope: 'local' });
+      const result = await signOut({ scope: 'local' });
       if (result.error) throw result.error;
     } catch {
       // Allow retry if sign out failed
@@ -47,7 +46,7 @@ export default function ProfileScreen() {
         setLoggingOut(false);
       }
     }
-  }, [loggingOut]);
+  }, [isConfigured, loggingOut, signOut]);
 
   const reloadSummary = useCallback(async () => {
     const id = ++summaryRequest.current;

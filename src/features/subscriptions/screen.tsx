@@ -4,6 +4,8 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/app-header';
 import { Fonts } from '@/constants/theme';
+import { Config } from '@/constants/config';
+import { formatDisplayDate } from '@/lib/format';
 import { useSubscription } from '@/providers/subscription-provider';
 import { availablePlans, PRO_ENTITLEMENT } from './model';
 
@@ -26,7 +28,8 @@ export default function SubscriptionScreen() {
   const disabled = billing.busy || !billing.ready || !!billing.unavailable;
   const price = plan?.pkg.product.priceString;
   const expiration = entitlement?.expirationDate;
-  const date = expiration ? new Date(expiration).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+  const date = expiration ? formatDisplayDate(expiration) : null;
+
   // The current offering may differ from an existing member's purchased product.
   const matchingPrice = plan?.pkg.product.identifier === entitlement?.productIdentifier ? price : undefined;
   const renewal = date
@@ -81,18 +84,19 @@ export default function SubscriptionScreen() {
           <Text style={styles.light}>Restore Purchases</Text>
         </Pressable>
       </>}
-      <Pressable accessibilityRole="button" onPress={() => { void openLink(process.env.EXPO_PUBLIC_SUPPORT_URL, 'Contact Support'); }} style={({ pressed }) => [styles.outline, styles.action, pressed && styles.dimmed]}>
+      <Pressable accessibilityRole="button" onPress={() => { void openLink(Config.support.contactUrl, 'Contact Support'); }} style={({ pressed }) => [styles.outline, styles.action, pressed && styles.dimmed]}>
         <Text style={styles.light}>Contact Support</Text>
       </Pressable>
       <View style={styles.legalLinks}>
-        <Pressable accessibilityRole="link" onPress={() => { void openLink(process.env.EXPO_PUBLIC_TERMS_URL, 'Terms of Use'); }} style={({ pressed }) => [styles.textLink, pressed && styles.dimmed]}>
+        <Pressable accessibilityRole="link" onPress={() => { void openLink(Config.support.termsUrl, 'Terms of Use'); }} style={({ pressed }) => [styles.textLink, pressed && styles.dimmed]}>
           <Text style={styles.light}>Terms of Use</Text>
         </Pressable>
         <Text accessibilityElementsHidden importantForAccessibility="no" style={styles.light}>·</Text>
-        <Pressable accessibilityRole="link" onPress={() => { void openLink(process.env.EXPO_PUBLIC_PRIVACY_URL, 'Privacy Policy'); }} style={({ pressed }) => [styles.textLink, pressed && styles.dimmed]}>
+        <Pressable accessibilityRole="link" onPress={() => { void openLink(Config.support.privacyUrl, 'Privacy Policy'); }} style={({ pressed }) => [styles.textLink, pressed && styles.dimmed]}>
           <Text style={styles.light}>Privacy Policy</Text>
         </Pressable>
       </View>
+
     </ScrollView>
   </SafeAreaView>;
 }

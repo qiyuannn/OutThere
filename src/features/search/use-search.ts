@@ -3,11 +3,10 @@ import { useFocusEffect } from 'expo-router';
 
 import { removeSavedPlace } from '@/features/bucket-list/service';
 import { savePlace } from '@/features/discover/service';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { mergeResults, type SearchPlace, type SearchRequest, type SearchResponse } from './model';
 import { getRecentPlaceIds, removeRecentPlaceId } from './recent-places';
-import { getLivePlaceDetails, searchPlaces } from './service';
+import { getLivePlaceDetails, getUserSavedPlaceIds, searchPlaces } from './service';
 
 export function usePlaceSearch() {
   const { session } = useAuth();
@@ -42,13 +41,13 @@ export function usePlaceSearch() {
   useFocusEffect(useCallback(() => {
     let active = true;
 
-    if (userId && supabase) {
-      void supabase
-        .from('saved_places')
-        .select('google_place_id')
-        .eq('user_id', userId)
-        .then(({ data, error: savedError }) => {
-          if (active && !savedError) setSavedIds(new Set((data ?? []).map((row) => row.google_place_id)));
+    if (userId) {
+      void getUserSavedPlaceIds(userId)
+        .then((ids) => {
+          if (active) setSavedIds(new Set(ids));
+        })
+        .catch(() => {
+          if (active) setSavedIds(new Set());
         });
     }
 

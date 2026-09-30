@@ -1,14 +1,68 @@
-import { createContext, useContext, useEffect, useState, type PropsWithChildren } from 'react';
-import type { Session } from '@supabase/supabase-js';
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, type PropsWithChildren } from 'react';
+import type { AuthError, Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import {
+  getAuthSession,
+  isAuthConfigured,
+  resendSignUpConfirmation,
+  resetPasswordForEmail,
+  setAuthSession,
+  signInWithOAuth,
+  signInWithPassword,
+  signOut,
+  signUpWithPassword,
+  updateUserPassword,
+  type OAuthSignInParams,
+  type SetSessionTokens,
+  type SignInCredentials,
+  type SignOutOptions,
+  type SignUpParams,
+} from '@/features/auth/service';
 
-interface AuthState {
+export interface AuthState {
   session: Session | null;
   loading: boolean;
   recovery: boolean;
   finishRecovery: () => void;
   initializationError: boolean;
   retry: () => void;
+  isConfigured: boolean;
+
+  signInWithPassword: (credentials: SignInCredentials) => Promise<{
+    data: { user: User | null; session: Session | null };
+    error: AuthError | null;
+  }>;
+  signUpWithPassword: (params: SignUpParams) => Promise<{
+    data: { user: User | null; session: Session | null };
+    error: AuthError | null;
+  }>;
+  signOut: (options?: SignOutOptions) => Promise<{
+    error: AuthError | null;
+  }>;
+  signInWithOAuth: (params: OAuthSignInParams) => Promise<{
+    data: { provider: string; url: string | null };
+    error: AuthError | null;
+  }>;
+  resetPasswordForEmail: (email: string, options?: { redirectTo?: string }) => Promise<{
+    data: Record<string, never>;
+    error: AuthError | null;
+  }>;
+  updateUserPassword: (password: string) => Promise<{
+    data: { user: User | null };
+    error: AuthError | null;
+  }>;
+  resendSignUpConfirmation: (email: string, options?: { emailRedirectTo?: string }) => Promise<{
+    data: Record<string, never>;
+    error: AuthError | null;
+  }>;
+  getAuthSession: () => Promise<{
+    data: { session: Session | null };
+    error: AuthError | null;
+  }>;
+  setAuthSession: (tokens: SetSessionTokens) => Promise<{
+    data: { session: Session | null; user: User | null };
+    error: AuthError | null;
+  }>;
 }
 const AuthContext = createContext<AuthState | null>(null);
 
@@ -46,10 +100,43 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return () => { active = false; subscription.unsubscribe(); };
   }, [attempt]);
 
-  return <AuthContext.Provider value={{ session, loading, recovery, initializationError,
-    finishRecovery: () => setRecovery(false), retry: () => setAttempt(value => value + 1) }}>
-    {children}
-  </AuthContext.Provider>;
+  const finishRecovery = useCallback(() => setRecovery(false), []);
+  const retry = useCallback(() => setAttempt((value) => value + 1), []);
+
+  const handleSignOut = useCallback(async (options?: SignOutOptions) => {
+    const res = await signOut(options);
+    if (!res.error) {
+      setSession(null);
+      setRecovery(false);
+    }
+    return res;
+  }, []);
+
+  const isConfigured = isAuthConfigured();
+
+  const value = useMemo<AuthState>(
+    () => ({
+      session,
+      loading,
+      recovery,
+      finishRecovery,
+      initializationError,
+      retry,
+      isConfigured,
+      signInWithPassword,
+      signUpWithPassword,
+      signOut: handleSignOut,
+      signInWithOAuth,
+      resetPasswordForEmail,
+      updateUserPassword,
+      resendSignUpConfirmation,
+      getAuthSession,
+      setAuthSession,
+    }),
+    [session, loading, recovery, finishRecovery, initializationError, retry, isConfigured, handleSignOut]
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

@@ -1,3 +1,4 @@
+import { normalizePostgrestError } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 import type { ProfileSearchResult, SearchArea, SearchPlace, SearchRequest, SearchResponse } from './model';
 import type { PlaceSuggestion } from './suggestions-controller';
@@ -93,4 +94,21 @@ export async function searchProfiles(query: string, limit = 20): Promise<Profile
 
   if (error) throw new Error('Could not search profiles. Check your connection and try again.');
   return (data ?? []) as ProfileSearchResult[];
+}
+
+/**
+ * Loads the list of Google Place IDs saved by the user.
+ */
+export async function getUserSavedPlaceIds(userId: string): Promise<string[]> {
+  if (!supabase || !userId) return [];
+  const { data, error } = await supabase
+    .from('saved_places')
+    .select('google_place_id')
+    .eq('user_id', userId);
+  if (error) {
+    const normalized = normalizePostgrestError(error, 'Could not load saved place IDs.');
+    console.warn('[SearchService] getUserSavedPlaceIds error:', normalized.message);
+    return [];
+  }
+  return (data ?? []).map((row) => row.google_place_id);
 }

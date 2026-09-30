@@ -1,4 +1,8 @@
+import { getErrorMessage, isCheckViolation, isUniqueViolation } from '../../lib/errors.ts';
+import { InputLimits } from '../../constants/limits.ts';
+
 export interface ProfileDraft {
+
   username: string;
   display_name: string;
   bio: string;
@@ -37,18 +41,19 @@ export function normalizeProfile(draft: ProfileDraft): ProfileDraft {
 }
 export function validateProfile(draft: ProfileDraft): string | null {
   const value = normalizeProfile(draft);
-  if (!value.display_name || value.display_name.length > 60) return 'Enter your name (up to 60 characters).';
+  if (!value.display_name || value.display_name.length > InputLimits.maxDisplayNameLength) return 'Enter your name (up to 60 characters).';
   if (!/^[a-z0-9_]{3,24}$/.test(value.username)) return 'Choose a username with 3–24 letters, numbers, or underscores.';
-  if (value.bio.length > 240) return 'Keep your bio within 240 characters.';
+  if (value.bio.length > InputLimits.maxBioLength) return 'Keep your bio within 240 characters.';
   return null;
 }
 export function profileError(error: unknown): string {
-  const code = error && typeof error === 'object' && 'code' in error ? error.code : '';
-  if (code === '23505') return 'That username is already taken. Choose another one.';
-  if (code === '23514') return 'Some profile details aren’t valid. Check your entries and try again.';
-  if (error instanceof Error && error.message.startsWith('Your profile changed')) return error.message;
+  if (isUniqueViolation(error)) return 'That username is already taken. Choose another one.';
+  if (isCheckViolation(error)) return 'Some profile details aren’t valid. Check your entries and try again.';
+  const message = getErrorMessage(error, '');
+  if (message.startsWith('Your profile changed')) return message;
   return 'We couldn’t save your profile. Check your connection and try again.';
 }
+
 
 export function formatActivitiesTitle(isOwn: boolean, userName?: string): string {
   if (isOwn) return 'My Past Activities';

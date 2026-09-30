@@ -1,11 +1,23 @@
 import * as Location from 'expo-location';
 
+import { Timeouts } from '@/constants/timing';
+import { normalizePostgrestError } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
+import {
+  parseSwipeResponse,
+  type SwipeChoice,
+  type SwipeMode,
+  type SwipeResponse,
+} from '../../../supabase/functions/_shared/discovery-contract.ts';
 import type { DiscoverLocation, DiscoverMode, RecommendationResponse } from './types';
 
 function client() {
   if (!supabase) throw new Error('Connect the app to Supabase to use recommendations.');
   return supabase;
+}
+
+export function isDiscoveryBackendAvailable(): boolean {
+  return !!supabase;
 }
 
 export async function getRoundedDeviceLocation(): Promise<DiscoverLocation> {
@@ -16,12 +28,12 @@ export async function getRoundedDeviceLocation(): Promise<DiscoverLocation> {
   }
 
   const currentPosition = Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-  const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Location request timed out.')), 12_000));
+  const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Location request timed out.')), Timeouts.deviceLocationMs));
   let result: Location.LocationObject;
   try {
     result = await Promise.race([currentPosition, timeout]);
   } catch {
-    const lastKnown = await Location.getLastKnownPositionAsync({ maxAge: 5 * 60 * 1000, requiredAccuracy: 1000 });
+    const lastKnown = await Location.getLastKnownPositionAsync({ maxAge: Timeouts.locationMaxAgeMs, requiredAccuracy: 1000 });
     if (!lastKnown) throw new Error('Could not find your location. Check your device location settings and try again.');
     result = lastKnown;
   }
@@ -44,7 +56,10 @@ export async function requestRecommendations(
     circleIndex,
     excludedPlaceIds,
   } });
-  if (error) throw error;
+  if (error) {
+    const normalized = normalizePostgrestError(error, 'Could not load recommendations.');
+    throw new Error(normalized.message);
+  }
   if (!data || !Array.isArray(data.recommendations) || typeof data.exhausted !== 'boolean' || typeof data.passedCount !== 'number') {
     throw new Error('The recommendation service returned an invalid response.');
   }
@@ -81,4 +96,43 @@ export async function passPlace(userId: string, placeId: string, mode: DiscoverM
 export async function clearPassedPlaces(userId: string, mode: DiscoverMode) {
   const { error } = await client().from('passed_places').delete().eq('user_id', userId).eq('mode', mode);
   if (error) throw error;
+}
+
+/**
+ * Fetches current user swipe allowance status from the discovery-swipes Edge Function.
+ */
+export async function fetchRemoteSwipeStatus(): Promise<SwipeResponse> {
+  const { data, error } = await client().functions.invoke('discovery-swipes', {
+    body: { action: 'status' },
+  });
+  if (error) {
+    const normalized = normalizePostgrestError(error, 'Could not retrieve swipe status.');
+    throw new Error(normalized.message);
+  }
+  return parseSwipeResponse(data);
+}
+
+/**
+ * Records a user swipe action via the discovery-swipes Edge Function.
+ */
+export async function recordSwipeAction(
+  requestId: string,
+  placeId: string,
+  mode: SwipeMode,
+  choice: SwipeChoice
+): Promise<SwipeResponse> {
+  const { data, error } = await client().functions.invoke('discovery-swipes', {
+    body: {
+      action: 'swipe',
+      requestId,
+      placeId,
+      mode,
+      choice,
+    },
+  });
+  if (error) {
+    const normalized = normalizePostgrestError(error, 'Could not record swipe.');
+    throw new Error(normalized.message);
+  }
+  return parseSwipeResponse(data);
 }

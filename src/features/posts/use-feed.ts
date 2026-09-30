@@ -25,7 +25,11 @@ export function useFeed(scope: FeedScope = 'explore') {
       setPosts([]);
       setCursor(null);
     }
-    hasLoaded.current ? setRefreshing(true) : setLoading(true);
+    if (hasLoaded.current) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
     try {
       const page = await getFeedPage(null, scope);

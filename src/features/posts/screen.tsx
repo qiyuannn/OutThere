@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import {
   ActivityIndicator,
@@ -18,13 +17,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/app-header';
 import { ThemedText } from '@/components/themed-text';
+import { ImageLimits } from '@/constants/limits';
 import { getScoreTier } from '@/features/rankings/comparison';
+import { getErrorMessage } from '@/lib/errors';
+import { pickMultipleImages, ImagePickerError } from '@/lib/image-picker';
 import { useAuth } from '@/providers/auth-provider';
 import { createPost } from './service';
 import type { SelectedPostPhoto } from './types';
 
 const addPhotoIcon = require('../../../assets/images/posts/add-photo-plus.svg');
-const PHOTO_LIMIT = 5;
+const PHOTO_LIMIT = ImageLimits.maxPostPhotos;
 
 type PostParams = {
   placeId?: string;
@@ -51,27 +53,19 @@ export default function PostScreen() {
       Alert.alert('Photo limit reached', `You can add up to ${PHOTO_LIMIT} photos.`);
       return;
     }
-    if (Platform.OS !== 'web') {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
+    try {
+      const selected = await pickMultipleImages({
+        limit: PHOTO_LIMIT,
+        currentCount: photos.length,
+        requestPermission: true,
+      });
+      if (selected.length === 0) return;
+      setPhotos((current) => [...current, ...selected].slice(0, PHOTO_LIMIT));
+    } catch (error) {
+      if (error instanceof ImagePickerError && error.code === 'PERMISSION_DENIED') {
         Alert.alert('Photo access needed', 'Allow photo access to add pictures to your post.');
-        return;
       }
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      selectionLimit: PHOTO_LIMIT - photos.length,
-      base64: true,
-      quality: 0.85,
-    });
-    if (result.canceled) return;
-    const selected = result.assets.flatMap((asset): SelectedPostPhoto[] => asset.base64 ? [{
-      uri: asset.uri,
-      base64: asset.base64,
-      mimeType: asset.mimeType ?? 'image/jpeg',
-    }] : []);
-    setPhotos((current) => [...current, ...selected].slice(0, PHOTO_LIMIT));
   };
 
   const submit = async () => {
@@ -82,10 +76,11 @@ export default function PostScreen() {
       await createPost(userId, { googlePlaceId: params.placeId, rating, body, photos });
       router.replace('/rankings' as Href);
     } catch (error) {
-      Alert.alert('Could not post', error instanceof Error ? error.message : 'Try again.');
+      Alert.alert('Could not post', getErrorMessage(error, 'Try again.'));
       setPosting(false);
     }
   };
+
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.screen}>

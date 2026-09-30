@@ -1,7 +1,8 @@
 import { supabase } from '@/lib/supabase';
+import { resolveSignedUrls } from '@/lib/storage';
+import { StorageBuckets } from '@/constants/storage';
+import { PaginationLimits } from '@/constants/limits';
 import type { AppNotification, NotificationType } from './types';
-
-const SIGNED_URL_LIFETIME_SECONDS = 3600;
 
 function client() {
   if (!supabase) throw new Error('Supabase client is not configured.');
@@ -31,19 +32,10 @@ type NotificationRow = {
   follow_status: string | null;
 };
 
-async function getSignedUrls(bucket: 'avatars' | 'post-photos', paths: string[]): Promise<Map<string, string>> {
-  const uniquePaths = [...new Set(paths.filter(Boolean))];
-  if (uniquePaths.length === 0) return new Map();
-
-  const { data, error } = await client().storage
-    .from(bucket)
-    .createSignedUrls(uniquePaths, SIGNED_URL_LIFETIME_SECONDS);
-
-  if (error || !data) return new Map();
-  return new Map(data.flatMap((item) => item.path && item.signedUrl ? [[item.path, item.signedUrl] as const] : []));
-}
-
-export async function getUserNotifications(limit = 50, offset = 0): Promise<AppNotification[]> {
+export async function getUserNotifications(
+  limit = PaginationLimits.notificationsPageSize,
+  offset = 0
+): Promise<AppNotification[]> {
   const { data, error } = await client().rpc('get_user_notifications', {
     p_limit: limit,
     p_offset: offset,
@@ -53,8 +45,8 @@ export async function getUserNotifications(limit = 50, offset = 0): Promise<AppN
   const rows = (data ?? []) as NotificationRow[];
 
   const [avatarUrls, postPhotoUrls] = await Promise.all([
-    getSignedUrls('avatars', rows.flatMap((r) => r.actor_avatar_path ? [r.actor_avatar_path] : [])),
-    getSignedUrls('post-photos', rows.flatMap((r) => r.post_photo_path ? [r.post_photo_path] : [])),
+    resolveSignedUrls(rows.map((r) => r.actor_avatar_path), StorageBuckets.avatars),
+    resolveSignedUrls(rows.map((r) => r.post_photo_path), StorageBuckets.postPhotos),
   ]);
 
   return rows.map((r) => ({
@@ -65,14 +57,15 @@ export async function getUserNotifications(limit = 50, offset = 0): Promise<AppN
     actorId: r.actor_id,
     actorDisplayName: r.actor_display_name,
     actorUsername: r.actor_username,
-    actorAvatarUrl: r.actor_avatar_path ? avatarUrls.get(r.actor_avatar_path) ?? null : null,
+    actorAvatarUrl: r.actor_avatar_path ? avatarUrls[r.actor_avatar_path] ?? null : null,
     postId: r.post_id != null ? Number(r.post_id) : null,
     placeName: r.place_name,
     placeCategory: r.place_category,
     postRating: r.post_rating != null ? Number(r.post_rating) : null,
     postBody: r.post_body,
-    postPhotoUrl: r.post_photo_path ? postPhotoUrls.get(r.post_photo_path) ?? null : null,
+    postPhotoUrl: r.post_photo_path ? postPhotoUrls[r.post_photo_path] ?? null : null,
     commentId: r.comment_id != null ? Number(r.comment_id) : null,
+
     commentBody: r.comment_body,
     isFollowingActor: r.is_following_actor,
     googlePlaceId: r.google_place_id ?? null,

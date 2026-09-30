@@ -57,7 +57,6 @@ export default function AppTabs() {
           }}
         />
       ))}
-      <Tabs.Screen name="explore/index" options={{ href: null }} />
       <Tabs.Screen name="friends" options={{ href: null }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />
     </Tabs>

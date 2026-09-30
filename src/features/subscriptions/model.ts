@@ -1,4 +1,6 @@
 import type { CustomerInfo, PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
+import { getErrorCode } from '../../lib/errors.ts';
+
 export const PRO_ENTITLEMENT = 'outthere_pro';
 export const PLANS = [
   { id: 'monthly', type: 'MONTHLY', label: 'Monthly', period: 'per month' },
@@ -28,7 +30,8 @@ export interface BillingAdapter {
 export class BillingError extends Error {}
 export function billingError(error: unknown): string | null {
   if (error instanceof BillingError) return error.message;
-  const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+  const code = getErrorCode(error) ?? '';
+
   // RevenueCat PURCHASES_ERROR_CODE values; kept independent of native modules for web and tests.
   switch (code) {
     case '1': return null; // User cancellation is not an error.

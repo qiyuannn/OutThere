@@ -5,11 +5,10 @@ import { Screen, Card, Button } from '@/components/foundation';
 import { AuthField } from '@/features/auth/components/auth-field';
 import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/providers/auth-provider';
-import { supabase } from '@/lib/supabase';
 import { authErrorMessage, validateNewPassword } from '@/lib/auth-validation';
 
 export default function ResetPassword() {
-  const { session, recovery, finishRecovery } = useAuth();
+  const { session, recovery, finishRecovery, updateUserPassword, signOut, isConfigured } = useAuth();
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [message, setMessage] = useState('');
@@ -19,22 +18,22 @@ export default function ResetPassword() {
   if (!session) return <Redirect href="/auth" />;
   if (!recovery) return <Redirect href="/" />;
   async function update() {
-    if (submitting.current || !supabase) return;
+    if (submitting.current || !isConfigured) return;
     const invalid = validateNewPassword(password, confirmation);
     if (invalid) { setMessage(invalid); return; }
     submitting.current = true; setBusy(true); setMessage('');
     try {
-      const { error } = await supabase.auth.updateUser({ password });
+      const { error } = await updateUserPassword(password);
       if (error) throw error;
       setPassword(''); setConfirmation(''); setSuccess(true);
     } catch (error) { setMessage(authErrorMessage(error)); }
     finally { submitting.current = false; setBusy(false); }
   }
   async function cancel() {
-    if (submitting.current || !supabase) return;
+    if (submitting.current || !isConfigured) return;
     submitting.current = true; setBusy(true);
     try {
-      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      const { error } = await signOut({ scope: 'local' });
       if (error) throw error;
       finishRecovery();
     } catch (error) { setMessage(authErrorMessage(error)); }

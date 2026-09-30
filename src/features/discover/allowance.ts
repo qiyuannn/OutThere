@@ -1,12 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '@/lib/supabase';
 import {
-  parseSwipeResponse,
   type SwipeAllowance,
   type SwipeChoice,
   type SwipeMode,
-  type SwipeResponse,
 } from '../../../supabase/functions/_shared/discovery-contract.ts';
+import {
+  fetchRemoteSwipeStatus,
+  isDiscoveryBackendAvailable,
+  passPlace,
+  recordSwipeAction,
+  savePlace,
+} from './service';
 import {
   DAILY_SWIPE_LIMIT,
   SWIPE_WINDOW_DURATION_MS,
@@ -92,18 +96,13 @@ export async function fetchSwipeAllowance(userId: string, isPro = false): Promis
     };
   }
 
-  if (!supabase) {
+  if (!isDiscoveryBackendAvailable()) {
     const cached = await loadCachedAllowance(userId, isPro);
     return cached ?? computeAllowanceState({ isPro: false });
   }
 
   try {
-    const { data, error } = await supabase.functions.invoke('discovery-swipes', {
-      body: { action: 'status' },
-    });
-
-    if (error) throw error;
-    const response = parseSwipeResponse(data);
+    const response = await fetchRemoteSwipeStatus();
     const state: SwipeAllowanceState = {
       unlimited: response.unlimited || isPro,
       limit: response.limit,
@@ -144,32 +143,20 @@ export async function executeSwipe(
         return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
       });
 
-  if (supabase) {
+  if (isDiscoveryBackendAvailable()) {
     try {
-      const { data, error } = await supabase.functions.invoke('discovery-swipes', {
-        body: {
-          action: 'swipe',
-          requestId,
-          placeId,
-          mode,
-          choice,
-        },
-      });
+      const response = await recordSwipeAction(requestId, placeId, mode, choice);
+      const allowance: SwipeAllowanceState = {
+        unlimited: response.unlimited || isPro,
+        limit: response.limit,
+        remaining: isPro ? null : response.remaining,
+        resetsAt: response.resetsAt ? new Date(response.resetsAt) : null,
+        isLimitReached: !isPro && response.remaining !== null && response.remaining <= 0,
+        serverTime: new Date(response.serverTime),
+      };
 
-      if (!error && data) {
-        const response: SwipeResponse = parseSwipeResponse(data);
-        const allowance: SwipeAllowanceState = {
-          unlimited: response.unlimited || isPro,
-          limit: response.limit,
-          remaining: isPro ? null : response.remaining,
-          resetsAt: response.resetsAt ? new Date(response.resetsAt) : null,
-          isLimitReached: !isPro && response.remaining !== null && response.remaining <= 0,
-          serverTime: new Date(response.serverTime),
-        };
-
-        await saveCachedAllowance(userId, response);
-        return { accepted: response.accepted, allowance };
-      }
+      await saveCachedAllowance(userId, response);
+      return { accepted: response.accepted, allowance };
     } catch (err) {
       console.warn('[Discovery:Allowance] Remote swipe failed, falling back to local tracking', err);
     }
@@ -197,27 +184,15 @@ export async function executeSwipe(
 
   await saveCachedAllowance(userId, nextState, nextUsed);
 
-  // Still execute direct save/pass if supabase is connected
-  if (supabase) {
-    try {
-      if (choice === 'pass') {
-        await supabase.from('passed_places').upsert({
-          user_id: userId,
-          google_place_id: placeId,
-          mode,
-          passed_at: new Date().toISOString(),
-        }, { onConflict: 'user_id,google_place_id,mode' });
-      } else {
-        await supabase.from('saved_places').upsert({
-          user_id: userId,
-          google_place_id: placeId,
-          mode,
-          saved_at: new Date().toISOString(),
-        }, { onConflict: 'user_id,google_place_id' });
-      }
-    } catch {
-      // Ignore background upsert error on offline
+  // Still execute direct save/pass if backend is connected
+  try {
+    if (choice === 'pass') {
+      await passPlace(userId, placeId, mode);
+    } else {
+      await savePlace(userId, placeId, mode);
     }
+  } catch {
+    // Ignore background upsert error on offline
   }
 
   return { accepted: true, allowance: nextState };

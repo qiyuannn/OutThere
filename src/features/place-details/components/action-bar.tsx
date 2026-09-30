@@ -1,9 +1,10 @@
 import { Image, type ImageSource } from 'expo-image';
-import { router, type Href } from 'expo-router';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { routes } from '@/lib/routes';
 import type { PlaceDetails } from '../types';
 
 const actionIcons = {
@@ -41,16 +42,15 @@ export function ActionBar({ place, isSaved = false, onToggleSave, userRating, ha
 
   const openPost = () => {
     if (userRating === null || userRating === undefined || hasPosted) return;
-    router.push({
-      pathname: '/rankings/post',
-      params: {
+    router.push(
+      routes.postRating({
         placeId: place.id,
         name: place.name,
         category: place.category ?? '',
         address: place.address ?? '',
         rating: userRating.toFixed(1),
-      },
-    } as unknown as Href);
+      })
+    );
   };
 
   return (
