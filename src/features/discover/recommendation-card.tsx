@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image } from 'expo-image';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
@@ -6,6 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { computeIsOpenNow } from '@/lib/opening-hours';
 import type { Recommendation } from './types';
+import { fetchOutThereRating } from './ratings';
 
 function distanceLabel(meters: number) {
   return meters < 1000 ? `${Math.max(50, Math.round(meters / 50) * 50)} m away` : `${(meters / 1000).toFixed(meters < 10000 ? 1 : 0)} km away`;
@@ -18,14 +19,22 @@ function priceLabel(level: string | null) {
 
 export function RecommendationCard({ place }: { place: Recommendation }) {
   const theme = useTheme(); const [imageFailed, setImageFailed] = useState(false);
+  const [rating, setRating] = useState<{ placeId: string; text: string } | null>(null);
+  useEffect(() => {
+    let active = true;
+    fetchOutThereRating(place.id).then(({ average, count }) => {
+      if (active) setRating({ placeId: place.id, text: average === null
+        ? 'Be the first to rate this place on OutThere.'
+        : `★ ${average.toFixed(1)}/10 on OutThere · ${count.toLocaleString()} ${count === 1 ? 'rating' : 'ratings'}` });
+    }).catch(() => {
+      if (active) setRating({ placeId: place.id, text: 'OutThere ratings are currently unavailable.' });
+    });
+    return () => { active = false; };
+  }, [place.id]);
   const isOpen = place.openNow ?? computeIsOpenNow(place.regularOpeningHours);
   const categoryLine = [place.category, priceLabel(place.priceLevel)].filter(Boolean).join('  ·  ');
   const locationLine = [place.address, distanceLabel(place.distanceMeters)].filter(Boolean).join('  ·  ');
-  const ratingLine = [
-    place.rating ? `★ ${place.rating.toFixed(1)}` : null,
-    isOpen === true ? 'Open now' : isOpen === false ? 'Closed now' : null,
-    place.ratingCount ? `${place.ratingCount.toLocaleString()} ratings` : null,
-  ].filter(Boolean).join('   ·   ');
+  const ratingLine = rating?.placeId === place.id ? rating.text : 'Loading OutThere ratings…';
 
   return <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
     <View style={[styles.imageFrame, { backgroundColor: theme.backgroundSelected }]}>
@@ -47,14 +56,13 @@ export function RecommendationCard({ place }: { place: Recommendation }) {
       </Pressable> : null}
     </View>
     <View style={styles.body}>
-      <ThemedText type="smallBold" themeColor="primary" style={styles.kicker}>PICKED FOR YOU · {place.matchPercent}% MATCH</ThemedText>
+      <ThemedText type="smallBold" themeColor="primary" style={styles.kicker}>PICKED FOR YOU</ThemedText>
       <ThemedText accessibilityRole="header" numberOfLines={1} style={styles.placeName}>{place.name}</ThemedText>
       {categoryLine ? <ThemedText style={styles.category} numberOfLines={1}>{categoryLine}</ThemedText> : null}
       {locationLine ? <ThemedText style={styles.detail} themeColor="textSecondary" numberOfLines={1}>{locationLine}</ThemedText> : null}
-      {ratingLine ? <ThemedText style={styles.detail} themeColor="textSecondary" numberOfLines={1}>{ratingLine}</ThemedText> : null}
-      {place.mapsUrl ? <Pressable accessibilityRole="link" onPress={() => Linking.openURL(place.mapsUrl!)} style={({ pressed }) => [styles.detailsLink, pressed && styles.pressed]}>
-        <ThemedText style={styles.detailsLinkText} themeColor="primary">View place details  ↗</ThemedText>
-      </Pressable> : null}
+      <View style={[styles.ratingSection, { borderTopColor: theme.border }]}>
+        <ThemedText style={styles.ratingText} themeColor="primary">{ratingLine}</ThemedText>
+      </View>
     </View>
   </View>;
 }
@@ -72,7 +80,6 @@ const styles = StyleSheet.create({
   placeName: { fontSize: 26, lineHeight: 32, fontWeight: '800', letterSpacing: -0.5 },
   category: { fontSize: 14, lineHeight: 20, fontWeight: '600' },
   detail: { fontSize: 13, lineHeight: 19, fontWeight: '500' },
-  detailsLink: { alignSelf: 'flex-start' },
-  detailsLinkText: { fontSize: 13, lineHeight: 19, fontWeight: '600' },
-  pressed: { opacity: 0.6 },
+  ratingSection: { marginTop: 5, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
+  ratingText: { fontSize: 13, lineHeight: 19, fontWeight: '600' },
 });

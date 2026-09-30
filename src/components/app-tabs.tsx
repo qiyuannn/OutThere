@@ -58,7 +58,6 @@ export default function AppTabs() {
         />
       ))}
       <Tabs.Screen name="friends" options={{ href: null }} />
-      <Tabs.Screen name="notifications" options={{ href: null }} />
     </Tabs>
   );
 }

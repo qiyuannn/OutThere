@@ -40,27 +40,6 @@ export default function DiscoverScreen() {
         >
           <ThemedText type="smallBold" themeColor="primary">📍 {Math.round(discover.radiusMeters / 1000)} km</ThemedText>
         </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={discover.isUnlimitedSwipes ? 'Unlimited discovery swipes' : `${discover.swipesRemaining ?? discover.swipesLimit} daily swipes remaining`}
-          accessibilityHint="Opens membership details"
-          onPress={() => router.push('/profile/subscription')}
-          style={({ pressed }) => [
-            styles.rangeButton,
-            {
-              backgroundColor: theme.backgroundSelected,
-              borderColor: discover.isSwipeLimitReached ? theme.accent : theme.border,
-              opacity: pressed ? 0.75 : 1,
-            },
-          ]}
-        >
-          <ThemedText
-            type="smallBold"
-            themeColor={discover.isSwipeLimitReached ? 'accent' : 'primary'}
-          >
-            {discover.isUnlimitedSwipes ? '⚡ Pro' : `⚡ ${discover.swipesRemaining ?? discover.swipesLimit}/${discover.swipesLimit}`}
-          </ThemedText>
-        </Pressable>
       </View>
 
       <View style={styles.recommendationArea}>

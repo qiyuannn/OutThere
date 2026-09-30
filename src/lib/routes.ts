@@ -60,7 +60,7 @@ export const routes = {
 
   /** Navigate to bucket list venue item */
   bucketListPlace: (id: string, mode?: string): Href => ({
-    pathname: '/(tabs)/bucket-list/[id]',
+    pathname: '/bucket-list/[id]',
     params: mode ? { id, mode } : { id },
   }),
 

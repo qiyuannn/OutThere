@@ -40,7 +40,7 @@ function Navigation() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="auth" />
       <Stack.Protected guard={!!session}>
-        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(main)" />
         <Stack.Screen name="onboarding" />
       </Stack.Protected>
     </Stack>

@@ -16,7 +16,7 @@ export function PlaceDetailsScreen(props: Partial<PlaceDetailsScreenProps>) {
     } else if (router.canGoBack()) {
       router.back();
     } else {
-      router.navigate('/(tabs)/bucket-list');
+      router.navigate('/bucket-list');
     }
   };
 

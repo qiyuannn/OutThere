@@ -69,7 +69,7 @@ export default function BucketListScreen() {
 
   const openDetails = (place: SavedPlace) => {
     router.push({
-      pathname: '/(tabs)/bucket-list/[id]',
+      pathname: '/bucket-list/[id]',
       params: { id: place.google_place_id, mode: place.mode },
     });
   };
