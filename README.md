@@ -346,6 +346,59 @@ npx supabase functions deploy place-search
 npx supabase functions deploy discovery-swipes
 ```
 
+#### 6. Configure Google OAuth (Optional)
+
+> [!NOTE]
+> **Optional Setup**: Setting up Google OAuth is optional. If you skip this configuration, email and password authentication will still function normally, but **Google Sign-In will not work**.
+
+##### Step 1: Configure OAuth in Google Cloud Console
+1. Open the [Google Cloud Console Credentials page](https://console.cloud.google.com/apis/credentials) in your GCP project.
+2. **Set up the OAuth Consent Screen** (if not done already):
+   - Go to **APIs & Services > OAuth consent screen**.
+   - Choose **External** and click **Create**.
+   - Fill in:
+     - **App name**: `OutThere`
+     - **User support email**: your email
+     - **Developer contact email**: your email
+   - Under **Scopes**, ensure `.../auth/userinfo.email`, `.../auth/userinfo.profile`, and `openid` are selected (default).
+   - Save and finish the wizard (you can keep it in Testing status for local development).
+3. **Create OAuth 2.0 Client ID**:
+   - Go to **APIs & Services > Credentials**.
+   - Click **+ Create Credentials > OAuth client ID**.
+   - **Application type**: Select **Web application** (Supabase acts as the web backend broker for OAuth, even for mobile apps).
+   - **Name**: `OutThere Supabase Auth`
+   - **Authorized JavaScript origins**:
+     ```text
+     https://<your-project-ref>.supabase.co
+     ```
+     *(e.g., `https://zvqkiluzvxcfgsgvwfvj.supabase.co`)*
+   - **Authorized redirect URIs**:
+     ```text
+     https://<your-project-ref>.supabase.co/auth/v1/callback
+     ```
+     *(e.g., `https://zvqkiluzvxcfgsgvwfvj.supabase.co/auth/v1/callback`)*
+   - Click **Create**.
+   - Copy the generated **Client ID** and **Client Secret**.
+
+##### Step 2: Enable Google Provider in Supabase
+1. Open your [Supabase Project Dashboard](https://supabase.com/dashboard).
+2. Go to **Authentication** in the left sidebar → **Providers**.
+3. Locate **Google** in the list and click to expand it.
+4. Toggle **Enable Google provider** to **ON**.
+5. Paste:
+   - **Client ID**: (from Google Cloud)
+   - **Client Secret**: (from Google Cloud)
+6. Click **Save**.
+
+##### Step 3: Add OutThere Deep Link & Redirect URLs in Supabase
+Because OutThere uses Expo WebBrowser for OAuth and redirects back to the mobile app or web client, Supabase needs to allow the redirect URIs:
+1. In Supabase Dashboard, go to **Authentication > URL Configuration**.
+2. Under **Redirect URLs**, click **Add URL** and add:
+   - `outthere://auth/callback` *(required for iOS & Android native deep linking)*
+   - `http://localhost:8081/auth/callback` *(for Expo local web development)*
+   - `http://localhost:3000/auth/callback` *(for web production/preview)*
+3. Click **Save**.
+
 ---
 
 ### Running the App
