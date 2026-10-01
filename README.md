@@ -15,13 +15,13 @@
   - [5. Taste Profile & Analytics](#5-taste-profile--analytics)
   - [6. Universal Search](#6-universal-search)
 - [Monetization & OutThere Pro](#-monetization--outthere-pro)
-- [Tech Stack](#-tech-stack)
-- [Project Architecture](#-project-architecture)
 - [Getting Started](#-getting-started)
   - [Prerequisites](#prerequisites)
-  - [Environment Configuration](#environment-configuration)
-  - [Supabase Backend Setup](#supabase-backend-setup)
+  - [Installation & Setup](#installation--setup)
+  - [Backend & Cloud Configuration](#backend--cloud-configuration)
   - [Running the App](#running-the-app)
+- [Tech Stack](#-tech-stack)
+- [Project Architecture](#-project-architecture)
 - [Testing & Verification](#-testing--verification)
 - [Contributing & Team Workflow](#-contributing--team-workflow)
 
@@ -238,6 +238,136 @@ OutThere incorporates a hybrid monetization strategy combining premium subscript
 
 ---
 
+## 🚀 Getting Started
+
+Follow these steps to set up your local development environment and connect your backend services.
+
+---
+
+### Prerequisites
+
+Ensure you have the following installed and configured before starting:
+
+- **Git**
+- **Node.js**: `v22.13.0` or higher (`node -v`)
+- **npm**: `v10.0.0` or higher (`npm -v`)
+- **[Supabase](https://supabase.com/) Account & Project**:
+  - A Supabase project (free tier works).
+  - Note your **Project URL** and **Publishable/Anon Key** from **Project Settings > API**.
+  - Supabase CLI installed via npm (accessible as `npx supabase`).
+- **[Google Cloud Platform (GCP)](https://console.cloud.google.com/) Project**:
+  - An active GCP project with billing enabled.
+  - Enable the **Places API (New)** in **APIs & Services > Library**.
+  - Generate an API Key under **APIs & Services > Credentials** (restricted to Places API).
+  - *Note: This key is stored securely in Supabase Edge Functions (`GOOGLE_PLACES_API_KEY`) and is never exposed to the client app.*
+- **[RevenueCat](https://www.revenuecat.com/) Account & Project**:
+  - A RevenueCat project configured for subscription management (OutThere Pro entitlement `outthere_pro`).
+  - Use the **Public API Keys** for the mobile client (found under **Project Settings > API Keys**):
+    - For local development: **Public Test Store API key** (`test_...`).
+    - For production builds: **Public App-Specific API keys** (`appl_...` for iOS, `goog_...` for Android).
+  - Generate a **v1 Secret API Key** (`sk_...`) under **Project Settings > API Keys > Secret API keys** (the `discovery-swipes` Supabase Edge Function queries RevenueCat's `/v1/subscribers` endpoint).
+- **Mobile Development Tools** *(optional for native simulator/device builds)*:
+  - **iOS**: macOS with Xcode 15+ and CocoaPods (`npm run ios`).
+  - **Android**: Android Studio with Android SDK & JDK 17 (`npm run android`).
+
+---
+
+### Installation & Setup
+
+#### 1. Clone the repository
+```bash
+git clone https://github.com/qiyuannn/OutThere.git
+cd OutThere
+```
+
+#### 2. Install dependencies
+```bash
+npm ci
+```
+
+#### 3. Configure client environment variables
+Copy the template to create your local environment file:
+```bash
+cp .env.example .env.local
+```
+
+Populate `.env.local` with your Supabase keys and test configuration:
+```dotenv
+# Supabase credentials (find in Supabase Dashboard -> Settings -> API)
+EXPO_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+
+# RevenueCat keys (find in RevenueCat Dashboard -> Project Settings -> API Keys)
+# Use the Public Test Store key (test_...) for local dev, or Public App-Specific keys (appl_... / goog_...) for production
+EXPO_PUBLIC_REVENUECAT_MODE=test
+EXPO_PUBLIC_REVENUECAT_TEST_API_KEY=test_your_revenuecat_key
+EXPO_PUBLIC_REVENUECAT_IOS_API_KEY=
+EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY=
+
+# Google AdMob (optional - defaults to Google test banner IDs if empty)
+EXPO_PUBLIC_ADMOB_BANNER_ID_IOS=
+EXPO_PUBLIC_ADMOB_BANNER_ID_ANDROID=
+```
+
+> **Security Note**: Never commit `.env.local` or include service-role keys, `GOOGLE_PLACES_API_KEY`, or `REVENUECAT_SECRET_API_KEY` in `EXPO_PUBLIC_*` client variables. Sensitive keys are securely held by Supabase Edge Functions.
+
+---
+
+### Backend & Cloud Configuration
+
+#### 4. Provision Supabase Database
+Authenticate with Supabase, initialize local configuration, link to the remote project, and push database schemas, tables, RLS policies, and RPC functions:
+```bash
+# 1. Authenticate the Supabase CLI with your account
+npx supabase login
+
+# 2. Initialize local Supabase configuration
+npx supabase init
+
+# 3. Link to your remote Supabase project (find your Reference ID in Dashboard -> Settings -> General)
+npx supabase link --project-ref <your-project-ref>
+
+# 4. Apply database migrations
+npx supabase db push
+```
+
+#### 5. Configure Cloud Secrets on Supabase
+Store your Google Cloud Places API key and RevenueCat v1 secret API key in your Supabase project's vault so Edge Functions can query venue data and verify Pro subscriber status:
+```bash
+# Set Google Places API key (used by place-recommendations and place-search)
+npx supabase secrets set GOOGLE_PLACES_API_KEY="your-gcp-places-api-key"
+
+# Set RevenueCat v1 Secret API key (used by discovery-swipes for Pro verification via /v1/subscribers)
+npx supabase secrets set REVENUECAT_SECRET_API_KEY="sk_your_revenuecat_secret_key"
+
+# Deploy edge functions
+npx supabase functions deploy place-recommendations
+npx supabase functions deploy place-search
+npx supabase functions deploy discovery-swipes
+```
+
+---
+
+### Running the App
+
+Start the development server with Expo:
+
+```bash
+# Run on web (quickest way to preview UI)
+npm run web
+
+# Run on iOS simulator (requires Xcode)
+npm run ios
+
+# Run on Android emulator (requires Android Studio)
+npm run android
+
+# Run using Expo Dev Client (custom native build)
+npm run dev
+```
+
+---
+
 ## 🛠 Tech Stack
 
 | Layer | Technology | Description |
@@ -293,79 +423,6 @@ OutThere/
 │   ├── functions/              # Edge functions (e.g. place-search with Google Places)
 │   └── migrations/             # Versioned SQL migrations with RLS policies & RPCs
 └── tests/                      # Comprehensive unit and integration test suite
-```
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- **Node.js**: `v22.13.0` or higher
-- **npm**: `v10.0.0` or higher
-- **Expo CLI**: included with `npx expo`
-- **Mobile Development** *(optional for native builds)*:
-  - iOS: macOS with Xcode 15+ and CocoaPods
-  - Android: Android Studio and Android SDK / JDK 17
-
-### Environment Configuration
-
-1. Copy `.env.example` to create `.env.local`:
-
-```sh
-cp .env.example .env.local
-```
-
-2. Populate the required environment variables:
-
-```env
-# Supabase credentials (find in Supabase Dashboard -> Settings -> API)
-EXPO_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
-
-# RevenueCat keys (use Test API Key for local development)
-EXPO_PUBLIC_REVENUECAT_MODE=test
-EXPO_PUBLIC_REVENUECAT_TEST_API_KEY=test_your_revenuecat_key
-EXPO_PUBLIC_REVENUECAT_IOS_API_KEY=appl_your_key
-EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY=goog_your_key
-```
-
-> **Security Note**: Never commit `.env.local` or include service-role keys or `GOOGLE_PLACES_API_KEY` in `EXPO_PUBLIC_*` client variables. Sensitive keys are securely held by Supabase Edge Functions.
-
-### Supabase Backend Setup
-
-Apply the SQL migrations to your Supabase project to provision tables, indexes, RLS policies, and RPC functions:
-
-```sh
-# Using the Supabase CLI
-npx supabase db push
-```
-
-Key database functions configured by the migrations:
-- `send_place_invite`: Dispatches outing invitations to mutual followers.
-- `respond_to_place_invite`: Handles accepting or declining invites and alerts the sender.
-- `get_follow_relationship` & `send_follow_request`: Manages public/private social follow graphs.
-
-### Running the App
-
-1. Install dependencies:
-```sh
-npm ci
-```
-
-2. Start the development server:
-```sh
-# Run on web (quickest way to preview UI)
-npm run web
-
-# Run on iOS simulator (requires Xcode)
-npm run ios
-
-# Run on Android emulator (requires Android Studio)
-npm run android
-
-# Run using Expo Dev Client (custom native build)
-npm run dev
 ```
 
 ---

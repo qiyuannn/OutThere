@@ -88,7 +88,9 @@ export async function cacheFetchedPlaces(admin: SupabaseClientLike, places: Iter
   const rows = [...places].map((p) => cachedPlace(p, fetchedAt)).filter((p): p is CachedPlace => p !== null);
   if (rows.length === 0) return;
   const { error } = await admin.from("places").upsert(rows, { onConflict: "google_place_id" });
-  if (error) throw error;
+  if (error) {
+    console.error("Failed to cache places in database:", error);
+  }
 }
 
 export function filterTierPlaces(
