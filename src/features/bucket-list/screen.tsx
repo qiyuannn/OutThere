@@ -29,7 +29,7 @@ export default function BucketListScreen() {
   const { places, loading, refreshing, error, refresh } = useSavedPlaces();
 
   const [selectedMode, setSelectedMode] = useState<SavedPlace['mode']>('food');
-  const [ratingStatus, setRatingStatus] = useState<RatingStatus>('rated');
+  const [ratingStatus, setRatingStatus] = useState<RatingStatus>('all');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [ratingsMap, setRatingsMap] = useState<Record<string, number>>({});
   const [ratingsLoading, setRatingsLoading] = useState(true);
