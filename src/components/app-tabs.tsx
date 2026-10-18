@@ -11,6 +11,7 @@ const tabs: { name: MainTabName; title: string }[] = [
   { name: 'profile', title: 'Profile' },
 ];
 
+
 export default function AppTabs() {
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(insets.bottom, 14);
