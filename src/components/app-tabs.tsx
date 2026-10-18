@@ -32,7 +32,7 @@ export default function AppTabs() {
           borderTopColor: 'rgba(0, 0, 0, 0.1)',
           borderTopWidth: 0.5,
           elevation: 0,
-          maxWidth: 480,
+          maxWidth: 402,
           width: '100%',
           alignSelf: 'center',
         },

@@ -57,10 +57,10 @@ function WebContainer({
   borderColor: string;
 }) {
   const { width } = useWindowDimensions();
-  const isDesktop = width > 480;
+  const isDesktop = width > 402;
 
   return (
-    <View style={[styles.webOuter, isDesktop && { backgroundColor: '#0D1117' }]}>
+    <View style={[styles.webOuter, isDesktop && styles.webOuterDesktop]}>
       <View
         style={[
           styles.webFrame,
@@ -125,21 +125,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  webOuterDesktop: {
+    backgroundColor: '#0D1117',
+    padding: 16,
+  },
   webFrame: {
     flex: 1,
     width: '100%',
-    maxWidth: 480,
+    maxWidth: 402,
     height: '100%',
     alignSelf: 'center',
   },
   webFrameDesktop: {
+    height: '100%',
+    maxHeight: 874,
+    borderRadius: 48,
     overflow: 'hidden',
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
+    borderWidth: 1,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 30,
   },
 });
 
