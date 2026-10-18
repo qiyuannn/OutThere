@@ -130,6 +130,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 480,
     height: '100%',
+    alignSelf: 'center',
   },
   webFrameDesktop: {
     overflow: 'hidden',

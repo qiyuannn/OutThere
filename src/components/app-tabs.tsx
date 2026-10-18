@@ -32,11 +32,16 @@ export default function AppTabs() {
           borderTopColor: 'rgba(0, 0, 0, 0.1)',
           borderTopWidth: 0.5,
           elevation: 0,
+          maxWidth: 480,
+          width: '100%',
+          alignSelf: 'center',
         },
         tabBarItemStyle: {
           height: 48,
-          maxWidth: 76,
+          flex: 1,
           padding: 0,
+          alignItems: 'center',
+          justifyContent: 'center',
         },
         tabBarIconStyle: {
           width: 24,
