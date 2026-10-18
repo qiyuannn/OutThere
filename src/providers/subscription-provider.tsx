@@ -16,6 +16,7 @@ function useSubscriptionState() {
     isPro: matched && hasPro(state.customerInfo), busy: !matched || state.busy,
     error: matched ? state.error : null, message: matched ? state.message : null,
     unavailable: billingAdapter.unavailable, testStore: billingAdapter.testStore,
+    readOnly: !!billingAdapter.readOnly,
     reportError: (error: string | null) => {
       if (controller.snapshot().userId === userId) controller.reportError(error);
     },

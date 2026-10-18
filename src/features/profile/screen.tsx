@@ -16,7 +16,7 @@ const EMPTY_SUMMARY: ProfileVisitSummary = { averageRating: null, places: [], vi
 export default function ProfileScreen() {
   const { session, signOut, isConfigured } = useAuth();
   const { profile, reload } = useProfile();
-  const { isPro, ready: membershipReady, unavailable: membershipUnavailable } = useSubscription();
+  const { isPro, ready: membershipReady, unavailable: membershipUnavailable, error: membershipError, readOnly: membershipReadOnly } = useSubscription();
   const { updated } = useLocalSearchParams<{ updated?: string }>();
   const [summary, setSummary] = useState<ProfileVisitSummary>(EMPTY_SUMMARY);
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
@@ -159,10 +159,10 @@ export default function ProfileScreen() {
           <View style={styles.membershipCopy}>
             <Text style={styles.membershipTitle}>OutThere Pro</Text>
             <Text style={styles.membershipDescription}>
-              {membershipUnavailable ?? (isPro
-                ? 'Pro is active. Manage your membership and purchases.'
+              {membershipUnavailable ?? membershipError ?? (isPro
+                ? membershipReadOnly ? 'Pro is active. View your membership status.' : 'Pro is active. Manage your membership and purchases.'
                 : membershipReady
-                  ? 'View plans, the paywall, and restore purchases.'
+                  ? membershipReadOnly ? 'View your membership status.' : 'View plans, the paywall, and restore purchases.'
                   : 'Checking your membership status…')}
             </Text>
           </View>

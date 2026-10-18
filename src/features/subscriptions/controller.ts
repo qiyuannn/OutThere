@@ -77,6 +77,7 @@ export class BillingController {
     });
   }
   async purchase(pkg: PurchasesPackage) {
+    if (this.adapter.readOnly) return;
     if (!this.state.ready || hasPro(this.state.customerInfo)) return;
     await this.run(async current => {
       if (!availablePlans(this.state.offering).some(plan => plan.pkg === pkg)) throw new BillingError('Plans changed. Refresh them before purchasing.');
@@ -88,9 +89,11 @@ export class BillingController {
     this.update({ customerInfo, ready: true, message: hasPro(customerInfo) ? (restored ? 'Your OutThere Pro access is restored.' : 'OutThere Pro is active.') : (restored ? 'No active OutThere Pro purchase was found for this account.' : 'The store completed your purchase, but Pro isn’t active yet. Refresh your status before trying another purchase.') });
   }
   async restore() {
+    if (this.adapter.readOnly) return;
     await this.run(async current => { const info = await this.adapter.restore(); if (current()) this.acceptPurchase(info, true); });
   }
   async presentPaywall() {
+    if (this.adapter.readOnly) return;
     // All purchase entry points use the single monthly package, including older callers.
     const plan = availablePlans(this.state.offering)[0];
     if (!plan) {
@@ -100,6 +103,7 @@ export class BillingController {
     await this.purchase(plan.pkg);
   }
   async cancelSubscription() {
+    if (this.adapter.readOnly) return;
     if (!this.state.ready || !hasPro(this.state.customerInfo)) return;
     await this.run(async current => {
       if (this.adapter.testStore) {
@@ -114,6 +118,7 @@ export class BillingController {
     });
   }
   async customerCenter() {
+    if (this.adapter.readOnly) return;
     await this.run(async current => {
       await this.adapter.customerCenter();
       if (!current()) return;

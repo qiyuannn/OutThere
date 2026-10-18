@@ -1,8 +1,10 @@
-import type { BillingAdapter } from './model';
-const unsupported = async (): Promise<never> => { throw new Error('Use the native app for subscriptions.'); };
-// Web/SSR must never import or configure a native purchases module.
-export const billingAdapter: BillingAdapter = {
-  unavailable: 'Subscriptions are available in the iOS and Android apps.', testStore: false,
-  identify: unsupported, customerInfo: unsupported, offerings: unsupported, purchase: unsupported,
-  restore: unsupported, paywall: unsupported, customerCenter: unsupported, manageSubscription: unsupported, listen: () => () => {},
-};
+import { Config } from '@/constants/config';
+import { selectWebBillingKey } from './config';
+import { createWebBillingAdapter } from './web-adapter';
+
+// Load the SDK's browser implementation only after a signed-in client identifies.
+// Server rendering never imports or configures Purchases.
+export const billingAdapter = createWebBillingAdapter(
+  selectWebBillingKey(Config.revenueCat.mode, Config.revenueCat.testApiKey, Config.revenueCat.webApiKey),
+  async () => (await import('react-native-purchases')).default,
+);

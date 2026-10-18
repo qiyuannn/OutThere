@@ -8,3 +8,13 @@ export function selectBillingKey(platform: string, development: boolean, mode: s
   const prefix = platform === 'ios' ? 'appl_' : 'goog_';
   return key?.startsWith(prefix) ? { key, testStore: false, error: null } : { key: '', testStore: false, error: 'Subscriptions aren’t configured for this build.' };
 }
+
+// Web only reads membership status; it never exposes Test Store purchases.
+export function selectWebBillingKey(mode: string | undefined, testKey: string | undefined, webKey: string | undefined) {
+  const testStore = mode === 'test';
+  const key = testStore ? testKey : webKey;
+  const prefix = testStore ? 'test_' : 'rcb_';
+  return key?.startsWith(prefix)
+    ? { key, testStore, error: null }
+    : { key: '', testStore, error: 'Membership status isn’t configured for the web app.' };
+}

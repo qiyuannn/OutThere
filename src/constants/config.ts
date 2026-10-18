@@ -41,6 +41,9 @@ export const Config = {
     get androidApiKey(): string | undefined {
       return process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY;
     },
+    get webApiKey(): string | undefined {
+      return process.env.EXPO_PUBLIC_REVENUECAT_WEB_API_KEY;
+    },
   },
 
   ads: {

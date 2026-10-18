@@ -20,8 +20,10 @@ without cancelling the purchase. After pulling this change into a checkout with
 existing generated native folders, run `npx expo prebuild --no-install` before
 the native rebuild. Expo development builds must be rebuilt after adding them;
 refreshing an old build does not install native modules. Use an actual development
-build for purchase testing, not Expo Go's preview behavior. This implementation
-intentionally leaves web billing unsupported and keeps native modules out of SSR.
+build for purchase testing, not Expo Go's preview behavior. Web supports reading
+membership status through the SDK's browser implementation; purchase, restoration,
+and management remain native-only. The SDK is loaded on the client after sign-in,
+so SSR does not initialize it.
 
 ## 2. Configure public SDK keys
 
@@ -48,6 +50,24 @@ products are separate from App Store/Google Play products; a Test Store key is
 not an Apple sandbox key. Store sandbox/TestFlight testing uses the platform's
 public store key. Never place RevenueCat secret `sk_` keys or Supabase service-role
 keys in Expo public variables.
+
+### Web membership status
+
+Web uses the same signed-in user UUID and `outthere_pro` entitlement as mobile.
+In `test` mode, set `EXPO_PUBLIC_REVENUECAT_TEST_API_KEY` in the web build environment.
+Read-only Test Store status works in deployed web previews too; the native release
+restriction and all web purchase restrictions remain in place.
+In `store` mode, create a RevenueCat Billing app in the **same RevenueCat project**
+and set `EXPO_PUBLIC_REVENUECAT_WEB_API_KEY=rcb_your_public_web_sdk_key`.
+Do not substitute an Apple, Google, or secret API key. Rebuild/redeploy web after
+changing public environment variables.
+
+The web adapter fetches customer info without fetching offerings. Membership shows
+active/expired status, renewal or access end date, and a **Refresh membership status**
+button. Network failures show a retryable error and preserve previously loaded
+access for the same account. Signing out or changing accounts clears old access
+immediately. Purchase, restore, and management actions are hidden on web and
+blocked by the controller as well as the adapter.
 
 ## 3. Products, entitlement, and offering
 

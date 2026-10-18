@@ -25,7 +25,7 @@ export default function SubscriptionScreen() {
   }
   const plan = availablePlans(billing.offering)[0];
   const entitlement = billing.customerInfo?.entitlements.active[PRO_ENTITLEMENT];
-  const disabled = billing.busy || !billing.ready || !!billing.unavailable;
+  const disabled = billing.busy || !billing.ready || !!billing.unavailable || billing.readOnly;
   const price = plan?.pkg.product.priceString;
   const expiration = entitlement?.expirationDate;
   const date = expiration ? formatDisplayDate(expiration) : null;
@@ -37,7 +37,7 @@ export default function SubscriptionScreen() {
     : 'Your Pro access is active';
   const feedback = billing.error ?? billing.message ?? billing.unavailable
     ?? (entitlement?.billingIssueDetectedAt ? 'There’s a billing issue. Manage your subscription to review your payment details.' : null)
-    ?? (billing.ready && !billing.isPro && !plan ? 'The monthly plan is temporarily unavailable. You can still restore purchases.' : null);
+    ?? (billing.ready && !billing.isPro && !plan && !billing.readOnly ? 'The monthly plan is temporarily unavailable. You can still restore purchases.' : null);
   const canCancel = entitlement?.willRenew && !!expiration;
 
   return <SafeAreaView edges={['left', 'right']} style={styles.page}>
@@ -50,8 +50,10 @@ export default function SubscriptionScreen() {
         <Text style={styles.light}>{renewal}</Text>
       </View> : <>
         <View style={styles.heading}>
-          <Text style={styles.title}>Subscribe to <Text style={styles.brand}>OutThere</Text> Pro</Text>
-          <Text style={styles.light}>{price ? `${price}/month` : billing.ready ? 'Monthly membership' : 'Checking your membership…'}</Text>
+          <Text style={styles.title}>{billing.readOnly ? 'Your ' : 'Subscribe to '}<Text style={styles.brand}>OutThere</Text> Pro{billing.readOnly ? ' membership' : ''}</Text>
+          <Text style={styles.light}>{billing.readOnly
+            ? billing.ready ? 'No active Pro membership' : billing.unavailable || billing.error ? 'Membership status unavailable' : 'Checking your membership…'
+            : price ? `${price}/month` : billing.ready ? 'Monthly membership' : 'Checking your membership…'}</Text>
         </View>
         <View style={styles.benefits}>
           <Text style={styles.semibold}>Pro Benefits</Text>
@@ -62,13 +64,14 @@ export default function SubscriptionScreen() {
         </View>
       </>}
       <View style={styles.spacer} />
-      {(billing.testStore || billing.busy || feedback) && <View style={styles.status}>
+      {(billing.readOnly || billing.testStore || billing.busy || feedback) && <View style={styles.status}>
+        {billing.readOnly && <Text style={styles.light}>Purchase, restore, or manage your subscription in the iOS or Android app.</Text>}
         {billing.testStore && <Text style={styles.light}>Test Store · No real charges</Text>}
         {billing.busy && !billing.unavailable && <ActivityIndicator color="#000000" accessibilityLabel="Updating membership" />}
         {!!feedback && <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.light}>{feedback}</Text>}
 
       </View>}
-      {billing.isPro ? <>
+      {billing.readOnly ? null : billing.isPro ? <>
         <Pressable accessibilityRole="button" accessibilityHint="Opens membership management" accessibilityState={{ disabled }} disabled={disabled} onPress={() => { void billing.customerCenter(); }} style={({ pressed }) => [styles.outline, styles.action, (disabled || pressed) && styles.dimmed]}>
           <Text style={styles.light}>Manage Subscription</Text>
         </Pressable>
@@ -84,6 +87,9 @@ export default function SubscriptionScreen() {
           <Text style={styles.light}>Restore Purchases</Text>
         </Pressable>
       </>}
+      <Pressable accessibilityRole="button" disabled={billing.busy || !!billing.unavailable} accessibilityState={{ disabled: billing.busy || !!billing.unavailable }} onPress={() => { void billing.refresh(); }} style={({ pressed }) => [styles.outline, styles.action, (billing.busy || !!billing.unavailable || pressed) && styles.dimmed]}>
+        <Text style={styles.light}>Refresh membership status</Text>
+      </Pressable>
       <Pressable accessibilityRole="button" onPress={() => { void openLink(Config.support.contactUrl, 'Contact Support'); }} style={({ pressed }) => [styles.outline, styles.action, pressed && styles.dimmed]}>
         <Text style={styles.light}>Contact Support</Text>
       </Pressable>

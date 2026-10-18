@@ -16,6 +16,7 @@ export function availablePlans(offering: PurchasesOffering | null) {
 }
 export interface BillingAdapter {
   unavailable: string | null;
+  readOnly?: boolean;
   testStore: boolean;
   identify(userId: string): Promise<void>;
   customerInfo(): Promise<CustomerInfo>;

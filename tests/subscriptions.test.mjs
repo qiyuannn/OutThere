@@ -25,7 +25,7 @@ test('offers only one monthly package even when legacy or duplicate packages are
   assert.equal(availablePlans({availablePackages:[{...pkg,packageType:'LIFETIME'},pkg,{...pkg,identifier:'another_monthly'}]}).length,1);
   assert.equal(availablePlans(null).length,0);
 });
-test('test key is restricted to development, store keys are platform-specific, web stays unsupported', () => {
+test('native Test Store purchases are development-only and native key selection rejects web', () => {
   assert.equal(selectBillingKey('ios',true,'test','test_public').key,'test_public');
   assert.ok(selectBillingKey('ios',false,'test','test_public').error);
   assert.ok(selectBillingKey('android',false,'store',undefined,'appl_key','test_key').error);
