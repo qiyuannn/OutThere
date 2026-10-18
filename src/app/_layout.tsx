@@ -1,6 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, useColorScheme, useWindowDimensions } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/use-theme';
 import { SubscriptionProvider } from '@/providers/subscription-provider';
@@ -44,6 +44,33 @@ function Navigation() {
         <Stack.Screen name="onboarding" />
       </Stack.Protected>
     </Stack>
+  );
+}
+
+function WebContainer({
+  children,
+  backgroundColor,
+  borderColor,
+}: {
+  children: React.ReactNode;
+  backgroundColor: string;
+  borderColor: string;
+}) {
+  const { width } = useWindowDimensions();
+  const isDesktop = width > 480;
+
+  return (
+    <View style={[styles.webOuter, isDesktop && { backgroundColor: '#0D1117' }]}>
+      <View
+        style={[
+          styles.webFrame,
+          { backgroundColor },
+          isDesktop && [styles.webFrameDesktop, { borderColor }],
+        ]}
+      >
+        {children}
+      </View>
+    </View>
   );
 }
 
@@ -91,13 +118,68 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.55,
   },
+  webOuter: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  webFrame: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 480,
+    height: '100%',
+  },
+  webFrameDesktop: {
+    overflow: 'hidden',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+  },
 });
 
 export default function RootLayout() {
   const dark = useColorScheme() === 'dark';
   const colors = useTheme();
   const base = dark ? DarkTheme : DefaultTheme;
-  return <SafeAreaProvider><ThemeProvider value={{ ...base, colors: { ...base.colors, primary: colors.primary, background: colors.background, card: colors.backgroundElement, text: colors.text, border: colors.border } }}>
-    <BackendProvider><AuthProvider><SubscriptionProvider><ProfileProvider><NotificationsProvider><StatusBar style={dark ? 'light' : 'dark'} /><Navigation /></NotificationsProvider></ProfileProvider></SubscriptionProvider></AuthProvider></BackendProvider>
-  </ThemeProvider></SafeAreaProvider>;
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider
+        value={{
+          ...base,
+          colors: {
+            ...base.colors,
+            primary: colors.primary,
+            background: colors.background,
+            card: colors.backgroundElement,
+            text: colors.text,
+            border: colors.border,
+          },
+        }}
+      >
+        <BackendProvider>
+          <AuthProvider>
+            <SubscriptionProvider>
+              <ProfileProvider>
+                <NotificationsProvider>
+                  <StatusBar style={dark ? 'light' : 'dark'} />
+                  {Platform.OS === 'web' ? (
+                    <WebContainer backgroundColor={colors.background} borderColor={colors.border}>
+                      <Navigation />
+                    </WebContainer>
+                  ) : (
+                    <Navigation />
+                  )}
+                </NotificationsProvider>
+              </ProfileProvider>
+            </SubscriptionProvider>
+          </AuthProvider>
+        </BackendProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
+  );
 }
