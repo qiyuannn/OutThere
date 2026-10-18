@@ -127,7 +127,8 @@ const styles = StyleSheet.create({
   },
   webOuterDesktop: {
     backgroundColor: '#0D1117',
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
   webFrame: {
     flex: 1,
@@ -138,7 +139,7 @@ const styles = StyleSheet.create({
   },
   webFrameDesktop: {
     height: '100%',
-    maxHeight: 874,
+    maxHeight: 932,
     borderRadius: 48,
     overflow: 'hidden',
     borderWidth: 1,
