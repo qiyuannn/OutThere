@@ -261,6 +261,8 @@ const styles = StyleSheet.create({
   webFrameDesktop: {
     height: '100%',
     maxHeight: 874,
+    // Reserve the status-bar space that iOS supplies inside its safe area.
+    paddingTop: 54,
     borderRadius: 48,
     overflow: 'hidden',
     borderWidth: 1,
