@@ -48,7 +48,9 @@
     "dev": "expo start --dev-client",
     "build:development:android": "npx eas-cli build --profile development --platform android",
     "build:development:ios": "npx eas-cli build --profile development --platform ios",
-    "test": "node --experimental-strip-types --test tests/*.test.mjs"
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test:coverage": "node --experimental-strip-types --test --experimental-test-coverage tests/*.test.mjs",
+    "test:e2e": "maestro test .maestro/"
   },
   "private": true
 }

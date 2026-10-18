@@ -1,0 +1,29 @@
+appId: com.outthere.app
+---
+# Flow 1: Auth and Welcome Screen
+# Tests the initial onboarding entry points and form state toggling
+
+- launchApp:
+    clearState: true
+
+# Verify welcome screen branding and action buttons
+- assertVisible: "Get started with Email"
+- assertVisible: "Get started with Google"
+
+# Navigate into Email Sign In
+- tapOn: "Get started with Email"
+
+# Verify email form fields and mode
+- assertVisible: "Sign in with Email"
+- assertVisible: "Sign In"
+- assertVisible: "Don’t have an account ? Sign Up here."
+
+# Toggle to Sign Up mode
+- tapOn: "Don’t have an account ? Sign Up here."
+- assertVisible: "Sign up with Email"
+- assertVisible: "Create Account"
+- assertVisible: "Already have an account? Sign In here."
+
+# Toggle back to Sign In mode
+- tapOn: "Already have an account? Sign In here."
+- assertVisible: "Sign in with Email"

@@ -1,0 +1,36 @@
+appId: com.outthere.app
+---
+# Flow 2: Search & Filter Flow
+# Tests the search bar, filter bottom sheet, and query input
+
+- launchApp
+
+# Tap on Search tab in bottom navigation
+- tapOn:
+    text: "Search"
+    optional: true
+
+# Verify search input is present
+- assertVisible: "Where To Go?"
+
+# Open filters sheet
+- tapOn:
+    label: "Search filters.*"
+
+# Verify filter sheet controls
+- assertVisible: "Looking for"
+- assertVisible: "Food"
+- assertVisible: "Activities"
+- assertVisible: "Apply filters"
+
+# Select 'Food' filter and apply
+- tapOn: "Food"
+- tapOn: "Apply filters"
+
+# Type into the search input
+- tapOn:
+    label: "Search places, dishes or cuisines"
+- inputText: "Coffee"
+
+# Confirm input was populated
+- assertVisible: "Coffee"

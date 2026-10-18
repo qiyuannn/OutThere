@@ -1,0 +1,34 @@
+appId: com.outthere.app
+---
+# Flow 3: Membership & Paywall Flow
+# Tests navigation into the Pro subscription paywall and status checks
+
+- launchApp
+
+# Tap on Profile tab in bottom navigation
+- tapOn:
+    text: "Profile"
+    optional: true
+
+# Look for OutThere Pro membership entry point
+- assertVisible: "OutThere Pro"
+- tapOn: "OutThere Pro"
+
+# Verify Membership header and Pro benefits
+- assertVisible: "Membership"
+- assertVisible: "Pro Benefits"
+- assertVisible: "1. Ad-Free"
+- assertVisible: "2. Unlimited Discovery swipes"
+
+# Verify membership action buttons
+- assertVisible: "Restore Purchases"
+- assertVisible: "Refresh membership status"
+- assertVisible: "Contact Support"
+- assertVisible: "Terms of Use"
+- assertVisible: "Privacy Policy"
+
+# Tap Refresh membership to verify action triggers without crash
+- tapOn: "Refresh membership status"
+
+# Navigate back safely
+- back
