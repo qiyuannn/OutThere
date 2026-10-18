@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/app-header';
@@ -21,13 +21,12 @@ export default function StatisticsScreen() {
   const targetUserId = paramUserId || currentUserId;
   const isOwn = !paramUserId || paramUserId === currentUserId;
 
-  const { width } = useWindowDimensions();
+  const [availableChartSize, setAvailableChartSize] = useState(0);
   const [mode, setMode] = useState<ProfileMode>('activities');
   const [statistics, setStatistics] = useState<DistributionStatistics>(EMPTY_STATISTICS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const availableChartSize = Math.min(width - 20, 700);
   const chartSize = mode === 'food' ? availableChartSize * 0.84 : availableChartSize;
 
   useFocusEffect(useCallback(() => {
@@ -80,9 +79,12 @@ export default function StatisticsScreen() {
           ))}
         </View>
 
-        <View style={[styles.chartArea, { height: chartSize * 0.95 + 8 }]}>
-          {loading ? <ActivityIndicator color="#000000" /> : (
-            <RadarChart items={chartItems} size={chartSize} showLegend={false} showPoints={false}
+        <View
+          onLayout={({ nativeEvent }) => setAvailableChartSize(Math.min(nativeEvent.layout.width, 700))}
+          style={[styles.chartArea, { height: chartSize * 0.95 + 8 }]}
+        >
+          {loading || availableChartSize === 0 ? <ActivityIndicator color="#000000" /> : (
+            <RadarChart items={chartItems} size={chartSize} width={availableChartSize} showLegend={false} showPoints={false}
               accentColor="#3157D5" backgroundColor="#FFFFFF" gridColor="#B8B8B8" labelColor="#000000" />
           )}
         </View>

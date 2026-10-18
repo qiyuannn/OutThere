@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
-import Svg, { Circle, Line, Polygon, Text as SvgText } from 'react-native-svg';
+import { Platform, StyleSheet, View } from 'react-native';
+import Svg, { Circle, Line, Polygon, Text as SvgText, TSpan } from 'react-native-svg';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -22,19 +22,20 @@ interface RadarChartProps {
   showLegend?: boolean;
   showPoints?: boolean;
   size?: number;
+  width?: number;
 }
 
 const SHORT_LABELS: Record<string, string> = {
   // Food
   cafes_bakeries_sweets: 'Cafes & Sweets',
   east_southeast_asian: 'East Asian',
-  western_european_mediterranean: 'Western & Med',
-  latin_south_american_bbq: 'Latin & BBQ',
+  western_european_mediterranean: 'Western &\nMed',
+  latin_south_american_bbq: 'Latin &\nBBQ',
   south_asian_middle_eastern_african: 'South Asian',
   quick_bites_fast_food: 'Quick Bites',
   bars_pubs_breweries: 'Bars & Pubs',
-  steak_seafood_specialty: 'Steak & Seafood',
-  healthy_vegan_fusion: 'Healthy & Vegan',
+  steak_seafood_specialty: 'Steak &\nSeafood',
+  healthy_vegan_fusion: 'Healthy &\nVegan',
   casual_fine_dining: 'Fine Dining',
   // Activities
   nature_parks_outdoors: 'Nature',
@@ -55,6 +56,7 @@ export function RadarChart({
   showLegend = true,
   showPoints = true,
   size = 320,
+  width = size,
 }: RadarChartProps) {
   const theme = useTheme();
   const accent = accentColor ?? theme.primary;
@@ -66,11 +68,11 @@ export function RadarChart({
     const count = items.length;
     if (count < 3) return null;
 
-    const width = size;
     const height = size * 0.95;
     const cx = width / 2;
     const cy = height / 2;
-    const radius = Math.min(cx, cy) * 0.60;
+    // Keep the plot size independent of the wider canvas reserved for labels.
+    const radius = Math.min(size / 2, cy) * 0.60;
     const labelRadius = radius + 24;
 
     const angles = items.map((_, i) => -Math.PI / 2 + (i * 2 * Math.PI) / count);
@@ -126,7 +128,7 @@ export function RadarChart({
 
       return {
         key: item.key,
-        text: short,
+        lines: short.split('\n'),
         x: lx,
         y: ly + 4,
         textAnchor,
@@ -145,7 +147,7 @@ export function RadarChart({
       dataPolygonPoints,
       labels,
     };
-  }, [items, size]);
+  }, [items, size, width]);
 
   if (!chartData) return null;
 
@@ -216,10 +218,15 @@ export function RadarChart({
             y={lbl.y}
             textAnchor={lbl.textAnchor}
             fontSize="10.5"
+            fontFamily={Platform.select({ web: 'system-ui, sans-serif' })}
             fontWeight="600"
             fill={labels}
           >
-            {lbl.text}
+            {lbl.lines.map((line, index) => (
+              <TSpan key={index} x={lbl.x} dy={index === 0 ? -(lbl.lines.length - 1) * 6 : 12}>
+                {line}
+              </TSpan>
+            ))}
           </SvgText>
         ))}
       </Svg>
