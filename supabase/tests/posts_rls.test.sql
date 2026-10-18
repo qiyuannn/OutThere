@@ -50,8 +50,8 @@ select results_eq(
 );
 
 select ok(
-  has_function_privilege('authenticated', 'public.get_feed_posts(timestamptz,bigint,integer,boolean)', 'execute')
-  and not has_function_privilege('anon', 'public.get_feed_posts(timestamptz,bigint,integer,boolean)', 'execute'),
+  has_function_privilege('authenticated', 'public.get_feed_posts(timestamptz,bigint,integer,boolean,uuid,text)', 'execute')
+  and not has_function_privilege('anon', 'public.get_feed_posts(timestamptz,bigint,integer,boolean,uuid,text)', 'execute'),
   'only signed-in users can call the feed function'
 );
 
