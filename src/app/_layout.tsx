@@ -47,6 +47,46 @@ function Navigation() {
   );
 }
 
+function WebSidebar() {
+  return (
+    <View style={styles.webSidebar}>
+      <View style={styles.webSidebarHeader}>
+        <Text style={styles.webSidebarTitle}>OutThere 🧭</Text>
+        <Text style={styles.webSidebarSubtitle}>Web Preview & Testing</Text>
+      </View>
+
+      <View style={styles.webSidebarCard}>
+        <Text style={styles.webSidebarCardTitle}>🔑 Demo Account Login</Text>
+
+        <View style={styles.webCredField}>
+          <Text style={styles.webCredLabel}>Email</Text>
+          <Text selectable style={styles.webCredValue}>test@test.com</Text>
+        </View>
+
+        <View style={styles.webCredField}>
+          <Text style={styles.webCredLabel}>Password</Text>
+          <Text selectable style={styles.webCredValue}>12345678</Text>
+        </View>
+
+        <View style={styles.webDivider} />
+
+        <Text style={styles.webSidebarTip}>
+          • Select and copy the credentials above to log in.
+        </Text>
+        <Text style={styles.webSidebarTip}>
+          • Or create a fresh account using the Sign Up tab.
+        </Text>
+      </View>
+
+      <View style={styles.webSidebarFooter}>
+        <Text style={styles.webFooterText}>
+          📱 Pro Tip: For the authentic mobile experience with haptics & gestures, open this link directly on your phone.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 function WebContainer({
   children,
   backgroundColor,
@@ -58,9 +98,11 @@ function WebContainer({
 }) {
   const { width } = useWindowDimensions();
   const isDesktop = width > 402;
+  const showSidebar = width > 880;
 
   return (
-    <View style={[styles.webOuter, isDesktop && styles.webOuterDesktop]}>
+    <View style={[styles.webOuter, isDesktop && styles.webOuterDesktop, showSidebar && styles.webOuterRow]}>
+      {showSidebar && <WebSidebar />}
       <View
         style={[
           styles.webFrame,
@@ -124,6 +166,86 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  webOuterRow: {
+    flexDirection: 'row',
+    gap: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  webSidebar: {
+    width: 320,
+    gap: 16,
+  },
+  webSidebarHeader: {
+    gap: 4,
+  },
+  webSidebarTitle: {
+    color: '#FFFFFF',
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  webSidebarSubtitle: {
+    color: '#8B949E',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  webSidebarCard: {
+    backgroundColor: '#161B22',
+    borderWidth: 1,
+    borderColor: '#30363D',
+    borderRadius: 16,
+    padding: 18,
+    gap: 12,
+  },
+  webSidebarCardTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  webCredField: {
+    backgroundColor: '#0D1117',
+    borderWidth: 1,
+    borderColor: '#30363D',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 2,
+  },
+  webCredLabel: {
+    color: '#8B949E',
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  webCredValue: {
+    color: '#58A6FF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  webDivider: {
+    height: 1,
+    backgroundColor: '#30363D',
+    marginVertical: 2,
+  },
+  webSidebarTip: {
+    color: '#8B949E',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  webSidebarFooter: {
+    backgroundColor: 'rgba(56, 139, 253, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 139, 253, 0.25)',
+    borderRadius: 12,
+    padding: 14,
+  },
+  webFooterText: {
+    color: '#79C0FF',
+    fontSize: 12,
+    lineHeight: 17,
   },
   webOuterDesktop: {
     backgroundColor: '#0D1117',
