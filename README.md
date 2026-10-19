@@ -5,8 +5,19 @@
 
 ---
 
+## 🎬 Live Demo & Deployment
+
+- **Video Demo**: [https://youtu.be/kYmlBZJYjxc](https://youtu.be/kYmlBZJYjxc)
+- **Web Deployment**: [https://outthere-silk.vercel.app](https://outthere-silk.vercel.app)
+- **Test Account Credentials**:
+  - **Email**: `test@test.com`
+  - **Password**: `12345678`
+
+---
+
 ## 🌟 Table of Contents
 
+- [Live Demo & Deployment](#-live-demo--deployment)
 - [Core Features](#-core-features)
   - [1. Discovery](#1-discovery)
   - [2. Rankings & Showdown Engine](#2-rankings--showdown-engine)
@@ -23,6 +34,7 @@
 - [Tech Stack](#-tech-stack)
 - [Project Architecture](#-project-architecture)
 - [Testing & Verification](#-testing--verification)
+- [CI/CD Pipeline](#-cicd-pipeline)
 - [Contributing & Team Workflow](#-contributing--team-workflow)
 
 ---
@@ -441,6 +453,8 @@ npm run dev
 
 ```text
 OutThere/
+├── .github/workflows/          # GitHub Actions CI/CD workflows (ci.yaml, deploy_backend.yaml)
+├── .maestro/                   # Maestro mobile end-to-end smoke test flows
 ├── assets/                     # App icons, splash screens, and static images
 ├── docs/                       # Architecture documentation (place-search, revenuecat)
 ├── src/
@@ -474,7 +488,8 @@ OutThere/
 │   └── providers/              # Context providers (Auth, Profile, Subscription, Notifications)
 ├── supabase/
 │   ├── functions/              # Edge functions (e.g. place-search with Google Places)
-│   └── migrations/             # Versioned SQL migrations with RLS policies & RPCs
+│   ├── migrations/             # Versioned SQL migrations with RLS policies & RPCs
+│   └── tests/                  # Database schema & RLS test suites (saved_places_rls.test.sql)
 └── tests/                      # Comprehensive unit and integration test suite
 ```
 
@@ -482,14 +497,21 @@ OutThere/
 
 ## 🧪 Testing & Verification
 
-OutThere maintains a comprehensive, fast test suite covering ranking algorithms, queue sampling, search debounce, auth validation, and notifications.
+OutThere maintains a comprehensive test suite covering ranking algorithms, queue sampling, search debounce, auth validation, database RLS, and end-to-end mobile smoke flows.
 
-Run the test suite:
+### 1. Unit & Integration Tests
+Run the fast native Node.js test runner suite (`node --experimental-strip-types`):
 ```sh
 npm test
 ```
 
-Perform type checking and linting:
+Generate test execution coverage:
+```sh
+npm run test:coverage
+```
+
+### 2. Static Analysis & Build Verification
+Validate strict TypeScript types, ESLint rules, and web export bundles:
 ```sh
 # TypeScript validation
 npm run typecheck
@@ -500,6 +522,107 @@ npm run lint
 # Export web build check
 npx expo export --platform web
 ```
+
+### 3. Database Schema & RLS Tests
+Validate Supabase Postgres Row Level Security (RLS) policies and database schemas locally:
+```sh
+# Start local Supabase container (requires Docker)
+supabase start
+
+# Run pgTAP / SQL tests
+supabase test db
+```
+
+### 4. End-to-End (E2E) Smoke Tests (Maestro)
+Automated UI smoke flows powered by [Maestro](https://maestro.mobile.dev/) (`.maestro/`) validate critical user journeys on iOS simulator or Android emulator:
+- `01-auth-flow.yaml`: Welcome screen entry points, sign-in, and sign-up toggles.
+- `02-search-flow.yaml`: Search navigation, bottom sheet filter interactions, and query inputs.
+- `03-membership-paywall-flow.yaml`: Profile navigation, OutThere Pro paywall presentation, and plan inspection.
+
+```sh
+# Run all Maestro E2E flows
+npm run test:e2e
+
+# Or run an individual flow
+maestro test .maestro/01-auth-flow.yaml
+```
+
+---
+
+## 🔄 CI/CD Pipeline
+
+OutThere implements an automated CI/CD pipeline leveraging **GitHub Actions** and **Vercel** for continuous validation, test automation, database migrations, serverless function deployments, and production web hosting.
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Push / Pull Request (main)                      │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+        ┌───────────────────────────┴───────────────────────────┐
+        ▼                                                       ▼
+┌───────────────────────────────┐               ┌───────────────────────────────┐
+│     CI: Code & Build Check    │               │    CI: Ephemeral Supabase     │
+│  • Typecheck (tsc --noEmit)   │               │  • Spin up local Supabase DB  │
+│  • Lint (eslint src)          │               │  • Run schema & RLS test      │
+│  • Node Test Runner (npm test)│               │    (supabase test db)         │
+│  • Web Export Build Test      │               │  • Clean shutdown             │
+└───────────────┬───────────────┘               └───────────────┬───────────────┘
+                │                                               │
+                └───────────────────────┬───────────────────────┘
+                                        │ (Merge / Push to main)
+        ┌───────────────────────────────┴───────────────────────────────┐
+        ▼                                                               ▼
+┌───────────────────────────────┐               ┌───────────────────────────────┐
+│       Frontend CD (Vercel)    │               │  Backend CD (Supabase Deploy) │
+│  • Triggered on push to main  │               │  • Triggered on supabase/**   │
+│  • npx expo export -p web     │               │  • Push migrations (db push)  │
+│  • Auto-deploy to Vercel      │               │  • Deploy Edge Functions      │
+└───────────────────────────────┘               └───────────────────────────────┘
+```
+
+### 1. Continuous Integration (`ci.yaml`)
+Triggered automatically on **Pull Requests** targeting `main`, **Pushes** to `main`, or manual **Workflow Dispatch**. Runs in parallel across two jobs on `ubuntu-24.04`:
+
+- **Lint, Type, Tests, & Web Build (`validate-and-test`)**:
+  - Sets up Node.js 24 with npm package caching.
+  - Installs dependencies cleanly using `npm ci`.
+  - Runs static type analysis: `npm run typecheck` (`tsc --noEmit`).
+  - Lints codebase: `npx eslint src`.
+  - Executes unit and integration test suite: `npm test`.
+  - Verifies production web export: `npx expo export -p web` (with dummy Supabase CI secrets to prevent bundle regression).
+- **Supabase RLS and DB Test (`database-rls`)**:
+  - Sets up the Supabase CLI (`supabase/setup-cli@v3`).
+  - Boots an ephemeral local Supabase instance in Docker via `supabase start`.
+  - Executes schema and Row Level Security test suites: `supabase test db` (running `supabase/tests/saved_places_rls.test.sql`).
+  - Ensures clean teardown with `supabase stop --no-backup` in an `always()` step.
+
+### 2. Backend Continuous Deployment (`deploy_backend.yaml`)
+Triggered on **Pushes to `main`** when changes are made within the `supabase/**` path, or via manual **Workflow Dispatch**:
+
+- **Secret Validation**: Validates the presence of required deployment secrets (`SUPABASE_PROJECT_ID`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`) before execution.
+- **Link Project**: Links to the remote Supabase project using `supabase link --project-ref "$SUPABASE_PROJECT_ID"`.
+- **Apply Database Migrations**: Runs `supabase db push` to idempotently apply any new versioned SQL migrations.
+- **Deploy Edge Functions**: Deploys updated serverless functions (`place-recommendations`, `place-search`, and `discovery-swipes`) using `supabase functions deploy`.
+
+### 3. Frontend Web Continuous Deployment (Vercel)
+Configured via `vercel.json` linked to the repository's `main` branch:
+
+- **Build Command**: `npx expo export -p web`
+- **Output Directory**: `dist`
+- **Routing**: Single Page Application (SPA) routing with rewrites to `/index.html` and clean URLs enabled.
+- **Production URL**: [https://outthere-silk.vercel.app](https://outthere-silk.vercel.app)
+
+### 4. Required Secrets Configuration
+
+To run the automated CI/CD pipeline, configure the following secrets in **GitHub Repository > Settings > Secrets and variables > Actions**:
+
+| Secret Name | Description | Used In |
+| :--- | :--- | :--- |
+| `EXPO_PUBLIC_SUPABASE_URL` | Supabase project API URL for web export verification | `ci.yaml` |
+| `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon/publishable API key for web export verification | `ci.yaml` |
+| `SUPABASE_PROJECT_ID` | Remote Supabase project reference ID | `deploy_backend.yaml` |
+| `SUPABASE_ACCESS_TOKEN` | Supabase CLI personal access token | `deploy_backend.yaml` |
+| `SUPABASE_DB_PASSWORD` | Remote Postgres database connection password | `deploy_backend.yaml` |
 
 ---
 
